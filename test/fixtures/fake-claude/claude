@@ -1,0 +1,117 @@
+#!/usr/bin/env node
+// A stand-in for the Claude CLI, for tests. It costs nothing and never touches the network.
+// FAKE_CLAUDE_MODE: ok (default), fail-after-1, hang, slow, invalid-model, auth-error, invalid-output, usage-limit
+const fs = require("node:fs");
+
+const args = process.argv.slice(2);
+const mode = process.env.FAKE_CLAUDE_MODE ?? "ok";
+const record = process.env.FAKE_CLAUDE_RECORD;
+
+if (args[0] === "--version") {
+  console.log(process.env.FAKE_CLAUDE_VERSION ?? "2.1.319 (Claude Code)");
+  process.exit(0);
+}
+if (args[0] === "auth") {
+  const loggedIn = process.env.FAKE_CLAUDE_LOGGED_OUT === undefined;
+  const authMethod = process.env.ANTHROPIC_API_KEY ? "api_key" : loggedIn ? "claude.ai" : "none";
+  console.log(JSON.stringify({ loggedIn, authMethod }));
+  process.exit(loggedIn ? 0 : 1);
+}
+
+const prompt = fs.readFileSync(0, "utf8");
+const callNumber = () => {
+  if (!record) return 1;
+  return fs.existsSync(record) ? fs.readFileSync(record, "utf8").split("\n").filter(Boolean).length : 0;
+};
+const count = callNumber();
+if (record) {
+  const env = Object.fromEntries(
+    ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_MAX_RETRIES", "CLAUDE_CODE_MAX_OUTPUT_TOKENS", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"].map(
+      (key) => [key, process.env[key] ?? null],
+    ),
+  );
+  const cwdEntries = fs.readdirSync(process.cwd());
+  fs.appendFileSync(record, `${JSON.stringify({ args, cwd: process.cwd(), cwdEntries, env, prompt })}\n`);
+}
+
+const emit = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
+const fail = (fields, code = 1) => {
+  emit({ type: "result", is_error: true, subtype: "success", structured_output: null, ...fields });
+  process.exit(code);
+};
+
+if (mode === "retry-events") {
+  emit({ type: "system", subtype: "api_retry", attempt: 1, max_retries: 2, retry_delay_ms: Number(process.env.FAKE_CLAUDE_DELAY_MS ?? 0), error: "rate_limit" });
+}
+if (mode === "hang") {
+  setInterval(() => {}, 1000);
+  return;
+}
+if (mode === "invalid-model") fail({ api_error_status: 404, result: "There's an issue with the selected model." });
+if (mode === "auth-error") fail({ api_error_status: 401, result: "Invalid credentials" });
+if (mode === "usage-limit") fail({ api_error_status: 429, result: "You've hit your session limit. Resets at 5pm." });
+if (mode === "fail-after-1" && count >= 1) fail({ api_error_status: 500, result: "Server error" });
+if (mode === "invalid-output") {
+  emit({ type: "result", is_error: false, subtype: "success", structured_output: { nonsense: true }, total_cost_usd: 0.01, modelUsage: { "claude-sonnet-5-5": {} } });
+  process.exit(0);
+}
+
+const schema = JSON.parse(args[args.indexOf("--json-schema") + 1]);
+const keys = Object.keys(schema.properties);
+const fileFromPrompt = () => {
+  const inContent = /<file path="([^"]+)"/.exec(prompt);
+  if (inContent) return inContent[1];
+  const inList = /^- (.+)$/m.exec(prompt.slice(prompt.indexOf("Files analysed")));
+  return inList ? inList[1] : "unknown";
+};
+const evidence = [`${fileFromPrompt()}:1`];
+
+let data;
+if (keys.includes("capabilities")) {
+  data = {
+    purpose: "Does a thing.",
+    capabilities: [{ name: "thing", description: "Does the thing", evidence }],
+    dataAndInterfaces: [],
+    businessRules: [],
+    technologies: [],
+    conventions: [],
+    commands: [],
+  };
+} else if (keys.includes("overview")) {
+  data = {
+    overview: { purpose: "A sample project.", users: ["Developers"], scope: ["Things"], nonGoals: [], glossary: [] },
+    stack: [{ category: "Language", name: "JavaScript", version: "unknown", evidence }],
+    architecture: { parts: [], dataFlow: [], externalSystems: [], problems: [] },
+    guidelines: [{ section: "Naming", guidance: "Use camelCase.", label: "observed", evidence }],
+    specs: [{ name: "core-feature", area: "CORE", goal: "Do the thing.", modules: [] }],
+    openQuestions: [],
+  };
+} else {
+  data = {
+    goal: "Do the thing.",
+    requirements: [{ id: "FR-CORE-001", statement: "It must do the thing.", status: "code-only", evidence }],
+    edgeCases: [],
+    nonGoals: [],
+    testSetup: [],
+    acceptanceCriteria: [{ id: "VAL-CORE-001", covers: ["FR-CORE-001"], userNeed: "I need the thing", acceptedWhen: "The thing happens" }],
+    testCases: [{ id: "TC-CORE-001", covers: ["FR-CORE-001"], level: "unit", given: "A setup", when: "It runs", then: "The thing happens" }],
+    openQuestions: [],
+  };
+}
+
+const finish = () => {
+  emit({ type: "system", subtype: "init" });
+  emit({
+    type: "result",
+    is_error: false,
+    subtype: "success",
+    stop_reason: "tool_use",
+    structured_output: data,
+    total_cost_usd: 0.01,
+    modelUsage: { "claude-sonnet-5-5": {} },
+    usage: { input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 },
+  });
+  process.exit(0);
+};
+if (mode === "slow") setTimeout(finish, Number(process.env.FAKE_CLAUDE_DELAY_MS ?? 3000));
+else finish();

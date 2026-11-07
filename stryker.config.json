@@ -1,0 +1,6 @@
+{
+  "testRunner": "vitest",
+  "mutate": ["src/core/**/*.ts", "!src/core/**/*.test.ts", "!src/core/guidelines-baseline.ts"],
+  "reporters": ["clear-text", "progress"],
+  "thresholds": { "high": 85, "low": 70, "break": null }
+}

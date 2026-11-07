@@ -1,0 +1,40 @@
+/** Names of the files and folders cclinic reads and writes. */
+
+export const TOOL_FOLDER_NAME = ".cclinic";
+export const DOCUMENTS_FOLDER_NAME = "sdd";
+export const CACHE_FOLDER_NAME = "cache";
+export const FAILED_FOLDER_NAME = "failed";
+export const LOCK_FILE_NAME = ".lock";
+export const TEMP_FOLDER_SUFFIX = ".cclinic-tmp-";
+export const BACKUP_FOLDER_SUFFIX = ".cclinic-old-";
+
+export const GITIGNORE_FILE = ".gitignore";
+export const CCLINIC_IGNORE_FILE = ".cclinicignore";
+export const AGENTS_FILE = "AGENTS.md";
+export const SKILL_FILE = "SKILL.md";
+export const SKILL_FOLDERS = [".agents/skills", ".claude/skills"] as const;
+
+export const USER_CONFIG_BASE_FOLDER = ".config";
+export const USER_CONFIG_FOLDER = "cclinic";
+export const USER_CONFIG_FILE = "config.json";
+
+/** The generated project documents. */
+export const DOCUMENT_FILES = {
+  README: "README.md",
+  OVERVIEW: "overview.md",
+  STACK: "stack.md",
+  ARCHITECTURE: "architecture.md",
+  GUIDELINES: "developer-guidelines.md",
+  OPEN_QUESTIONS: "open-questions.md",
+  SCAN_REPORT: "scan-report.md",
+  MANIFEST: "manifest.json",
+} as const;
+
+/** The three files in every spec folder. */
+export const SPEC_FILES = {
+  SPEC: "spec.md",
+  VALIDATION: "validation.md",
+  VERIFICATION: "verification.md",
+} as const;
+
+export const SPECS_FOLDER_NAME = "specs";
