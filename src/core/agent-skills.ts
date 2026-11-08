@@ -5,7 +5,7 @@
  */
 
 import { DEVOPS_SKILL_NAME, ENVIRONMENT_FILE, ENVIRONMENT_FOLDER } from "./constants/environment.js";
-import { AGENTS_FILE } from "./constants/paths.js";
+import { AGENTS_FILE, REVIEW_DOC_SKILL_NAME, REVIEWS_FOLDER } from "./constants/paths.js";
 export interface AgentSkill {
   readonly name: string;
   readonly description: string;
@@ -53,6 +53,13 @@ Each spec is a folder, \`{{DOCS}}/specs/<kebab-case-name>/\`, with exactly three
 - **Evidence:** cite \`path:line\`, \`path:start-end\`, \`document.pdf:page\` or \`document.docx#Heading\`. For a new request with no document, cite where it came from, such as \`user request\`.
 - **Unknowns:** never invent an answer. Add it to \`{{DOCS}}/open-questions.md\`.`;
 
+const REVIEW_OPTIONS = `Then offer the user three options, and stop until they choose one:
+   - **\`approve\`:** the spec is ready to implement.
+   - **\`refine\`:** refine the spec with the changes they ask for, and ask again.
+   - **\`review-doc\`:** use the \`${REVIEW_DOC_SKILL_NAME}\` skill to write a visual doc of how the project will work and look after the change.
+
+   Don't implement it in this skill.`;
+
 const MISSING_DOCS = `If \`{{DOCS}}\` doesn't exist, stop and ask the user to run \`cclinic\` in the project root to generate it.`;
 
 export const AGENT_SKILLS: readonly AgentSkill[] = [
@@ -73,7 +80,7 @@ Write a spec that a developer and an automation tester could each work from with
 5. **Write the three files,** using the format below. Scope one capability per spec, and split it if it's growing into several.
 6. **Add it to the specs table** in \`{{DOCS}}/README.md\`.
 7. **Check your work** using the checklist below.
-8. **Ask for review, and stop.** Summarise the spec and any open questions, and ask the user to approve or reject it. Don't implement it in this skill. If they reject it or ask for changes, refine it and ask again.
+8. **Ask for review, and stop.** Summarise the spec and any open questions. ${REVIEW_OPTIONS}
 
 ${SPEC_FORMAT}
 
@@ -110,7 +117,7 @@ Make an existing spec more accurate and testable, without changing what the proj
 4. **Separate what you can fix from what the user must decide.** Fix wording, coverage, evidence and status yourself. Anything that changes intended behaviour is the user's decision, so ask. If they can't answer now, record an open question.
 5. **Make the changes,** keeping IDs stable. When a requirement is removed, delete it and don't reuse its ID. When one is split, keep the ID for the closest match, and give the rest new numbers.
 6. **Remove resolved items** from \`open-questions.md\`, and reflect the answers in the spec.
-7. **Ask for review, and stop.** Report what changed and why, what you asked, and what's still open, and ask the user to approve or reject it. Don't implement it in this skill. If they reject it or ask for changes, refine it and ask again.
+7. **Ask for review, and stop.** Report what changed and why, what you asked, and what's still open. ${REVIEW_OPTIONS}
 
 ${SPEC_FORMAT}
 
@@ -387,6 +394,92 @@ Do this after the tests have run, and before asking the user to approve the impl
 5. **If the preview can't start,** say why, report the test results anyway, and still ask for review. Never hide a failed preview, and never let it block the review. If the 3rd QA run failed, report the failures and don't ask for approval.
 `,
   },
+  {
+    name: "product-engineer",
+    description:
+      "Helps the user decide what to build, by asking questions and proposing a roadmap of milestones and tasks, which it saves once approved. Use when the user wants to plan, build a roadmap, create or refine tasks, or decide what to build next.",
+    body: `# Plan the work as a product engineer
+
+Help the user turn an idea into a clear roadmap of tasks. You plan; you don't build.
+
+## Rules
+
+- **Don't write or change production code, tests or specs.** Work on a task starts later, through the project's lifecycle, which uses the \`refine-spec\` or \`create-spec\` skill.
+- **Save nothing until the user approves.** If they reject the proposal, nothing is saved.
+- **Never invent an answer.** If the user can't answer a question that matters, add it to \`{{DOCS}}/open-questions.md\`, and say so.
+- **Use only the \`cclinic tasks\` commands** to read and change tasks. Never edit the task database directly. If \`cclinic\` isn't available, tell the user and stop.
+
+## Steps
+
+1. **Read the context.** Read \`{{DOCS}}/overview.md\`, the specs table in \`{{DOCS}}/README.md\`, and the current roadmap, with \`cclinic tasks roadmap --json\`. ${MISSING_DOCS}
+2. **Ask before proposing.** Ask a few focused questions at a time, and wait for the answers. Cover:
+   - **Goal:** what problem this solves, and why now
+   - **Users:** who it's for, and what they do today
+   - **Scope:** what's in, and what's explicitly out
+   - **Constraints:** deadlines, technology, compliance, and what mustn't change
+   - **Done:** how the user will know it works
+
+   Skip anything the documents already answer, and keep asking until the work is clear.
+3. **Propose the roadmap.** Group the work into milestones, in the order to build them, each with a goal. Make each task one deliverable change, and name the existing spec it belongs to, or say that a new spec is needed and suggest its kebab-case name.
+
+   \`\`\`markdown
+   **Milestone 1: Account security.** Goal: stop password guessing
+   | Task | Spec | Notes |
+   |---|---|---|
+   | Lock an account after 5 failed logins | auth | |
+   | Email the user when their account is locked | notifications (new spec) | Needs an email provider |
+   \`\`\`
+
+4. **Get approval.** Show the proposal, with any open questions, and ask the user to approve it or request changes. If they request changes, revise it and ask again.
+5. **Save it.** Only after approval, add each milestone, then its tasks, using the IDs the commands print:
+
+   \`\`\`bash
+   cclinic tasks milestone add --title "Account security" --goal "Stop password guessing" --json
+   cclinic tasks add --title "Lock an account after 5 failed logins" --milestone 1 --spec auth --json
+   \`\`\`
+
+   Put the details and notes for a task in \`--description\`. Then show the result with \`cclinic tasks roadmap\`.
+6. **Hand over.** Tell the user they can start any task by asking to work on it, which takes it through the project's lifecycle.
+`,
+  },
+  {
+    name: REVIEW_DOC_SKILL_NAME,
+    description:
+      "Writes a simple, visual review doc for a spec change, with diagrams, screenshots and mockups of how the project will work and look after it. Use when the user chooses review-doc while reviewing a spec, or asks to see what a spec change will look like before approving it.",
+    body: `# Write a review doc for a spec change
+
+Help the user decide whether to approve a spec change, by showing in one simple doc how the project will work and look after it. You explain the change; you don't build it.
+
+## Rules
+
+- **Don't change production code, tests or the spec's files.** Write only in \`${REVIEWS_FOLDER}/<spec-name>/\`.
+- **Never present a mockup as real.** Caption every image of the behaviour after the change with "Mockup, not built yet".
+- **Never invent behaviour.** Show only what the spec says. If the spec doesn't say, list it under open questions.
+- **Keep it simple.** Short sentences, small diagrams, and one idea per image.
+
+## Steps
+
+1. **Read the change.** Read the spec's \`spec.md\`, \`validation.md\` and \`verification.md\` in \`{{DOCS}}/specs/<spec-name>/\`, and the spec's uncommitted changes, such as its diff against the last commit. Then read the code that the changed requirements touch. ${MISSING_DOCS}
+2. **Start fresh.** If \`${REVIEWS_FOLDER}/<spec-name>/\` already exists, delete it, so the doc and its images are replaced, not added to.
+3. **Capture today.** If \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\` exists, run its \`start\` commands, and take screenshots of the screens or output the change affects, if you can capture them. Save them as \`images/before-<n>.png\`. If the environment can't start, or you can't take screenshots, say why in the doc, and carry on.
+4. **Draw the change.** Make mockups of how it will look after the change, as SVG files in \`images/after-<n>.svg\`: a simple screen for a user interface, or terminal output for a command-line tool. If nothing is visible, show example input and output instead, or say that there's nothing to see.
+5. **Write \`${REVIEWS_FOLDER}/<spec-name>/review.md\`,** with these sections, in this order:
+   1. **Summary:** what changes and why, in a few plain sentences
+   2. **What changes in the spec:** each added, changed or removed requirement, with its ID, in a table
+   3. **How it works now and after:** at least one Mermaid diagram of the behaviour after the change, such as a flowchart or a sequence diagram, and one of today's behaviour where it helps to compare
+   4. **How it looks:** the screenshots of today and the mockups of after, side by side where you can, each with a caption
+   5. **How it will be tested:** each changed requirement, with the test cases that will prove it
+   6. **Open questions and risks:** anything unclear, and what could break
+
+   Link images with relative paths, such as \`![Mockup, not built yet: the new menu](images/after-1.svg)\`.
+6. **Check it.** Every changed requirement appears, every Mermaid block is valid, every image link works, and every after image says it's a mockup.
+7. **Ask for review, and stop.** Give the user the doc's path, and ask them to review it and choose:
+   - **\`approve\`:** the spec is ready to implement.
+   - **\`refine\`:** refine the spec with the changes they ask for, and review it again.
+
+   A review doc isn't approval, so don't implement anything until the user chooses \`approve\`.
+`,
+  },
 ];
 
 const GENERATED_MARK = "generated-by: cclinic";
@@ -438,14 +531,21 @@ This project uses spec-driven development. Specs are in \`{{DOCS}}/specs/\`, and
 
 Analyse every prompt, and follow this lifecycle:
 
-**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask.
+**0. Check open tasks.** On every prompt, first run \`cclinic tasks list --json\`. If it lists tasks and the prompt isn't about one of them, list them (ID, title, status, spec), and wait for the user to choose: work on one of them, remove it with \`cclinic tasks remove <id>\` and continue with the prompt, or keep it and continue with the prompt. Once the user chooses to keep them, don't ask about the same tasks again in this conversation, only when a new task appears. If there are no tasks, don't mention them. If the command fails, say so in one line and continue.
+
+**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, use the \`product-engineer\` skill, and don't start spec or code work. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask. When work starts on a task, run \`cclinic tasks start <id>\`, and use the task's spec.
 
 **2. Refine the spec, and get it approved.**
 - **New feature:** use the \`refine-spec\` skill if it belongs in an existing spec, or the \`create-spec\` skill if not.
 - **Bug or issue:** use \`refine-spec\`. Add a test case that reproduces it, and correct any requirement that's wrong or missing.
 - **No behaviour change**, such as a refactor, formatting, a typo or a dependency update: no spec update is needed. Go to stage 3.
 
-Show what changed in \`spec.md\`, \`validation.md\` and \`verification.md\`, and any open questions. Ask the user to approve or reject it, and stop. Don't change production code until they clearly approve. If they reject it or ask for changes, refine the spec and ask again.
+Show what changed in \`spec.md\`, \`validation.md\` and \`verification.md\`, and any open questions. Then offer the user three options, and stop until they choose one. Don't change production code until they clearly approve:
+- **\`approve\`:** go to stage 3.
+- **\`refine\`:** refine the spec with the changes they ask for, and offer the three options again. A rejection works the same way.
+- **\`review-doc\`:** use the \`${REVIEW_DOC_SKILL_NAME}\` skill to write a visual doc of how the project will work and look after the change, in \`${REVIEWS_FOLDER}/<spec-name>/review.md\`. Give the user its path, ask them to review it, and offer \`approve\` or \`refine\`. A review doc isn't approval, and it changes no production code.
+
+Any other reply, such as a question, isn't approval: answer it, and offer the options again.
 
 **3. Implement, test, and get it approved.** Use the \`implement-spec\` skill, with the \`write-code\` skill for all code. If the spec turns out to be wrong, go back to stage 2. Then, in this order:
 1. **Test it as QA.** Use the \`test-spec\` skill to test the change against the spec's \`verification.md\` and \`validation.md\`, even if the spec didn't change. If no spec covers the change, QA runs the project's full checks and reports that. If your tool can run a separate agent, run QA there, so the code isn't checked by the agent that wrote it. If you're running QA for the agent that implemented the change, follow only the \`test-spec\` skill. Don't start this lifecycle, change the spec or stop at stage 2.
@@ -454,7 +554,7 @@ Show what changed in \`spec.md\`, \`validation.md\` and \`verification.md\`, and
 4. **Show a preview. Don't ask for approval until you've done this.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and check it. A server you start yourself doesn't count. If the file doesn't exist, set it up with the \`devops\` skill. Give the user the link, simulator build or command to try. If there's nothing to run, or it can't start, say why.
 5. Ask the user to test it by hand, with steps for each \`manual\` test case QA didn't run. Ask the user to approve the implementation or request changes. If they request changes, make them, take them through QA again, show the preview again, and ask again.
 
-**4. Ask to commit.** Once the user approves the implementation, ask whether to commit it. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change. Don't push unless asked. If they decline, leave the changes uncommitted.
+**4. Ask to commit.** Once the user approves the implementation, run \`cclinic tasks done <id>\` if it was a task, then ask whether to commit it. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and leave out review docs in \`${REVIEWS_FOLDER}/\` unless the user asks for them. Don't push unless asked. If they decline, leave the changes uncommitted.
 
 If the user tells you to skip a stage, do as they ask, and say which stage was skipped. If \`{{DOCS}}\` doesn't exist, ask the user to run \`cclinic\` first. If nobody can answer, as in an unattended run, stop at stage 2 and report the spec, because silence isn't approval.`;
 

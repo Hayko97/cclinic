@@ -22,7 +22,7 @@ const skill = (name: string): AgentSkill => {
 const render = (name: string): string => renderSkill(skill(name), ".cclinic/sdd", hash);
 
 describe("skill format", () => {
-  it("TC-SKILL-001: provides the six skills", () => {
+  it("TC-SKILL-040: provides the eight skills", () => {
     expect(AGENT_SKILLS.map((item) => item.name)).toEqual([
       "create-spec",
       "refine-spec",
@@ -30,6 +30,8 @@ describe("skill format", () => {
       "implement-spec",
       "test-spec",
       "devops",
+      "product-engineer",
+      "review-doc",
     ]);
   });
 
@@ -211,7 +213,7 @@ describe("agent workflow", () => {
       "`refine-spec`",
       "`create-spec`",
       "Add a test case that reproduces it",
-      "Ask the user to approve or reject it, and stop",
+      "offer the user three options, and stop until they choose one",
       "Don't change production code until they clearly approve",
       "`implement-spec`",
       "`write-code`",
@@ -236,7 +238,7 @@ describe("agent workflow", () => {
   it.each(["create-spec", "refine-spec"])("TC-INSTR-016: %s asks for review and doesn't implement", (name) => {
     const body = skill(name).body;
     expect(body).toContain("Ask for review, and stop");
-    expect(body).toContain("approve or reject");
+    expect(body).toContain("offer the user three options, and stop until they choose one");
     expect(body).toContain("Don't implement it in this skill");
   });
 
@@ -351,5 +353,176 @@ describe("agent workflow", () => {
 
   it("the import sits outside any code span, so Claude Code reads it", () => {
     expect(renderClaudeBlock().split("\n")).toContain("@AGENTS.md");
+  });
+});
+
+describe("product engineer and tasks", () => {
+  const planner = render("product-engineer");
+  const position = (text: string): number => {
+    const found = planner.indexOf(text);
+    expect(found, text).toBeGreaterThan(-1);
+    return found;
+  };
+
+  it("TC-SKILL-036: reads the context and asks before proposing", () => {
+    for (const text of [".cclinic/sdd/overview.md", ".cclinic/sdd/README.md", "`cclinic tasks roadmap --json`"]) {
+      expect(position(text)).toBeLessThan(position("**Ask before proposing.**"));
+    }
+    for (const text of ["**Goal:**", "**Users:**", "**Scope:**", "**Constraints:**", "**Done:**"]) {
+      expect(position(text)).toBeLessThan(position("**Propose the roadmap.**"));
+    }
+    expect(planner).toContain("add it to `.cclinic/sdd/open-questions.md`");
+  });
+
+  it("TC-SKILL-037: each task names its spec, and saving waits for approval", () => {
+    expect(planner).toContain("name the existing spec it belongs to, or say that a new spec is needed");
+    expect(planner).toContain("Save nothing until the user approves");
+    expect(position("**Get approval.**")).toBeLessThan(position("**Save it.** Only after approval"));
+    expect(position("**Save it.**")).toBeLessThan(position("cclinic tasks milestone add"));
+    expect(planner).toContain("cclinic tasks add --title");
+  });
+
+  it("TC-SKILL-038: plans without changing code, tests or specs", () => {
+    expect(planner).toContain("Don't write or change production code, tests or specs");
+    expect(planner).toContain("`refine-spec` or `create-spec`");
+  });
+
+  it("TC-INSTR-043: every prompt checks open tasks first, and offers work, remove or keep", () => {
+    const step = AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf("**0."), AGENT_WORKFLOW.indexOf("**1."));
+    expect(AGENT_WORKFLOW.indexOf("**0. Check open tasks.**")).toBeGreaterThan(-1);
+    for (const text of [
+      "On every prompt, first run `cclinic tasks list --json`",
+      "the prompt isn't about one of them",
+      "wait for the user to choose",
+      "work on one of them",
+      "remove it with `cclinic tasks remove <id>` and continue with the prompt",
+      "keep it and continue with the prompt",
+    ]) {
+      expect(step).toContain(text);
+    }
+  });
+
+  it("TC-INSTR-044: kept tasks aren't raised again, and a failed check doesn't block", () => {
+    expect(AGENT_WORKFLOW).toContain(
+      "don't ask about the same tasks again in this conversation, only when a new task appears",
+    );
+    expect(AGENT_WORKFLOW).toContain("If the command fails, say so in one line and continue");
+  });
+
+  it("TC-INSTR-045: planning prompts go to product-engineer", () => {
+    const stage = AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf("**1."), AGENT_WORKFLOW.indexOf("**2."));
+    expect(stage).toContain(
+      "If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, use the `product-engineer` skill",
+    );
+  });
+
+  it("TC-INSTR-046: tasks are started with the work, and done after approval", () => {
+    expect(AGENT_WORKFLOW).toContain("When work starts on a task, run `cclinic tasks start <id>`");
+    const stage = AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf("**4."));
+    expect(stage).toContain("Once the user approves the implementation, run `cclinic tasks done <id>`");
+  });
+
+  it("TC-INSTR-047: the section with the task steps stays under 200 lines", () => {
+    expect(renderAgentsBlock(".cclinic/sdd").split("\n").length).toBeLessThan(200);
+    expect(renderAgentsBlock(".cclinic/sdd")).toContain("| `product-engineer` |");
+  });
+});
+
+describe("review doc", () => {
+  const reviewer = render("review-doc");
+  const stage = (from: string, to?: string): string =>
+    AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf(from), to === undefined ? undefined : AGENT_WORKFLOW.indexOf(to));
+  const at = (text: string): number => {
+    const found = reviewer.indexOf(text);
+    expect(found, text).toBeGreaterThan(-1);
+    return found;
+  };
+
+  it("TC-INSTR-050: stage 2 ends with approve, refine or review-doc, and waits", () => {
+    const review = stage("**2.", "**3.");
+    expect(review).toContain("offer the user three options, and stop until they choose one");
+    expect(review.match(/^- \*\*`[a-z-]+`:\*\*/gm)).toEqual([
+      "- **`approve`:**",
+      "- **`refine`:**",
+      "- **`review-doc`:**",
+    ]);
+    expect(review).toContain("- **`approve`:** go to stage 3.");
+    expect(review).toContain(
+      "- **`refine`:** refine the spec with the changes they ask for, and offer the three options again.",
+    );
+    expect(review).toContain("Don't change production code until they clearly approve");
+    expect(review).toContain("Any other reply, such as a question, isn't approval");
+  });
+
+  it("TC-INSTR-051: review-doc uses its skill, gives the path, and then asks to approve or refine", () => {
+    const review = stage("**2.", "**3.");
+    for (const text of [
+      "use the `review-doc` skill",
+      "`.cclinic/reviews/<spec-name>/review.md`",
+      "Give the user its path, ask them to review it, and offer `approve` or `refine`",
+      "A review doc isn't approval, and it changes no production code",
+    ]) {
+      expect(review).toContain(text);
+    }
+  });
+
+  it("TC-INSTR-052: commits leave out review docs unless asked", () => {
+    expect(stage("**4.")).toContain("leave out review docs in `.cclinic/reviews/` unless the user asks for them");
+  });
+
+  it("TC-INSTR-053: the section with the stage 2 options stays under 200 lines", () => {
+    const block = renderAgentsBlock(".cclinic/sdd");
+    expect(block.split("\n").length).toBeLessThan(200);
+    expect(block).toContain("| `review-doc` |");
+  });
+
+  it("TC-SKILL-041: reads the change and writes one doc per spec, replacing the old one", () => {
+    for (const text of [
+      "`spec.md`, `validation.md` and `verification.md` in `.cclinic/sdd/specs/<spec-name>/`",
+      "the spec's uncommitted changes",
+      "read the code that the changed requirements touch",
+      "If `.cclinic/reviews/<spec-name>/` already exists, delete it",
+      "`.cclinic/reviews/<spec-name>/review.md`",
+      "`images/after-<n>.svg`",
+    ]) {
+      expect(reviewer).toContain(text);
+    }
+  });
+
+  it("TC-SKILL-042: the doc has the six sections, in order, with a Mermaid diagram", () => {
+    const sections = [
+      "**Summary:**",
+      "**What changes in the spec:** each added, changed or removed requirement, with its ID",
+      "**How it works now and after:** at least one Mermaid diagram of the behaviour after the change",
+      "**How it looks:**",
+      "**How it will be tested:** each changed requirement, with the test cases",
+      "**Open questions and risks:**",
+    ].map(at);
+    expect(sections).toEqual([...sections].sort((a, b) => a - b));
+  });
+
+  it("TC-SKILL-043: real screenshots of today, or why not, and labelled mockups of after", () => {
+    expect(reviewer).toContain("run its `start` commands, and take screenshots");
+    expect(reviewer).toContain("`.cclinic/environment/environment.json`");
+    expect(reviewer).toContain("If the environment can't start, or you can't take screenshots, say why in the doc");
+    expect(reviewer).toContain('Caption every image of the behaviour after the change with "Mockup, not built yet"');
+    expect(reviewer).toContain("every after image says it's a mockup");
+  });
+
+  it("TC-SKILL-044: changes nothing else, and ends by asking to approve or refine", () => {
+    expect(reviewer).toContain("Don't change production code, tests or the spec's files");
+    const last = reviewer.slice(at("**Ask for review, and stop.**"));
+    expect(last).toContain("Give the user the doc's path, and ask them to review it and choose");
+    expect(last).toContain("- **`approve`:**");
+    expect(last).toContain("- **`refine`:**");
+    expect(last).not.toContain("- **`review-doc`:**");
+    expect(last).toContain("A review doc isn't approval");
+  });
+
+  it.each(["create-spec", "refine-spec"])("TC-SKILL-045: %s offers approve, refine and review-doc", (name) => {
+    const step = skill(name).body.slice(skill(name).body.indexOf("**Ask for review, and stop.**"));
+    for (const text of ["- **`approve`:**", "- **`refine`:**", "- **`review-doc`:** use the `review-doc` skill"]) {
+      expect(step).toContain(text);
+    }
   });
 });

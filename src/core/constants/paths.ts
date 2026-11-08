@@ -5,6 +5,10 @@ export const DOCUMENTS_FOLDER_NAME = "sdd";
 export const CACHE_FOLDER_NAME = "cache";
 export const FAILED_FOLDER_NAME = "failed";
 export const LOCK_FILE_NAME = ".lock";
+export const TASKS_DB_FILE = "tasks.db";
+/** Visual review docs written by the review-doc skill, outside the documents folder (FR-SKILL-033). */
+export const REVIEWS_FOLDER = `${TOOL_FOLDER_NAME}/reviews`;
+export const REVIEW_DOC_SKILL_NAME = "review-doc";
 export const TEMP_FOLDER_SUFFIX = ".cclinic-tmp-";
 export const BACKUP_FOLDER_SUFFIX = ".cclinic-old-";
 

@@ -69,16 +69,22 @@ Run `cclinic guide` for the full walkthrough, or `cclinic --help` for every opti
 
 ## Skills for your coding agent
 
-`cclinic` also installs six skills, so your coding agent can work from these documents:
+`cclinic` also installs eight skills, so your coding agent can work from these documents:
 
-| Skill            | Use it to                                                             |
-| ---------------- | --------------------------------------------------------------------- |
-| `create-spec`    | Write a new spec for a new capability                                 |
-| `refine-spec`    | Improve an existing spec, and resolve its open questions              |
-| `write-code`     | Write code that fits your stack and guidelines, as a maintainer would |
-| `implement-spec` | Build a spec requirement by requirement, and prove that it works      |
-| `test-spec`      | Act as QA: automate the test cases, run them, and report defects      |
-| `devops`         | Set up a local environment, and show how to review each change        |
+| Skill              | Use it to                                                             |
+| ------------------ | --------------------------------------------------------------------- |
+| `create-spec`      | Write a new spec for a new capability                                 |
+| `refine-spec`      | Improve an existing spec, and resolve its open questions              |
+| `write-code`       | Write code that fits your stack and guidelines, as a maintainer would |
+| `implement-spec`   | Build a spec requirement by requirement, and prove that it works      |
+| `test-spec`        | Act as QA: automate the test cases, run them, and report defects      |
+| `devops`           | Set up a local environment, and show how to review each change        |
+| `product-engineer` | Ask what you want to build, and plan it as a roadmap of tasks         |
+| `review-doc`       | Show, with diagrams and mockups, how a spec change will work and look |
+
+Planned milestones and tasks are kept in `.cclinic/tasks.db`, and read and changed with `cclinic tasks` (`list`, `roadmap`, `add`, `show`, `start`, `done`, `remove`, `milestone add|remove`, each with `--json` and `-C <folder>`). On every prompt, your agent checks for open tasks, and asks whether to work on one, remove it, or keep it and carry on.
+
+When your agent asks you to review a spec change, you can choose `approve`, `refine` or `review-doc`. `review-doc` writes `.cclinic/reviews/<spec>/review.md`, with diagrams, screenshots of today and mockups of after, and then asks you to approve or refine the spec.
 
 They're installed in `.agents/skills/` (Codex, Cursor, GitHub Copilot, Gemini CLI) and `.claude/skills/` (Claude Code), and `AGENTS.md` points other agents to them. Commit them, so your team shares them. Your own skills and edits are never overwritten without `--force`, and skills cclinic didn't create are never overwritten at all.
 
@@ -127,6 +133,7 @@ Run `cclinic guide` for the full walkthrough, `cclinic --help` for an overview a
 | `cclinic doctor`       | Check your setup, without using any Claude usage          |
 | `cclinic skills`       | Install the coding agent skills, with no Claude usage     |
 | `cclinic environment`  | Set up a local environment for previewing changes         |
+| `cclinic tasks`        | Plan the roadmap and track tasks, with no Claude usage    |
 | `cclinic clean`        | Delete the cache and failed drafts                        |
 
 The default is Sonnet at medium reasoning. Re-running only reprocesses what changed, and continues from where a failed run stopped.

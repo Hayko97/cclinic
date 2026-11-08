@@ -2,7 +2,7 @@
 
 ## Goal
 
-Install marked AGENTS.md and CLAUDE.md sections into a target project so coding agents follow a spec-first lifecycle (prompt, spec approval, implementation approval, optional commit), without disturbing the user's own instructions or triggering reprocessing by cclinic.
+Install marked AGENTS.md and CLAUDE.md sections into a target project so coding agents follow a spec-first lifecycle (open-task check, prompt, spec approval with an optional visual review doc, implementation approval, optional commit), without disturbing the user's own instructions or triggering reprocessing by cclinic.
 
 Stage 3 also requires a QA pass against the spec's test cases and acceptance criteria, fixing and re-testing until it passes, then a preview for the user to test by hand before asking for approval. For the preview, see FR-ENV-027 in [local-environment](../local-environment/spec.md).
 
@@ -38,6 +38,13 @@ Stage 3 also requires a QA pass against the spec's test cases and acceptance cri
 | FR-INSTR-026 | When QA finds a test that doesn't check what the spec says, the workflow must tell agents to fix the test with the `write-code` skill so it matches the spec, without weakening it, and send it back to QA. | confirmed | `src/core/agent-skills.ts:452`, `src/core/agent-skills.test.ts:287`, `user request` |
 | FR-INSTR-027 | The 3-run QA limit must count every QA run for a change, whatever was fixed between runs, and must start again only after the user replies, such as approving a spec change or requesting a change. | confirmed | `src/core/agent-skills.ts:452`, `src/core/agent-skills.test.ts:287`, `user request` |
 | FR-INSTR-028 | When no spec covers a change, such as some refactors, the workflow must tell agents that QA runs the project's full checks and reports that no spec covers the change, without asking to create a spec. | confirmed | `src/core/agent-skills.ts:451`, `src/core/agent-skills.test.ts:302`, `user request` |
+| FR-INSTR-029 | The workflow must tell agents, on every prompt and before stage 1, to run `cclinic tasks list --json`. If it lists open or in-progress tasks and the prompt isn't about one of them, the agent must list them (ID, title, status, spec) and wait for the user to choose: work on one of them, remove it with `cclinic tasks remove` and continue with the prompt, or keep it and continue with the prompt. | confirmed | `src/core/agent-skills.ts:489`, `src/core/agent-skills.test.ts`, `user request` |
+| FR-INSTR-030 | After the user chooses to keep the listed tasks, the workflow must tell agents not to ask about those same tasks again in that conversation, and to ask again only when a new task appears. If `cclinic tasks list` fails or isn't available, the agent must say so in one line and continue with the prompt. | confirmed | `src/core/agent-skills.ts:489`, `src/core/agent-skills.test.ts`, `user request` |
+| FR-INSTR-031 | The workflow must tell agents, at stage 1, to use the `product-engineer` skill when the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, without starting spec or code work. | confirmed | `src/core/agent-skills.ts:491`, `src/core/agent-skills.test.ts`, `user request` |
+| FR-INSTR-032 | The workflow must tell agents, when work starts on a task, to run `cclinic tasks start <id>` and take the task's spec into stage 1, and, once the user approves the implementation, to run `cclinic tasks done <id>`. | confirmed | `src/core/agent-skills.ts:491`, `src/core/agent-skills.ts:507`, `src/core/agent-skills.test.ts`, `user request` |
+| FR-INSTR-033 | At the end of stage 2, the workflow must tell agents to offer the user exactly three options, `approve`, `refine` and `review-doc`, and stop until the user chooses one: `approve` goes to stage 3; `refine` refines the spec with the user's changes and asks again; `review-doc` builds a visual review doc. | confirmed | `src/core/agent-skills.ts:543-548`, `src/core/agent-skills.test.ts:431`, `user request` |
+| FR-INSTR-034 | When the user chooses `review-doc`, the workflow must tell agents to use the `review-doc` skill, give the user the path to the doc, ask them to review it, and then offer two options, `approve` or `refine`, without changing production code. Choosing `review-doc` must not count as approval. If they choose `refine`, the refined spec's review must end with the three options again. | confirmed | `src/core/agent-skills.ts:546-548`, `src/core/agent-skills.test.ts:431`, `user request` |
+| FR-INSTR-035 | At stage 4, the workflow must tell agents not to stage review docs in `.cclinic/reviews/` unless the user asks for them to be committed. | confirmed | `src/core/agent-skills.ts:557`, `src/core/agent-skills.test.ts:431`, `user request` |
 
 ## Edge cases
 
@@ -61,6 +68,13 @@ Stage 3 also requires a QA pass against the spec's test cases and acceptance cri
 - QA alternates between a code fix and a test fix: every run counts, so it still stops after the 3rd run.
 - The agent returns to stage 2 and the user doesn't reply: no new QA runs start.
 - A refactor matches no spec: QA runs the full checks and says no spec covers it.
+- The prompt is about an open task: the agent works on it without asking first.
+- The user keeps the open tasks: they aren't raised again in that conversation unless a new task appears.
+- cclinic isn't installed where the agent runs: the agent says the task check couldn't run, and continues.
+- No open tasks: the agent goes straight to stage 1 without mentioning tasks.
+- After a review doc, the user chooses `refine`: the spec is refined, and the next review offers all three options, so a new doc can be made that replaces the old one.
+- The user replies with something other than the three options, such as a question: the agent answers it and offers the options again; it doesn't treat the reply as approval.
+- Unattended run: the agent stops at the three options and doesn't create a review doc on its own.
 
 ## Non-goals
 

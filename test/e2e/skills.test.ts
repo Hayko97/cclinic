@@ -1,6 +1,15 @@
 /** The skills commands through the built binary, with a fake `claude`. */
 import { spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -50,9 +59,9 @@ describe("agent skills", () => {
     expect(existsSync(path.join(root, ".cclinic/sdd/README.md"))).toBe(true);
     expect(existsSync(path.join(root, SKILL_FILE))).toBe(true);
     expect(existsSync(path.join(root, ".claude/skills/test-spec/SKILL.md"))).toBe(true);
-    expect(stdout).toContain("Agent skills: 14 installed");
+    expect(stdout).toContain("Agent skills: 18 installed");
     const json = cclinic([project(), "--yes", "--json"]);
-    expect((JSON.parse(json.stdout) as { skills: unknown[] }).skills).toHaveLength(14);
+    expect((JSON.parse(json.stdout) as { skills: unknown[] }).skills).toHaveLength(18);
   });
 
   it("TC-SKILL-006: --no-skills leaves them out", () => {
@@ -82,7 +91,7 @@ describe("agent skills", () => {
     const root = project();
     const { code, stdout } = cclinic(["skills", root], { noClaude: true });
     expect(code).toBe(0);
-    expect(stdout).toContain("14 installed");
+    expect(stdout).toContain("18 installed");
     expect(existsSync(path.join(root, SKILL_FILE))).toBe(true);
     expect(existsSync(path.join(root, ".cclinic"))).toBe(false);
     const missing = cclinic(["skills", "/no/such/folder"]);
@@ -100,8 +109,8 @@ describe("agent skills", () => {
 
   it("TC-SKILL-010: results are reported in text and JSON", () => {
     const root = project();
-    expect(cclinic(["skills", root]).stdout).toContain("14 installed");
-    expect(cclinic(["skills", root]).stdout).toContain("14 unchanged");
+    expect(cclinic(["skills", root]).stdout).toContain("18 installed");
+    expect(cclinic(["skills", root]).stdout).toContain("18 unchanged");
     const parsed = JSON.parse(cclinic(["skills", root, "--json"]).stdout) as {
       skills: { path: string; status: string }[];
     };
@@ -113,6 +122,25 @@ describe("agent skills", () => {
     const root = project();
     expect(cclinic([root, "--dry-run"]).code).toBe(0);
     expect(readdirSync(root)).toEqual(["src"]);
+  });
+
+  it("TC-SKILL-046: review docs aren't analysed, aren't hand edits, and survive a re-run", () => {
+    const root = project();
+    expect(cclinic([root, "--yes"]).code).toBe(0);
+    const reviews = path.join(root, ".cclinic/reviews/demo");
+    mkdirSync(path.join(reviews, "images"), { recursive: true });
+    const doc = "# Review\n\n```mermaid\nflowchart LR\n  a --> b\n```\n";
+    const image = '<svg xmlns="http://www.w3.org/2000/svg"><text>Mockup, not built yet</text></svg>\n';
+    writeFileSync(path.join(reviews, "review.md"), doc);
+    writeFileSync(path.join(reviews, "images/after.svg"), image);
+    const preview = JSON.parse(cclinic([root, "--dry-run", "--json"]).stdout) as { included: { path: string }[] };
+    expect(preview.included.map((file) => file.path)).toEqual(["src/a.ts"]);
+    const record = path.join(makeTempFolder(), "calls.jsonl");
+    const { code, stderr } = cclinic([root, "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
+    expect(code, stderr).toBe(0);
+    expect(existsSync(record)).toBe(false);
+    expect(readFileSync(path.join(reviews, "review.md"), "utf8")).toBe(doc);
+    expect(readFileSync(path.join(reviews, "images/after.svg"), "utf8")).toBe(image);
   });
 
   it.each([
@@ -134,7 +162,7 @@ describe("agent skills", () => {
     const { code, stdout } = cclinic([root, "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
     expect(code).toBe(0);
     expect(existsSync(record)).toBe(false);
-    expect(stdout).toContain("14 unchanged");
+    expect(stdout).toContain("18 unchanged");
     expect(snapshot()).toEqual(before);
     if ("AGENTS.md" in files) expect(readFileSync(path.join(root, "AGENTS.md"), "utf8")).toContain("Use tabs.");
   });

@@ -54,8 +54,8 @@ describe("installing", () => {
 
   it("TC-SKILL-010: the summary counts each outcome", async () => {
     const root = makeTempFolder();
-    expect(summarizeInstall(await install(root))).toContain("14 installed");
-    expect(summarizeInstall(await install(root))).toContain("14 unchanged");
+    expect(summarizeInstall(await install(root))).toContain("18 installed");
+    expect(summarizeInstall(await install(root))).toContain("18 unchanged");
     writeFileSync(path.join(root, AGENTS_COPY), "mine");
     expect(summarizeInstall(await install(root))).toContain("1 skipped");
   });
