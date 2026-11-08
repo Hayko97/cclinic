@@ -71,6 +71,6 @@ export function chooseEffort(current: Effort): Promise<Effort> {
   );
 }
 
-export function askToConfirm(message: string): Promise<boolean> {
-  return prompting(() => confirm({ message, default: false }, { output: process.stderr }));
+export function askToConfirm(message: string, defaultAnswer = false): Promise<boolean> {
+  return prompting(() => confirm({ message, default: defaultAnswer }, { output: process.stderr }));
 }

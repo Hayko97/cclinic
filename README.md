@@ -69,7 +69,7 @@ Run `cclinic guide` for the full walkthrough, or `cclinic --help` for every opti
 
 ## Skills for your coding agent
 
-`cclinic` also installs five skills, so your coding agent can work from these documents:
+`cclinic` also installs six skills, so your coding agent can work from these documents:
 
 | Skill            | Use it to                                                             |
 | ---------------- | --------------------------------------------------------------------- |
@@ -78,10 +78,40 @@ Run `cclinic guide` for the full walkthrough, or `cclinic --help` for every opti
 | `write-code`     | Write code that fits your stack and guidelines, as a maintainer would |
 | `implement-spec` | Build a spec requirement by requirement, and prove that it works      |
 | `test-spec`      | Act as QA: automate the test cases, run them, and report defects      |
+| `devops`         | Set up a local environment, and show how to review each change        |
 
 They're installed in `.agents/skills/` (Codex, Cursor, GitHub Copilot, Gemini CLI) and `.claude/skills/` (Claude Code), and `AGENTS.md` points other agents to them. Commit them, so your team shares them. Your own skills and edits are never overwritten without `--force`, and skills cclinic didn't create are never overwritten at all.
 
+## How your coding agent works
+
+`cclinic` also adds a section to `AGENTS.md`, and a `CLAUDE.md` that imports it. Your own text in those files is kept. They tell your agent to follow this lifecycle for code changes:
+
+1. **Prompt:** it analyses your request, and finds the spec. A question just gets an answer.
+2. **Spec:** it refines or creates the spec, and asks you to approve or reject it. No production code changes before you approve.
+3. **Implement:** it builds and tests, shows you a way to try the change, such as a link or a simulator build, and asks you to approve it or request changes.
+4. **Commit:** once you approve, it asks whether to commit. It never pushes on its own.
+
+These files are guidance, so an agent can still fail to follow them.
+
 After an agent edits the documents, re-running `cclinic` stops rather than overwriting them, and `--force` replaces them completely.
+
+## Local environment
+
+After generating documents, `cclinic` offers to set up a local environment, so you can try each change yourself. If you agree, Claude creates files in `.cclinic/environment/` and runs build and Docker commands, which can build and run your project's code.
+
+| Project type            | How you review a change                                                      |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| Web app or API          | Docker Compose, at `http://my-app.localhost:3000` or `http://localhost:3000` |
+| iOS or Android          | The app in a simulator or emulator                                           |
+| Desktop, CLI or library | An exact command, and what it should do                                      |
+
+`--yes` doesn't agree to this step, so use `--environment` in scripts, `--no-environment` to skip it, or `cclinic environment` to run it later. It stops after 15 minutes, or $2 unless you set `--max-budget-usd`. Without the Claude CLI, `cclinic` gives you a sentence to pass to your own coding agent.
+
+## Git
+
+If the project has no Git repository, `cclinic` creates a local one and tells you how to connect a remote, such as GitHub. It never commits or pushes for you.
+
+If there is a repository, its last 14 days of commit messages and changed file names give Claude context on recent work. Code diffs and author details are never sent. Use `--no-git` to turn this off.
 
 ## Help
 
@@ -96,6 +126,7 @@ Run `cclinic guide` for the full walkthrough, `cclinic --help` for an overview a
 | `cclinic model --list` | Show the options and your current choice                  |
 | `cclinic doctor`       | Check your setup, without using any Claude usage          |
 | `cclinic skills`       | Install the coding agent skills, with no Claude usage     |
+| `cclinic environment`  | Set up a local environment for previewing changes         |
 | `cclinic clean`        | Delete the cache and failed drafts                        |
 
 The default is Sonnet at medium reasoning. Re-running only reprocesses what changed, and continues from where a failed run stopped.
@@ -122,7 +153,7 @@ Large or expensive runs stop before anything is sent. Each limit can be changed.
 
 ## Development
 
-The specifications live in [`sdd/`](sdd/README.md). Start there, and follow [`sdd/developer-guidelines.md`](sdd/developer-guidelines.md).
+The specifications live in [`.cclinic/sdd/`](.cclinic/sdd/README.md). Start there, and follow [`.cclinic/sdd/developer-guidelines.md`](.cclinic/sdd/developer-guidelines.md).
 
 ```
 npm run verify          # lint, types, architecture, tests and coverage

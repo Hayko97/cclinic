@@ -1,9 +1,9 @@
 /** Turns each format into text with positions. Runs locally, and one bad file never stops the others. */
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { stripAgentsBlock } from "../../core/agent-skills.js";
+import { stripManagedSection } from "../../core/agent-skills.js";
 import { MIN_PDF_CHARS_PER_PAGE } from "../../core/constants/limits.js";
-import { AGENTS_FILE } from "../../core/constants/paths.js";
+import { MANAGED_INSTRUCTION_FILES } from "../../core/constants/paths.js";
 import { extensionOf } from "../../core/exclusion-rules.js";
 import type { ContentExtractor, ExtractedFile, ScannedFile, TextUnit } from "../../core/ports.js";
 
@@ -141,8 +141,10 @@ export function createExtractor(): ContentExtractor {
   return {
     async extract(file) {
       const original = await readFile(file.absolutePath);
-      // Installing skills adds a section to AGENTS.md, which must not count as a project change.
-      const bytes = file.path === AGENTS_FILE ? Buffer.from(stripAgentsBlock(original.toString("utf8"))) : original;
+      // cclinic adds a section to these files, which must not count as a project change.
+      const bytes = MANAGED_INSTRUCTION_FILES.includes(file.path)
+        ? Buffer.from(stripManagedSection(original.toString("utf8")))
+        : original;
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       try {
         switch (extensionOf(file.path)) {

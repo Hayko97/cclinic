@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { confirm, select } from "@inquirer/prompts";
 import { createAnthropicApiProvider, type ApiClient } from "../../src/adapters/llm/anthropic-api.js";
 import { createClaudeCliProvider } from "../../src/adapters/llm/claude-cli.js";
+import { runEnvironmentAgent } from "../../src/adapters/llm/environment-agent.js";
 import { createExtractor } from "../../src/adapters/extraction/extract.js";
 import { recoverInterruptedWrite, sha256 } from "../../src/adapters/storage/document-store.js";
 import { generateDocuments, prepareRun } from "../../src/application/pipeline.js";
@@ -226,6 +227,51 @@ describe("model selection", () => {
     process.stdin.isTTY = false;
     await expect(runModelCommand({}, harness().context)).rejects.toBeInstanceOf(UsageError);
     expect(selectMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("the environment step", () => {
+  const environmentRun = async (answers: readonly boolean[]) => {
+    for (const answer of answers) confirmMock.mockResolvedValueOnce(answer);
+    const root = project();
+    const record = path.join(makeTempFolder(), "calls.jsonl");
+    const test = harness({ FAKE_CLAUDE_RECORD: record });
+    await runGenerate(root, options(), test.context);
+    const started = readFileSync(record, "utf8")
+      .split("\n")
+      .filter((line) => line !== "" && !line.includes("--json-schema"));
+    return { root, started, test };
+  };
+
+  it("TC-ENV-004: asks after generating, says what will happen, and respects the answer", async () => {
+    const declined = await environmentRun([true, false]);
+    expect(declined.started).toEqual([]);
+    expect(declined.test.stdout()).toContain("Use the devops skill");
+    const prompt = confirmMock.mock.calls[1]?.[0] as { message: string; default: boolean };
+    expect(prompt.message).toContain("create files in .cclinic/environment");
+    expect(prompt.message).toContain("run this project's code");
+    expect(prompt.default).toBe(true);
+
+    const accepted = await environmentRun([true, true]);
+    expect(accepted.started).toHaveLength(1);
+    expect(accepted.test.stdout()).toContain("http://sample.localhost:3000");
+  });
+
+  it("TC-ENV-014: a run that doesn't finish is stopped at its limit", async () => {
+    const root = project();
+    const { environment } = harness({ FAKE_CLAUDE_MODE: "hang" });
+    await expect(
+      runEnvironmentAgent({
+        target: root,
+        prompt: "Set it up",
+        model: "sonnet",
+        effort: "medium",
+        maxBudgetUsd: 1,
+        environment,
+        signal: new AbortController().signal,
+        timeoutMs: 200,
+      }),
+    ).rejects.toThrow("stopped at its limit");
   });
 });
 

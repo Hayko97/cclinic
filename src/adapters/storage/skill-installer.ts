@@ -5,11 +5,12 @@ import {
   AGENT_SKILLS,
   classifySkill,
   isSameSkill,
-  mergeAgentsFile,
+  mergeManagedSection,
   renderAgentsBlock,
+  renderClaudeBlock,
   renderSkill,
 } from "../../core/agent-skills.js";
-import { AGENTS_FILE, SKILL_FILE, SKILL_FOLDERS } from "../../core/constants/paths.js";
+import { AGENTS_FILE, CLAUDE_FILE, SKILL_FILE, SKILL_FOLDERS } from "../../core/constants/paths.js";
 import { sha256 } from "./document-store.js";
 
 export type SkillStatus =
@@ -55,9 +56,9 @@ async function installSkillFile(file: string, rendered: string, isForced: boolea
   return "updated";
 }
 
-async function installAgentsFile(file: string, docsPath: string): Promise<SkillStatus> {
+async function installInstructionFile(file: string, section: string): Promise<SkillStatus> {
   const existing = await readIfExists(file);
-  const merged = mergeAgentsFile(existing, renderAgentsBlock(docsPath));
+  const merged = mergeManagedSection(existing, section);
   if (merged === undefined) return "skipped: damaged markers";
   if (merged === existing) return "unchanged";
   await writeAtomically(file, merged);
@@ -90,7 +91,14 @@ export async function installSkills(options: InstallOptions): Promise<readonly S
       entries.push({ path: relative, status });
     }
   }
-  entries.push({ path: AGENTS_FILE, status: await installAgentsFile(path.join(target, AGENTS_FILE), docsPath) });
+  entries.push({
+    path: AGENTS_FILE,
+    status: await installInstructionFile(path.join(target, AGENTS_FILE), renderAgentsBlock(docsPath)),
+  });
+  entries.push({
+    path: CLAUDE_FILE,
+    status: await installInstructionFile(path.join(target, CLAUDE_FILE), renderClaudeBlock()),
+  });
   return entries;
 }
 
@@ -104,7 +112,7 @@ export function summarizeInstall(entries: readonly SkillInstallEntry[]): string 
     .filter((label) => counts.has(label))
     .map((label) => `${counts.get(label) ?? 0} ${label}`)
     .join(", ");
-  return `Agent skills: ${summary}. Locations: ${SKILL_FOLDERS.join(", ")}, ${AGENTS_FILE}`;
+  return `Agent skills: ${summary}. Locations: ${SKILL_FOLDERS.join(", ")}, ${AGENTS_FILE}, ${CLAUDE_FILE}`;
 }
 
 export async function hasInstalledSkills(target: string): Promise<boolean> {

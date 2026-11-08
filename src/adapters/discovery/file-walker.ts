@@ -2,10 +2,10 @@
 import { lstat, open, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import ignore, { type Ignore } from "ignore";
-import { stripAgentsBlock } from "../../core/agent-skills.js";
+import { stripManagedSection } from "../../core/agent-skills.js";
 import { BINARY_DOCUMENT_EXTENSIONS, REASONS } from "../../core/constants/discovery.js";
 import { BINARY_SNIFF_BYTES, BYTES_PER_MIB, MAX_DOCUMENT_BYTES } from "../../core/constants/limits.js";
-import { AGENTS_FILE, CCLINIC_IGNORE_FILE, GITIGNORE_FILE } from "../../core/constants/paths.js";
+import { CCLINIC_IGNORE_FILE, GITIGNORE_FILE, MANAGED_INSTRUCTION_FILES } from "../../core/constants/paths.js";
 import {
   classifyFile,
   evaluatePath,
@@ -80,10 +80,26 @@ async function readHead(file: string): Promise<Uint8Array> {
 async function holdsOnlyCclinicSection(file: string): Promise<boolean> {
   try {
     const content = await readFile(file, "utf8");
-    return content.trim() !== "" && stripAgentsBlock(content).trim() === "";
+    return content.trim() !== "" && stripManagedSection(content).trim() === "";
   } catch {
     return false;
   }
+}
+
+/** The scan's rules for a path that may not exist any more, such as one named in Git history (FR-GIT-015). */
+export function createPathFilter(
+  options: Pick<ScanOptions, "target" | "outFolder" | "include" | "exclude">,
+): (relative: string) => boolean {
+  const includeMatcher = ignore().add([...options.include]);
+  const excludeMatcher = ignore().add([...options.exclude]);
+  const relativeOut = path.relative(options.target, options.outFolder).split(path.sep).join("/");
+  const context: RuleContext = {
+    ...(relativeOut === "" || relativeOut.startsWith("..") ? {} : { outFolder: relativeOut }),
+    isExcluded: (relative) => excludeMatcher.ignores(relative),
+    isIncluded: (relative) => includeMatcher.ignores(relative),
+    isIgnored: () => false,
+  };
+  return (relative) => evaluatePath(relative, false, context).keep;
 }
 
 export async function scanFolder(options: ScanOptions): Promise<ScanResult> {
@@ -180,7 +196,7 @@ export async function scanFolder(options: ScanOptions): Promise<ScanResult> {
         continue;
       }
       if (!entry.isFile()) continue;
-      if (relative === AGENTS_FILE && (await holdsOnlyCclinicSection(absolute))) continue;
+      if (MANAGED_INSTRUCTION_FILES.includes(relative) && (await holdsOnlyCclinicSection(absolute))) continue;
       const decision = evaluatePath(relative, false, context);
       if (decision.keep) await inspectFile(relative, absolute, decision.forced);
       else skipped.push({ path: relative, reason: decision.reason });

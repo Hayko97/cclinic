@@ -1,7 +1,7 @@
 /** Fixed values used by the providers (FR-LLM-035). API keys never belong here (FR-LLM-036). */
 
 /** Change this whenever a prompt or schema changes, so cached results are not reused. */
-export const PROMPT_VERSION = "1";
+export const PROMPT_VERSION = "3";
 
 export const MAX_OUTPUT_TOKENS = 64_000;
 export const CHARS_PER_TOKEN = 4;

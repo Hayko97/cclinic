@@ -61,6 +61,13 @@ export interface RunSettings {
   readonly noCache: boolean;
   readonly maxBudgetUsd?: number;
   readonly cclinicVersion: string;
+  readonly history?: HistoryForRun;
+}
+
+/** Recent Git history. Cache keys use the newest commit, so ageing out of the window costs nothing (FR-GIT-019). */
+export interface HistoryForRun {
+  readonly newestCommit: string;
+  readonly text: string;
 }
 
 export interface RunResult {
@@ -223,6 +230,8 @@ export async function generateDocuments(
   const analysedPaths = prepared.files.map((file) => file.path);
   const previous = await deps.store.readManifest();
   const previousRetired = previous?.retiredIds ?? [];
+  const newestCommit = settings.history?.newestCommit ?? "";
+  const historyText = settings.history?.text ?? "";
 
   const callLlm = async <T>(prompt: string, schema: Schema<T>, signal: AbortSignal): Promise<T> => {
     if (settings.maxBudgetUsd !== undefined && accounting.costUsd >= settings.maxBudgetUsd) {
@@ -263,13 +272,15 @@ export async function generateDocuments(
     schema: Schema<T>,
     signal: AbortSignal,
     produce: (signal: AbortSignal) => Promise<T>,
+    isValid: (value: T) => boolean = () => true,
   ): Promise<T> => {
     if (!settings.noCache) {
       const parsed = schema.safeParse(await cache.get(key));
-      if (parsed.success) return parsed.data;
+      if (parsed.success && isValid(parsed.data)) return parsed.data;
     }
     const value = await produce(signal);
-    await cache.set(key, value);
+    // An invalid result is never saved, so a re-run can correct it instead of failing forever (FR-ANA-028).
+    if (isValid(value)) await cache.set(key, value);
     return value;
   };
 
@@ -326,15 +337,24 @@ export async function generateDocuments(
     moduleId: "moduleId" in summary ? String(summary.moduleId) : "merged",
     ...summary,
   }));
-  const combineKey = hash(["combine", baseKey, JSON.stringify(combineInput), analysedPaths.join("\n")].join("\n"));
-  const project = await cached<ProjectData>(combineKey, projectDataSchema, deps.signal, async (signal) => {
-    const prompt = buildCombinePrompt(combineInput, analysedPaths, previous);
-    const first = await callLlm(prompt, projectDataSchema, signal);
-    const problems = validateProject(first, index);
-    if (problems.length === 0) return first;
-    logger.info(`Retrying project data to fix ${problems.length} problems...`);
-    return callLlm(withProblems(prompt, problems), projectDataSchema, signal);
-  });
+  const combineKey = hash(
+    ["combine", baseKey, newestCommit, JSON.stringify(combineInput), analysedPaths.join("\n")].join("\n"),
+  );
+  const project = await cached<ProjectData>(
+    combineKey,
+    projectDataSchema,
+    deps.signal,
+    async (signal) => {
+      const prompt = buildCombinePrompt(combineInput, analysedPaths, previous, historyText);
+      const first = await callLlm(prompt, projectDataSchema, signal);
+      const problems = validateProject(first, index);
+      if (problems.length === 0) return first;
+      logger.info(`Retrying project data to fix ${problems.length} problems...`);
+      for (const problem of problems) logger.debug(problem);
+      return callLlm(withProblems(prompt, problems), projectDataSchema, signal);
+    },
+    (value) => validateProject(value, index).length === 0,
+  );
 
   // Generate each spec in its own call (FR-ANA-025).
   logger.info(`Generating ${project.specs.length} specs...`);
@@ -345,6 +365,7 @@ export async function generateDocuments(
       [
         "spec",
         baseKey,
+        newestCommit,
         JSON.stringify(entry),
         JSON.stringify(project.specs),
         JSON.stringify(project.stack),
@@ -352,8 +373,12 @@ export async function generateDocuments(
         JSON.stringify(summaries),
       ].join("\n"),
     );
-    const specs = await cached<GeneratedSpec[]>(key, generatedSpecsSchema, signal, (innerSignal) =>
-      generateSpec(entry, project.specs, summaries, innerSignal),
+    const specs = await cached<GeneratedSpec[]>(
+      key,
+      generatedSpecsSchema,
+      signal,
+      (innerSignal) => generateSpec(entry, project.specs, summaries, innerSignal),
+      (values) => values.every((spec) => validateSpec(spec, index, previousRetired).length === 0),
     );
     logger.info(`  ${entry.name}`);
     return specs;
@@ -365,7 +390,7 @@ export async function generateDocuments(
     summaries: readonly ModuleSummary[],
     signal: AbortSignal,
   ): Promise<GeneratedSpec[]> {
-    const prompt = buildSpecPrompt(entry, allSpecs, summaries, analysedPaths, previous, project);
+    const prompt = buildSpecPrompt(entry, allSpecs, summaries, analysedPaths, previous, project, historyText);
     const named = (content: SpecContent): GeneratedSpec => ({
       ...content,
       name: entry.name,
@@ -392,6 +417,7 @@ export async function generateDocuments(
     const problems = validateSpec(first, index, previousRetired);
     if (problems.length === 0) return [first];
     logger.info(`Retrying spec ${entry.name} to fix ${problems.length} problems...`);
+    for (const problem of problems) logger.debug(problem);
     return [named(await callLlm(withProblems(prompt, problems), specContentSchema, signal))];
   }
 
@@ -411,7 +437,7 @@ export async function generateDocuments(
   if (problems.length > 0) {
     const draftPath = await deps.store.saveFailedDraft(documents);
     throw new ValidationFailedError(
-      `The generated documents failed validation, so existing documents were left unchanged. Draft saved to ${draftPath}.`,
+      `The generated documents failed validation, so existing documents were left unchanged. Draft saved to ${draftPath}. Valid results were kept, so re-running only redoes what failed. This run used ${(accounting.inputTokens + accounting.outputTokens).toLocaleString("en-US")} tokens.`,
       problems,
     );
   }
@@ -494,5 +520,8 @@ function buildManifest(input: {
       }))
       .sort((left, right) => left.name.localeCompare(right.name)),
     retiredIds,
+    ...(settings.history === undefined || settings.history.newestCommit === ""
+      ? {}
+      : { newestCommit: settings.history.newestCommit }),
   };
 }

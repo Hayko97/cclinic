@@ -534,3 +534,43 @@ describe("generated output", () => {
     expect(secondManifest.generatedAt).not.toBe(firstManifest.generatedAt);
   });
 });
+
+describe("recovering from invalid results", () => {
+  const stillInvalid = (request: LlmRequest<unknown>): unknown =>
+    isSpecCall(request) && request.prompt.includes("Spec: alpha.")
+      ? makeSpecContent("ALPHA", ["missing/file.ts:1"])
+      : undefined;
+
+  it("TC-ANA-038: a failed run keeps valid results, and only redoes what failed", async () => {
+    const root = makeTempFolder();
+    await expect(run(root, new FakeLlm(stillInvalid), { settings: { concurrency: 1 } })).rejects.toBeInstanceOf(
+      ValidationFailedError,
+    );
+    const second = new FakeLlm();
+    const { result } = await run(root, second);
+    expect(second.calls).toHaveLength(1);
+    expect(second.calls[0]?.prompt).toContain("Spec: alpha.");
+    expect(result.specCount).toBe(2);
+  });
+
+  it("TC-ANA-039: an invalid result already in the cache is regenerated", async () => {
+    const root = makeTempFolder();
+    const llm = new FakeLlm();
+    const { paths } = await run(root, llm);
+    const invalid = [{ name: "alpha", area: "ALPHA", ...makeSpecContent("ALPHA", ["missing/file.ts:1"]) }];
+    let replaced = 0;
+    for (const entry of readdirSync(paths.cache).filter((name) => name.endsWith(".json"))) {
+      const file = path.join(paths.cache, entry);
+      const value: unknown = JSON.parse(readFileSync(file, "utf8"));
+      if (Array.isArray(value) && (value[0] as { name?: string } | undefined)?.name === "alpha") {
+        writeFileSync(file, JSON.stringify(invalid));
+        replaced += 1;
+      }
+    }
+    expect(replaced).toBe(1);
+    const second = new FakeLlm();
+    await run(root, second);
+    expect(second.calls).toHaveLength(1);
+    expect(second.calls[0]?.prompt).toContain("Spec: alpha.");
+  });
+});

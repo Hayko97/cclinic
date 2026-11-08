@@ -31,7 +31,7 @@ if (record) {
     ),
   );
   const cwdEntries = fs.readdirSync(process.cwd());
-  fs.appendFileSync(record, `${JSON.stringify({ args, cwd: process.cwd(), cwdEntries, env, prompt })}\n`);
+  fs.appendFileSync(record, `${JSON.stringify({ args, cwd: process.cwd(), cwdEntries, env, prompt, watched: process.env.FAKE_CLAUDE_WATCH ? fs.existsSync(process.env.FAKE_CLAUDE_WATCH) : null })}\n`);
 }
 
 const emit = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
@@ -53,6 +53,21 @@ if (mode === "usage-limit") fail({ api_error_status: 429, result: "You've hit yo
 if (mode === "fail-after-1" && count >= 1) fail({ api_error_status: 500, result: "Server error" });
 if (mode === "invalid-output") {
   emit({ type: "result", is_error: false, subtype: "success", structured_output: { nonsense: true }, total_cost_usd: 0.01, modelUsage: { "claude-sonnet-5-5": {} } });
+  process.exit(0);
+}
+
+// The environment step runs with tools and no schema. FAKE_CLAUDE_ENVIRONMENT: valid (default), invalid, none, fail
+if (!args.includes("--json-schema")) {
+  const outcome = process.env.FAKE_CLAUDE_ENVIRONMENT ?? "valid";
+  if (outcome === "fail") fail({ api_error_status: 500, result: "Server error" });
+  const part = { name: "web", type: "web", start: "docker compose up", stop: "docker compose down", url: "http://sample.localhost:3000", fallbackUrl: "http://localhost:3000", review: "Open the link" };
+  const contents = { valid: JSON.stringify({ version: 1, alias: "sample", parts: [part] }), invalid: JSON.stringify({ version: 1, alias: "Bad Alias", parts: [] }) };
+  if (contents[outcome]) {
+    fs.mkdirSync(".cclinic/environment", { recursive: true });
+    fs.writeFileSync(".cclinic/environment/environment.json", contents[outcome]);
+  }
+  for (const file of (process.env.FAKE_CLAUDE_ALSO_WRITE ?? "").split(",").filter(Boolean)) fs.writeFileSync(file, "changed by the agent\n");
+  emit({ type: "result", is_error: false, subtype: "success", result: "I couldn't tell what runs here.", total_cost_usd: 0.25 });
   process.exit(0);
 }
 

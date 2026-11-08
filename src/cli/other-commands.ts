@@ -2,12 +2,15 @@
 import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { configFile, readSavedSettings, resetSettings, saveSettings } from "../adapters/config/user-config.js";
+import { detectGit } from "../adapters/git/git-repository.js";
 import { decideProvider, hasApiKey, probeClaude } from "../adapters/llm/select-provider.js";
 import { checkWritable, cleanProject, projectPaths } from "../adapters/storage/document-store.js";
 import { hasInstalledSkills, installSkills, summarizeInstall } from "../adapters/storage/skill-installer.js";
 import { BYTES_PER_KIB, BYTES_PER_MIB, MINIMUM_NODE, VERSION_CHECK_TIMEOUT_MS } from "../core/constants/limits.js";
 import { LIST_LABEL_WIDTH, LIST_VALUE_WIDTH, SIZE_DECIMAL_PLACES } from "../core/constants/terminal.js";
+import { GIT_INSTALL_LINK } from "../core/constants/git.js";
 import { EXIT_CODES, UsageError } from "../core/errors.js";
+import type { GitStatus } from "../core/git-history.js";
 import {
   DEFAULT_EFFORT,
   DEFAULT_MODEL,
@@ -105,6 +108,37 @@ export async function checkLatestVersion(
   }
 }
 
+/** Git is optional, so these never make cclinic "not ready" (FR-GIT-003). */
+function gitChecks(status: GitStatus): readonly DoctorCheck[] {
+  switch (status.kind) {
+    case "not-installed":
+      return [{ name: "Git", state: "skipped", detail: "not installed", fix: `Install it from ${GIT_INSTALL_LINK}` }];
+    case "unavailable":
+      return [{ name: "Git", state: "skipped", detail: status.reason }];
+    case "repository":
+      return [
+        { name: "Git repository", state: "passed", detail: status.root },
+        status.remote === undefined
+          ? {
+              name: "Git remote",
+              state: "skipped",
+              detail: "none",
+              fix: "Run: git remote add origin <repository-url>",
+            }
+          : { name: "Git remote", state: "passed", detail: `${status.remote.name} (${status.remote.host})` },
+      ];
+    default:
+      return [
+        {
+          name: "Git repository",
+          state: "skipped",
+          detail: "none",
+          fix: "Run cclinic to create one, or run: git init",
+        },
+      ];
+  }
+}
+
 export async function runDoctor(
   given: string | undefined,
   options: { readonly json?: boolean },
@@ -198,6 +232,7 @@ export async function runDoctor(
       ? { name: "Agent skills", state: "passed", detail: "installed" }
       : { name: "Agent skills", state: "skipped", detail: "not installed", fix: "Run: cclinic skills" },
   );
+  for (const check of gitChecks(await detectGit(target, { environment }))) add(check);
   add(await checkLatestVersion(version));
 
   const isReady = resolved.kind !== "none";

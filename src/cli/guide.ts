@@ -1,4 +1,5 @@
 /** Help text shown in the terminal. It works offline, so it's always available (FR-CLI-022). */
+import { HISTORY_WINDOW_DAYS } from "../core/constants/git.js";
 import { LIMITS } from "../core/constants/limits.js";
 import {
   CLAUDE_EFFORTS,
@@ -12,7 +13,8 @@ How it works:
   1. Scans your project, skipping dependencies, build output, binaries and secrets
   2. Shows a summary, and asks before sending anything to Anthropic
   3. Uses Claude to write specs and project documents to .cclinic/sdd/
-  4. Installs five skills, so your coding agent can work from those documents
+  4. Installs six skills, so your coding agent can work from those documents
+  5. Offers to set up a local environment, so you can try each change yourself
 
 Get started:
   cclinic doctor       check your setup
@@ -82,7 +84,13 @@ STEP 3: GENERATE
         validation.md           acceptance criteria
         verification.md         test cases for automation testers
 
-    .agents/skills/  .claude/skills/  AGENTS.md     skills for your coding agent
+    .agents/skills/  .claude/skills/          skills for your coding agent
+    AGENTS.md  CLAUDE.md                      how your coding agent should work
+
+  If there's no Git repository, cclinic creates a local one and tells you how to
+  connect a remote, such as GitHub. It never commits or pushes for you. If there
+  is a repository, its last ${HISTORY_WINDOW_DAYS} days of commit messages and file names give
+  Claude context on recent work. Use --no-git to turn all of this off.
 
 STEP 4: REVIEW
 
@@ -93,17 +101,31 @@ STEP 4: REVIEW
     code-only    found only in code
     docs-only    found only in documents, so it may not be built yet
 
-  Commit .cclinic/sdd, .agents, .claude and AGENTS.md, so your team shares them.
+  Commit .cclinic/sdd, .cclinic/environment, .agents, .claude, AGENTS.md and CLAUDE.md, so your team shares them.
+
+  cclinic then offers to set up a local environment. If you agree, Claude creates
+  files in .cclinic/environment and runs build and Docker commands. A web project
+  gets a link such as http://my-app.localhost:3000, a mobile app gets a simulator
+  build, and a command-line tool or library gets a command to try. --yes doesn't
+  agree to this, so use --environment, or run "cclinic environment" later.
 
 STEP 5: WORK WITH YOUR CODING AGENT
 
-  Most coding agents find the skills on their own. Ask for what you want:
+  AGENTS.md and CLAUDE.md tell your agent to follow this lifecycle for code changes:
+
+    1. Prompt      it analyses your request, and finds the spec
+    2. Spec        it refines the spec, and you approve or reject it
+    3. Implement   after approval, it builds and tests, shows you a preview, and you review it
+    4. Commit      after you approve, it asks to commit. It never pushes on its own
+
+  You can just describe what you want. You can also ask for a skill by name:
 
     create-spec      "Use create-spec to write a spec for password reset."
     refine-spec      "Use refine-spec on the user-login spec."
     write-code       "Use write-code to add a retry to the payment client."
     implement-spec   "Use implement-spec to build the user-login spec."
     test-spec        "Use test-spec to test the user-login spec."
+    devops           "Use devops to set up the local environment."
 
   Skills you wrote are never replaced. Skills you edited are kept unless you use
   "cclinic skills --force".
@@ -125,6 +147,7 @@ COMMANDS
   cclinic model --list    show the options and your current choice
   cclinic model --reset   go back to ${DEFAULT_CLAUDE_MODEL.label} at ${DEFAULT_CLAUDE_EFFORT.label.toLowerCase()}
   cclinic skills [path]   install the skills only, with no Claude usage
+  cclinic environment [path]  set up a local environment for previews
   cclinic doctor [path]   check your setup, with no Claude usage
   cclinic clean [path]    delete the cache and failed drafts
   cclinic guide           show this guide

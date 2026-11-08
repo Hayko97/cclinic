@@ -1,0 +1,2718 @@
+{
+  "cclinicVersion": "0.1.0",
+  "promptVersion": "2",
+  "generatedAt": "2026-11-07T18:19:02.017Z",
+  "provider": "claude-cli",
+  "requestedModel": "sonnet",
+  "actualModels": [
+    "claude-sonnet-5-5"
+  ],
+  "effort": "medium",
+  "analysedFiles": {
+    ".dependency-cruiser.cjs": "a5b3c03fdb5aef133f0525c0037162af06c261f8bdf7a69f522da0f79e644de4",
+    ".gitignore": "f4d5790caa3c461033b0173b2bb757fe8f7c3e5b88ac9370ff9e4b4a6b509a43",
+    ".nvmrc": "20d2add851bf39edcc6b5e830930f962db7e19dffa2cab8610eed551eda6c302",
+    ".prettierignore": "42d519640934df5d5042439a5d2184b427fe33ca3c07204ef6e1dea84b76e011",
+    ".prettierrc.json": "a9931ec80b8f419c8582ce5d53c6a829cfba3ad094477ec221741b3e808a6f47",
+    "README.md": "e684018e05501262dad935908763d1592ca74456d2acc11b4982371cdf9b1f5b",
+    "bin/cclinic.js": "c8aaabf988035d7c7171be2db9f22af2477d420d7e662bb6dfc8ff22d1678767",
+    "commitlint.config.js": "aebe32ef0f419edb675784d2a4ae2cc4e6a47cce5e436a4be7f90cd130ead2c8",
+    "eslint.config.js": "f4b618348d8f2cd71aeaaeac1622309d3d41e1d98f2df1f27bdcd7051e83f526",
+    "package.json": "f5f5636b3725a6746c2fe8d8f92b1621680bf52ed28058d1a31057235d47c76e",
+    "sdd/README.md": "04a59b74d72102af14e212cf8960beeeb0dfa05d9f509907844c95bea6725ca6",
+    "sdd/architecture.md": "5728be3d9ac66ee156170b84af4ca8e3924fa9d906abd5851d57cb2d7fa2b298",
+    "sdd/decisions/0001-cli-feature-scope.md": "543cb0115f3532f01a22060171a4db46e422bccc033250ab92040edc766dce63",
+    "sdd/decisions/0002-claude-cli-integration.md": "b5463cdcd0a841f869eefb91c1895dbb937baca3574c03d4034f62ea5e9f6441",
+    "sdd/decisions/0003-agent-skills.md": "1e99c9f7e5bc6d3f5264211e2ce297a168f446fbc0ed748c97e94277c79b82e4",
+    "sdd/decisions/0004-git-setup.md": "a1f9e5fd1f8799ffb86e58736a71d2d8a1b0ae8336d8b09aa0a8fabb315861c2",
+    "sdd/decisions/0005-agent-instructions.md": "779f17020fc587bb13dd12cdcec02c48182f2851303a0a1b40624086c802a332",
+    "sdd/developer-guidelines.md": "a9ccc455eec8dc1751231f2bd9b31dfc529571e9dd51396ec272c81083e9dc62",
+    "sdd/overview.md": "aa31ee6d39c946d3674717513fd7bf4549bccd5ad8c3d844c798061f9c077470",
+    "sdd/specs/agent-instructions/spec.md": "a31d15ecda1a121a8862872c677701d0cfb5d2318e512760c1d28f189233aa4f",
+    "sdd/specs/agent-instructions/validation.md": "7641ee3c29cabde15f6e22a716c9f8064c178deaa1f10dda8aa8faa5f53ca9ab",
+    "sdd/specs/agent-instructions/verification.md": "fa701c7ae65115d4c1e631d20a062868b8e3dc03c9857373c4f5800e1805958e",
+    "sdd/specs/agent-skills/spec.md": "ce16470761fd70f5f5e28b6569ead2bbdb4637210abc7fe38d4a2285e2e071d1",
+    "sdd/specs/agent-skills/validation.md": "2378da875a851d27e34430fa6c27bba828271cf26c61132f3d9ab71c50ee21af",
+    "sdd/specs/agent-skills/verification.md": "e8e45271238500d6a6d857e269c9221334965987e2bfccef9cd04b84ec4dcce3",
+    "sdd/specs/cli/spec.md": "51e0bf280c65aa495ed24be68a37397e793f36e9fb05c4e93dc58f3745c56559",
+    "sdd/specs/cli/validation.md": "a54d2c4497af94a1a01df03359a6f5c3044953fb47772f32320cfd5852daa7f6",
+    "sdd/specs/cli/verification.md": "e8daf66004262f02bdb14cf358f84a468ad53ed3632f41e5511a3cf894d06721",
+    "sdd/specs/content-extraction/spec.md": "2187c213870f5d4f86644a0aad5dc065fafeb352333022aba12adfed930823b2",
+    "sdd/specs/content-extraction/validation.md": "fc6ed49da1fe03e4f7a175cd41a3238da5238c78290f25a82f9eb7c4caf9999e",
+    "sdd/specs/content-extraction/verification.md": "d20dbd7dab03f2b68bf0ad2e153e2fab5a272143c0486c6fbfbc0d6e2888375d",
+    "sdd/specs/file-discovery/spec.md": "bf8abcf9e8386060dbfca26aa4124b0587d712a79c00dd0abbe6f3c0e49265eb",
+    "sdd/specs/file-discovery/validation.md": "8dbe14ae39a7c1a3c1f18b5fe21acb828427eb5594e9fc01776fac0c9d5b86c9",
+    "sdd/specs/file-discovery/verification.md": "39f3c8bbaac9025985cb62412dbe0b6cd0bd7001d5ee7fd318ae954842b0d2f1",
+    "sdd/specs/git-setup/spec.md": "2e244731b9874cb525ea497a5487e4cb3272ab1a4beeb294cde250399efd2ccb",
+    "sdd/specs/git-setup/validation.md": "5a0e25cae045c267b26295b06beb4f98bf557420eae7f173fc7eb89cdbfed1b5",
+    "sdd/specs/git-setup/verification.md": "863bb5428382b87ed948828d676c8f2a3f425c147ee63c209d152e6d336106af",
+    "sdd/specs/llm-providers/spec.md": "630109b2ea5c8c9dfaf7cfa21271eca45a82a90beed0317cfdae14dae6145e07",
+    "sdd/specs/llm-providers/validation.md": "ae91a74206d7c14186d73ead1277eb516a8634a08f5ac97f9c1eef515dbfe118",
+    "sdd/specs/llm-providers/verification.md": "d00519ff9d2b3dd4c44a0ee94bdabd843a52ff7ea7438358c035fe6b2830c84c",
+    "sdd/specs/model-selection/spec.md": "959d5fde99d9b1abef1025e2d28f7fea60f6293babc3578eb8a425526e663e7f",
+    "sdd/specs/model-selection/validation.md": "b8202a6d003e378ba96f349e5bab8ccb772be1136c318ca264475249536e09f8",
+    "sdd/specs/model-selection/verification.md": "372bc100d0f4eb96f7ed00aa00611644f85cfcfaf06447cac681933e46acab7b",
+    "sdd/specs/spec-analysis/spec.md": "b483d120df9f78c456604c04a2ac7b96244afe0531ead212e95e53417542ed61",
+    "sdd/specs/spec-analysis/validation.md": "b814b453886aa6c5efc99d04eed6382f5f1a4b24385f0618b2a36c2fa8047031",
+    "sdd/specs/spec-analysis/verification.md": "b80e0bffb4da51fde5632fd62348c70a7f2e3516666f1782a3c7b86bcc718c5e",
+    "sdd/specs/spec-output/spec.md": "804d532dc197a002b2a32657521524a8c7bb882fd926d8fce933b4b6a6cbf0d9",
+    "sdd/specs/spec-output/validation.md": "36e6dd7afdc10a030ec5fee938a230096a5dfd7e9a14fe061f1c07ec13dae767",
+    "sdd/specs/spec-output/verification.md": "1262cfa4829f2e1a01683103a808a198c0a1dc3f0563d7e9e6dba7093b5468dd",
+    "sdd/stack.md": "acd8e11192aa54ba2ea46cfe494512173b8bf0b78abf428a6eefd0b7227fd940",
+    "src/adapters/config/user-config.ts": "b28cd29c891ac0648a1bc3dbc2d5d2f01517f905e75d250b5dfbcfcf14baaf1d",
+    "src/adapters/discovery/file-walker.ts": "97d9ba19e133a3c44bf2b1b4b6895fb3192303e3f0b4a17f06ac2697acd62bdc",
+    "src/adapters/extraction/extract.ts": "2a6826e59807910bdcec78771e1d301b928c5c254095abb04529a5c937ad67f5",
+    "src/adapters/git/git-repository.ts": "6a5fc1af871cc732e966784310df779e959b8bc089d9f3ca8c5860b2b714069e",
+    "src/adapters/llm/anthropic-api.ts": "adbbc446c604431e065ecc8f1b604ba8bcc085a6ade70aaae023c5739b9620d1",
+    "src/adapters/llm/claude-cli.ts": "9970cddd38b4c48751f4e0adbfcd29bfef9508ec7a4a5ed6ab90b2829e7bcbf9",
+    "src/adapters/llm/llm-errors.test.ts": "7e268613bfe082cf63ba367dde4f7bab3618ce6d7c699cf5f16868a8d4c2508a",
+    "src/adapters/llm/llm.test.ts": "27a6e94f3577d7c1229abf71c9396a24d10e813e136546c86088592391a246b9",
+    "src/adapters/llm/retry.ts": "7096eaabf908389f2fbe874c61479e69b7c138916c1140b074ef4c826edf6bb7",
+    "src/adapters/llm/select-provider.ts": "8ce020f5e13ca60f14063be9cb98745a9735b7323d60a814dc80d5b137288b1e",
+    "src/adapters/storage/document-store.ts": "ee364f555c64982f9e8d7c2bd54f5495746d6ccb1d2945734d7d48b27da66fc0",
+    "src/adapters/storage/skill-installer.ts": "2f5c2f6165bbdf628c6c0802f9df69a867b1dac5e56c4a23d9d47b8c8b8eb319",
+    "src/application/pipeline.ts": "b3fac9f7962b15f966c475deaf1429d7518502deaf83aa80d2b2ee359611529c",
+    "src/cli/generate-command.ts": "3c7905e392f9490048384d84ec1b39f8777dad250b79493c416a439a208928a2",
+    "src/cli/guide.ts": "a44a5cecb523040a8092fa50aef557fd8ef53943a6b8a7d9e90e8b26c829ae81",
+    "src/cli/main.ts": "5eca2b61aad8e8c9a4aac36666299401cae78f860a532dc65701f18733398959",
+    "src/cli/menus.ts": "a4ff3e625fd1f159f35d77d2bf063209f867f473fac69b95226d3d3943b80f6f",
+    "src/cli/options.ts": "f7dc70c186dd10205b53d6251dce71e879107c0994ca49228ad2222299e31cb3",
+    "src/cli/other-commands.ts": "392d8d791c59029947db81b27f255c72afb74d599ea0507b69cdece57efeb834",
+    "src/cli/reporter.test.ts": "216bccbdbd6b903e54d243eaaa77d0e2eae2f8033292fdeecb8f6a9dd15464aa",
+    "src/cli/reporter.ts": "ca589d2a90b6e6c1fafc51babef036b6b837709f1b32a8c94591576d1fbfc96b",
+    "src/core/agent-skills.test.ts": "75b96f43d68ffa4102af7d55be10cb747a5bcaa4cfd4fbd7222169ac5ccb594c",
+    "src/core/agent-skills.ts": "0fb42a137114b3353213b3bad8c206de8b5337d235d60b6275f8155ddf60e9eb",
+    "src/core/chunking.ts": "158dc68b7ac9fab07e0b9e2e2b168ca834615571ea898f26ba5b742e69b1a198",
+    "src/core/constants/constants.test.ts": "857533e3a19b03cf2f51e879efbe9b8b6ef99060e417649f4ec94a46527475f2",
+    "src/core/constants/discovery.ts": "5b67a88e030029e7ce816d27d99cd183a8fbb3b8b54724c7ce68f38482f9a32c",
+    "src/core/constants/git.ts": "c02f9ea830278862d7188621ec733c1b17116ba8da2a6097196e43a753cf06ff",
+    "src/core/constants/limits.ts": "c4b3a1e6041aff0015a6729a6d8d769c69b211c7b63f4ce3bc899743834d4207",
+    "src/core/constants/llm.ts": "63ee4348e9417e2be8eb7e0907ba58f6c7a118e16f1deba7f9ce00b0c384749f",
+    "src/core/constants/models.ts": "6f797a4faf2cb6838af7491784cecd11aadd4c122fb3ec20caae29b025e7e1b0",
+    "src/core/constants/paths.ts": "04a06d82fa4fde22ceb556c3b777868ffd0232c7f1711cc59d4ac9e7da8ceb3a",
+    "src/core/constants/terminal.ts": "a97930a4f21e89e9a136c658b8d782d4241901407946bc308bacde7344948eae",
+    "src/core/core.test.ts": "352e548f8f8ee9c980cf0cafec74c49a6a573a964eff4da0cc56a1c6d1a5fc38",
+    "src/core/errors.ts": "5feaa510e43a05c47656fbb61af17e360c2f476524f90d0a616700b2caca33b8",
+    "src/core/exclusion-rules.ts": "1b939b2b73e193f3314d6a12912872e86707a50aede2b5a391e1e17620bdcc60",
+    "src/core/git-history.test.ts": "04456fda7d0e8f0fd2b0c499ad0757633a62989334c8040e5de8fa1bf7d1b8a5",
+    "src/core/git-history.ts": "d43e54a4c090c9f703314c062e63b7b1d22c5c0f1de5687dbc9aba8a9631778a",
+    "src/core/guidelines-baseline.ts": "c55e6460925867e3733065e6690c4f3c4966e63f9671b339750ab6af07504744",
+    "src/core/models.ts": "b12f5f0fcf3d969b9ec75ce20bff8111f0692f71a2f3b813594223842a2584c7",
+    "src/core/node-version.ts": "a865179c5d9dbc1ca5d6a8b66b180896dea48324966cfe0e68c40f3dc1d1395e",
+    "src/core/ports.ts": "430fa013a7c37aa6a5029ca1061c368d2fb5dfb7f8b9f638660232920c997153",
+    "src/core/prompts.ts": "0b2a84ca98bea48bfe59b17f2766848c1e98ea0400828c932f16920d797f2354",
+    "src/core/redaction.ts": "7303e881f602f2664c7482ba52b41d950c8b5421236b8212b15c982d4b0d6f06",
+    "src/core/rendering.ts": "f6974ad09264258d9dec78e1285b53c3dc1b3c62ee4ac51f7128650b0f7e5e8c",
+    "src/core/schemas.ts": "3a1a224494e29b0a5cb4399a6a3322979f901fe80efcc061943c243adfc6e400",
+    "src/core/validation.ts": "0bafc7af53b19b619918983a75a6e151ea1e17ddab41e05fc5a26ae86cbd355b",
+    "stryker.config.json": "da975435c7ceeccc837f873c4ca02485fd5e1503b003dcc70be48cb420a3c37f",
+    "test/e2e/cli.test.ts": "fb8e57f2a8446ca6a63d7948778e082d86370a80748d2fcbfd02698447dd1a5c",
+    "test/e2e/git.test.ts": "341139e6b44d3b87a09cfc88c67a9864a44638cd6f6d6d2fa56012e58e746651",
+    "test/e2e/skills.test.ts": "2a3895502f8c6ccedfd53632ce87e4fe79abdcda7dd8fd8ef9516c983474ce42",
+    "test/fixtures/fake-claude/claude": "a27af3aba7e083ded2424adfb96137bd986d06251cf339cba0586128abba2e26",
+    "test/fixtures/recorded-cli-output/budget.jsonl": "ba30d6763add1072e14e67146ccd272fe837361f87c4d1f1117afab7722d5ef3",
+    "test/fixtures/recorded-cli-output/invalid-model.jsonl": "2e075b5fde4ac9f2f251ae65d9d7bbcf9a314f069a1be01cbc32eaa2e5d9928e",
+    "test/fixtures/recorded-cli-output/success.jsonl": "743c101425ee552cade2984e2c71d31dcace7732540027c5ec30e28557253a64",
+    "test/integration/cli-commands.test.ts": "5f6ed97aaa5265e7108dcce0de93963aee5fc4347634857b20ac6d440521e38a",
+    "test/integration/discovery-extraction.test.ts": "9bd348062581b81d016f819946cae7ece4c566c3ed8fe3332cc4c1561e438232",
+    "test/integration/git.test.ts": "59de0a827de5df85236b0d8713b70b94976c388810cbd6a2c382f1d55e0bdebe",
+    "test/integration/pipeline.test.ts": "25e667e5fc94e25da71342e20895ae775f2753e3a84b2e79925792a12ecec90f",
+    "test/integration/skills.test.ts": "68f02972c0d9ae2cbd76e77a7950717b39ea60690721db66feb975bcae509a26",
+    "test/support/helpers.ts": "d0d01ea1ddd912eaae30058fa249cf8a45039df01b8799afe413cb1847245750",
+    "tsconfig.json": "a56378791f521cb23c8536d32614f4c577b8b05bc9759c0f5c382a715481032d",
+    "tsup.config.ts": "476ecdda6b0e171d7740600b26b352f2e5861c0f068490b093eca00d22859f58",
+    "vitest.config.ts": "0f4d947faaa563de5e02af990e909e62e61856238ae46997177a57038e25ec02"
+  },
+  "generatedFiles": {
+    "README.md": "84304a5a1e7b0fb99758c62fb9d114fe16e8c5c1edb5b565b36f5d97b4858b91",
+    "overview.md": "49a46a426750764d8384e90b753cb53134dc04207c66e6370f26745d5a98e270",
+    "stack.md": "5ddc299bc7089769396be7a443a7243d6ae226a2b356ddba0ce291d182051d2c",
+    "architecture.md": "ffc41c1121df921cb2d17f84386262d94ceea04ff8e90c50c26590dee6020585",
+    "developer-guidelines.md": "05dbcfe09ed5f62ad1234f94187725e612f3828c8b913e6b4bf910f487b2bb4a",
+    "open-questions.md": "257e750d990801bf7dd1285e88b4d25bc669005398ec330664a67a811bd001d8",
+    "scan-report.md": "0459e98d1a54351aec56c6100c0383546adf97abbff01e7afe5e19babe438c89",
+    "specs/agent-instructions/spec.md": "2df2cb520b7588f8336549f8d64cf67419013b6eddfe6f50225b4d403852a327",
+    "specs/agent-instructions/validation.md": "71ae6173e025c1044cd46782c7e0702489e31fb49fc85a6131dd00b9964a82af",
+    "specs/agent-instructions/verification.md": "5a7471b2b12b088b90fca742445e225bf40568b8a62fa0b882bc950fa79302b0",
+    "specs/agent-skills/spec.md": "4a6a43873d92cb95387f8b5674dcb65e919d5e4652d1bc0266c7d16e8a8cc995",
+    "specs/agent-skills/validation.md": "4c1ac4abca96e6433ac1a8bc3138908e92bb4128ae25efd83296fab5480eecfe",
+    "specs/agent-skills/verification.md": "3c37b1c18f60c3bec93ade95458be75f0d5c8f64f7755ad90d452b847a751dd1",
+    "specs/cli-commands/spec.md": "c5bab4f9617136ada9dde445420d741be8aaf28f2e559b16f6a3bd885c50f472",
+    "specs/cli-commands/validation.md": "df0a5d1e3745131a95ec524cd6bb9f3ee3d743feca03b92dd45d987faadd0408",
+    "specs/cli-commands/verification.md": "bac45dc0a3c9f817e431103801d61b77aec42ea26382d2bc87a1aed9f3cad317",
+    "specs/content-extraction/spec.md": "79fba8266a0611e5c8ad5d76cf57b42af36027a1468abec1756ef044bd879212",
+    "specs/content-extraction/validation.md": "30e1ddf5d3c663604b3ee0a83432199f8073230de52c737f4c2b77aff02ba4dc",
+    "specs/content-extraction/verification.md": "564a6e7090c14a24af3b82d984849fff889bec836d26b4c8420e6d081deda8cf",
+    "specs/file-discovery/spec.md": "ec9e5724956402bf90edd42489d22d28c3ed68b66be66516b2d640481f6905cd",
+    "specs/file-discovery/validation.md": "cf8f512aa117aec9023ab5fbb0f3db3d73ac849865e84a5992a08fa961ee26f5",
+    "specs/file-discovery/verification.md": "b7bd735bd77f16b3d225868973006878af229e8efc454ca89035631ef98e9992",
+    "specs/git-setup/spec.md": "a6c0d8055ae790e92776f93103fa98529b09527b1dcfeab50b00c61c43caf428",
+    "specs/git-setup/validation.md": "4ccc8eae27e0fca15f8980a47be0733804a6aef2cdf4c3dc0d61e95187098c0a",
+    "specs/git-setup/verification.md": "09275a4e9f4ab35d99a7a9ab04487ca8f9457cfa78930cc062c912de62c684eb",
+    "specs/llm-providers/spec.md": "0fc4d07c18113105911105ed48b973dab8a681462eb2864526f31c0d74c3dfcd",
+    "specs/llm-providers/validation.md": "d058a4efd45d609316f2152d864ee7969121d1c7f25d5489baf6e22659238b5e",
+    "specs/llm-providers/verification.md": "c269fc4b4cb125318216f9938794c7e451620fe99233dd26735b95985e9955d2",
+    "specs/model-selection/spec.md": "4c0ede3792bac44d7710bd8fbc7da00a2e049d12f00b1f699d0ed3262fb3fcbd",
+    "specs/model-selection/validation.md": "c4473d9ca671bea119e477631d58687cf81b282de72dda4be0abeb8c21ad33ca",
+    "specs/model-selection/verification.md": "3c35b1e3ec29a5d1f89137cc0dc892fbe5a0523b69234f05929ced984b225e1f",
+    "specs/quality-tooling/spec.md": "399e0a6d929cafc564c192aa41677542206c8fd8d5053517ade2d17e8e94834d",
+    "specs/quality-tooling/validation.md": "e841d1e48d97e986e0e9bb64ffb6eaae1f3ea80a76b37a7c7fe8a760d2e47c18",
+    "specs/quality-tooling/verification.md": "730b2206b256b468e570debb3b73d141a7549ea8401861bffe5771b13c02aac2",
+    "specs/spec-analysis/spec.md": "8db36a3a8c91c62a8dc6af57f8d3a374b099fa03a6840eebaa817d0ca385a1f7",
+    "specs/spec-analysis/validation.md": "e09dedc1e9dbc7f55c7033ca51067a10bc1931a18dad869751cf5df35f1b3af6",
+    "specs/spec-analysis/verification.md": "75c09a9f64cbc557e9810777fb0f359f3e33b1afa1a748ecc9a5801764ed8423",
+    "specs/spec-output/spec.md": "836815f6e300737c631c4111520a87050404c950bb0db267cf6e51d2e4e3c821",
+    "specs/spec-output/validation.md": "98f768cabe922b89d02aa1116b756d2563a929aa8ebc82de5a478d87fff21578",
+    "specs/spec-output/verification.md": "2760cede155b31b8ba7e1f21361a9776b1e27dfada365a13fac412d367874e2b"
+  },
+  "specs": [
+    {
+      "name": "agent-instructions",
+      "area": "INSTR",
+      "ids": [
+        {
+          "id": "FR-INSTR-001",
+          "title": "cclinic must install into AGENTS.md of the target folder a marked section holding the full spec-driven workflow followed by the skills table, and must create AGENTS.md if it is missing."
+        },
+        {
+          "id": "FR-INSTR-002",
+          "title": "The installed workflow text must refer to the documents folder given by --out (specs in <out>/specs/, index <out>/README.md) instead of a fixed path."
+        },
+        {
+          "id": "FR-INSTR-003",
+          "title": "cclinic must install into CLAUDE.md a marked section that imports @AGENTS.md and contains no copy of the workflow text, and must create CLAUDE.md if it is missing."
+        },
+        {
+          "id": "FR-INSTR-004",
+          "title": "cclinic must install and report both instruction files after a successful generation run and when running `cclinic skills`."
+        },
+        {
+          "id": "FR-INSTR-005",
+          "title": "cclinic must not create or change AGENTS.md or CLAUDE.md when --no-skills or --dry-run is given."
+        },
+        {
+          "id": "FR-INSTR-006",
+          "title": "Installing the instruction files via `cclinic skills` must succeed with exit code 0 when no Claude CLI and no API key are available."
+        },
+        {
+          "id": "FR-INSTR-007",
+          "title": "When AGENTS.md or CLAUDE.md already exists, cclinic must change only the marked section and preserve all other content byte for byte; if CLAUDE.md has no marked section, one must be appended."
+        },
+        {
+          "id": "FR-INSTR-008",
+          "title": "cclinic must not rewrite a file whose marked section is already up to date and must report it as unchanged."
+        },
+        {
+          "id": "FR-INSTR-009",
+          "title": "If a file has a start marker without a matching end marker, cclinic must leave that file unchanged and report it, while still installing the other file."
+        },
+        {
+          "id": "FR-INSTR-010",
+          "title": "The installed workflow section and its imported content must stay under 200 lines."
+        },
+        {
+          "id": "FR-INSTR-011",
+          "title": "Before analysis and content hashing, cclinic must strip the marked section from the root CLAUDE.md, so installing it does not look like a project change."
+        },
+        {
+          "id": "FR-INSTR-012",
+          "title": "A CLAUDE.md that contains only the installed section must be left out of the scan without a skipped-file entry."
+        },
+        {
+          "id": "FR-INSTR-013",
+          "title": "Commits that touch only CLAUDE.md must be left out of the Git history used as context, so a re-run after committing the instruction files makes no Claude calls and changes no Markdown."
+        },
+        {
+          "id": "FR-INSTR-014",
+          "title": "The workflow must tell agents to apply the lifecycle only to code changes, answer questions, explanations and reviews directly without spec work, and name the spec a change belongs to, asking the user when unclear."
+        },
+        {
+          "id": "FR-INSTR-015",
+          "title": "The workflow must tell agents to use refine-spec or create-spec for new features, and refine-spec with a reproducing test case and corrected requirements for bugs, and to make no production code change until the user clearly approves the spec; a rejection must lead to refining and asking again."
+        },
+        {
+          "id": "FR-INSTR-016",
+          "title": "The workflow must tell agents to implement with implement-spec and write-code, return to the spec stage if the spec proves wrong, report real test results, and get the user's approval of the implementation before asking to commit."
+        },
+        {
+          "id": "FR-INSTR-017",
+          "title": "The workflow must tell agents that non-behaviour changes (refactor, formatting, typo, dependency update) skip spec update and spec review but still name the spec, follow write-code, and go through implementation review and the commit question."
+        },
+        {
+          "id": "FR-INSTR-018",
+          "title": "The workflow must tell agents to skip a step when the user says so and state which step was skipped, to ask the user to run cclinic when the docs folder is missing, and to stop at spec review in unattended runs without treating silence as approval."
+        },
+        {
+          "id": "FR-INSTR-019",
+          "title": "The workflow must tell agents to commit only if the user agrees (approval of a spec or implementation is not agreement), to put spec, code and tests in one commit that follows project conventions, references requirement IDs, stages only related files and excludes secrets, to state failing or unrun tests first, and never to push unless asked."
+        },
+        {
+          "id": "FR-INSTR-020",
+          "title": "cclinic itself must never commit or push; only the coding agent may commit, at the user's request."
+        },
+        {
+          "id": "VAL-INSTR-001",
+          "title": "After running cclinic (or its skills command) on a project, a fresh session in Claude Code, Codex, Cursor or Copilot describes the workflow and the right documents folder, and the instructions stay short."
+        },
+        {
+          "id": "VAL-INSTR-002",
+          "title": "Opting out of skills or doing a preview leaves both files untouched; installing works without Claude access; cclinic never commits or pushes."
+        },
+        {
+          "id": "VAL-INSTR-003",
+          "title": "My text stays exactly as written and is still followed after installing or re-installing; a damaged section leaves that file alone and tells me; repeating the install changes nothing."
+        },
+        {
+          "id": "VAL-INSTR-004",
+          "title": "Running cclinic again after installing and committing the files triggers no reprocessing and changes none of the generated documents."
+        },
+        {
+          "id": "VAL-INSTR-005",
+          "title": "A question is answered with no spec or code changes; for a code request the agent states which spec applies before acting, or asks me if unsure."
+        },
+        {
+          "id": "VAL-INSTR-006",
+          "title": "A feature or bug request yields a spec update for me to approve or reject; no production code changes until I approve; rejecting leads to a revised spec."
+        },
+        {
+          "id": "VAL-INSTR-007",
+          "title": "The agent builds the approved change, reports real test results, asks me to approve or request changes, and does not commit by itself."
+        },
+        {
+          "id": "VAL-INSTR-008",
+          "title": "A typo or refactor skips spec review; telling the agent to skip a step works and is acknowledged; with no docs the agent asks me to run cclinic; with nobody to approve it stops at the spec."
+        },
+        {
+          "id": "VAL-INSTR-009",
+          "title": "After I approve the implementation the agent asks to commit; if I agree the commit contains this change's spec, code and tests only and nothing is pushed; if I decline nothing is committed."
+        },
+        {
+          "id": "VAL-INSTR-010",
+          "title": "Claude Code follows the same workflow as other agents because CLAUDE.md only points to AGENTS.md."
+        },
+        {
+          "id": "TC-INSTR-001",
+          "title": "Exit code 0; AGENTS.md exists with one marked section containing the four lifecycle stages and the skills table; output reports AGENTS.md and CLAUDE.md as installed."
+        },
+        {
+          "id": "TC-INSTR-002",
+          "title": "AGENTS.md section references docs/sdd/specs/ and docs/sdd/README.md and does not contain `.cclinic/sdd` or an unreplaced {{DOCS}} placeholder."
+        },
+        {
+          "id": "TC-INSTR-003",
+          "title": "CLAUDE.md exists with a marked section containing `@AGENTS.md` outside any code span and none of the workflow text (e.g. no skill names such as create-spec)."
+        },
+        {
+          "id": "TC-INSTR-004",
+          "title": "After generation both AGENTS.md and CLAUDE.md sections exist and the report lists them."
+        },
+        {
+          "id": "TC-INSTR-005",
+          "title": "In both runs neither AGENTS.md nor CLAUDE.md exists afterwards."
+        },
+        {
+          "id": "TC-INSTR-006",
+          "title": "Exit code 0 and both files exist."
+        },
+        {
+          "id": "TC-INSTR-007",
+          "title": "Only the text inside the AGENTS.md markers differs (user text byte-identical); CLAUDE.md keeps its user text and gains a section appended at the end."
+        },
+        {
+          "id": "TC-INSTR-008",
+          "title": "Modification times and contents are unchanged and output reports both files as unchanged."
+        },
+        {
+          "id": "TC-INSTR-009",
+          "title": "CLAUDE.md is byte-identical to before; the output reports it as damaged/skipped; AGENTS.md is created with its section."
+        },
+        {
+          "id": "TC-INSTR-010",
+          "title": "Result signals a skipped/unchanged outcome and returns the original text unchanged."
+        },
+        {
+          "id": "TC-INSTR-011",
+          "title": "Count is below 200."
+        },
+        {
+          "id": "TC-INSTR-012",
+          "title": "The extracted text contains the user text but not the section, and the hash is identical in both cases."
+        },
+        {
+          "id": "TC-INSTR-013",
+          "title": "CLAUDE.md is not in the files to analyse and not in the skipped list."
+        },
+        {
+          "id": "TC-INSTR-014",
+          "title": "That commit is not included in the history."
+        },
+        {
+          "id": "TC-INSTR-015",
+          "title": "Fake claude records zero calls and no generated Markdown file changes."
+        },
+        {
+          "id": "TC-INSTR-016",
+          "title": "The agent answers directly and no spec or code file changes (check git status clean)."
+        },
+        {
+          "id": "TC-INSTR-017",
+          "title": "For the clear one the agent names the matching spec before acting; for the ambiguous one it asks which spec."
+        },
+        {
+          "id": "TC-INSTR-018",
+          "title": "Feature uses create-spec or refine-spec; bug uses refine-spec with a new reproducing test case; each ends by asking for spec review; no production code files changed."
+        },
+        {
+          "id": "TC-INSTR-019",
+          "title": "The agent refines the spec and asks again; no production code changes until an explicit approval."
+        },
+        {
+          "id": "TC-INSTR-020",
+          "title": "It implements using implement-spec/write-code, runs tests and reports actual results, asks for review, and makes no commit."
+        },
+        {
+          "id": "TC-INSTR-021",
+          "title": "It checks approval and asks for review before coding."
+        },
+        {
+          "id": "TC-INSTR-022",
+          "title": "The agent applies it and asks for review again without committing."
+        },
+        {
+          "id": "TC-INSTR-023",
+          "title": "No spec review is requested; the agent names the spec, asks for code review, then asks whether to commit."
+        },
+        {
+          "id": "TC-INSTR-024",
+          "title": "The agent skips the spec stage and states that it was skipped."
+        },
+        {
+          "id": "TC-INSTR-025",
+          "title": "The first agent asks the user to run cclinic; the unattended agent stops at the spec and changes no code."
+        },
+        {
+          "id": "TC-INSTR-026",
+          "title": "One commit contains only this change's spec, code and tests, follows the project commit format and references requirement IDs; unrelated changes remain uncommitted and are mentioned."
+        },
+        {
+          "id": "TC-INSTR-027",
+          "title": "No commit is created when declined; with the failing test the agent states the failure before asking to commit; no push occurs in any case."
+        },
+        {
+          "id": "TC-INSTR-028",
+          "title": "`git log` shows the same commit count and head as before; no push attempted."
+        }
+      ]
+    },
+    {
+      "name": "agent-skills",
+      "area": "SKILL",
+      "ids": [
+        {
+          "id": "FR-SKILL-001",
+          "title": "cclinic must provide exactly five skills named create-spec, refine-spec, write-code, implement-spec and test-spec."
+        },
+        {
+          "id": "FR-SKILL-002",
+          "title": "Each skill must follow the Agent Skills format: a folder named after the skill with SKILL.md whose frontmatter has a matching lowercase-hyphen name (max 64 chars) and a description of 1 to 1024 characters, and the file must be under 500 lines."
+        },
+        {
+          "id": "FR-SKILL-003",
+          "title": "cclinic must install each skill with identical content to <target>/.agents/skills/<name>/SKILL.md and <target>/.claude/skills/<name>/SKILL.md."
+        },
+        {
+          "id": "FR-SKILL-004",
+          "title": "cclinic must add a marked section to AGENTS.md listing the skills and the project document locations, creating the file if missing."
+        },
+        {
+          "id": "FR-SKILL-005",
+          "title": "Installed skill files must carry frontmatter metadata `generated-by: cclinic` and a content hash used to detect ownership and edits."
+        },
+        {
+          "id": "FR-SKILL-006",
+          "title": "A successful generation run must install the skills unless --no-skills is given, and --dry-run must create no skill folders or AGENTS.md."
+        },
+        {
+          "id": "FR-SKILL-007",
+          "title": "A skill installation failure during a generation run must only produce a warning and must not fail a run whose documents were saved."
+        },
+        {
+          "id": "FR-SKILL-008",
+          "title": "`cclinic skills [path]` must install the skills without calling Claude and without needing the claude executable or an API key, and must accept --out, --force, --json and --dry-run, where --dry-run installs nothing."
+        },
+        {
+          "id": "FR-SKILL-009",
+          "title": "The install result must report each location as installed, updated, unchanged or skipped with a reason, and --json must output each location with its status."
+        },
+        {
+          "id": "FR-SKILL-010",
+          "title": "A same-named skill without the cclinic mark must never be modified, even with --force, and must be reported."
+        },
+        {
+          "id": "FR-SKILL-011",
+          "title": "A cclinic skill whose content no longer matches its hash must be left alone and reported unless --force is given."
+        },
+        {
+          "id": "FR-SKILL-012",
+          "title": "Up-to-date skill files must not be rewritten, and older untouched cclinic copies whose hash is valid must be updated."
+        },
+        {
+          "id": "FR-SKILL-013",
+          "title": "Line endings (CRLF) in an installed skill file must not change whether it is classified as managed."
+        },
+        {
+          "id": "FR-SKILL-014",
+          "title": "Only the marked AGENTS.md section may change; other content must be preserved exactly, and a start marker without an end marker must leave the file untouched and be reported."
+        },
+        {
+          "id": "FR-SKILL-015",
+          "title": "Scanning must skip the .agents and .claude folders, strip the marked AGENTS.md section before analysis and hashing, and ignore an AGENTS.md that contains only that section."
+        },
+        {
+          "id": "FR-SKILL-016",
+          "title": "Installing skills must not change generated documents or invalidate the analysis cache, so a second `cclinic --yes` run makes no Claude calls and leaves all Markdown unchanged."
+        },
+        {
+          "id": "FR-SKILL-017",
+          "title": "Skills must be agent- and stack-agnostic and must refer to the project documents at the configured --out folder rather than the default .cclinic/sdd."
+        },
+        {
+          "id": "FR-SKILL-018",
+          "title": "The create-spec and refine-spec skills must require the project's spec format (three files per spec, permanent IDs, at least one VAL and one TC per requirement, evidence, statuses, unknowns as open questions) and warn that `cclinic --force` replaces hand-edited documents."
+        },
+        {
+          "id": "FR-SKILL-019",
+          "title": "The write-code skill must require reading stack, architecture, guidelines and nearby code first, matching conventions and small changes, and must not tell the agent to hide AI use."
+        },
+        {
+          "id": "FR-SKILL-020",
+          "title": "The implement-spec skill must work through requirements in order, stop on blocking open questions, write tests from test cases, run real project commands and never claim a pass without running."
+        },
+        {
+          "id": "FR-SKILL-021",
+          "title": "The test-spec skill must map every test case to an automated test named with its TC ID or to written manual steps, run them, report defects with reproduction steps, and not weaken tests or change production code to pass."
+        },
+        {
+          "id": "VAL-SKILL-001",
+          "title": "After setup the five named skills exist, each with a valid name and short description, none naming a specific agent, and all pointing to the project's own documents folder."
+        },
+        {
+          "id": "VAL-SKILL-002",
+          "title": "The skills appear in both shared skill locations with identical content, and AGENTS.md lists them and the documents folder."
+        },
+        {
+          "id": "VAL-SKILL-003",
+          "title": "Running cclinic installs skills unless opted out, a preview installs nothing, the skills-only command works with no Claude or key, a skill problem never fails a saved run, and each location is reported as installed, updated, unchanged or skipped."
+        },
+        {
+          "id": "VAL-SKILL-004",
+          "title": "My own same-named skill is never changed, my edited copy is kept unless I force, unchanged files are left as they are, and untouched older copies are updated, regardless of line endings."
+        },
+        {
+          "id": "VAL-SKILL-005",
+          "title": "Only the cclinic section changes, everything else is identical, and a broken section is left untouched and reported."
+        },
+        {
+          "id": "VAL-SKILL-006",
+          "title": "A second run after installing uses no Claude calls and changes no document."
+        },
+        {
+          "id": "VAL-SKILL-007",
+          "title": "Specs produced follow the three-file format with permanent IDs, coverage and evidence, refinement does not renumber or invent answers, and the user is warned that forcing a re-run replaces hand edits."
+        },
+        {
+          "id": "VAL-SKILL-008",
+          "title": "New code follows project conventions in small changes, every requirement is implemented with tests, open questions are raised instead of guessed, and no pass is claimed without running."
+        },
+        {
+          "id": "VAL-SKILL-009",
+          "title": "Each test case has an automated test or manual steps, results are reported, failures appear as defects with reproduction steps, and tests are not weakened."
+        },
+        {
+          "id": "TC-SKILL-001",
+          "title": "The list is exactly create-spec, refine-spec, write-code, implement-spec, test-spec."
+        },
+        {
+          "id": "TC-SKILL-002",
+          "title": "name equals the folder name and matches lowercase letters, digits and single hyphens up to 64 chars; description is 1-1024 chars; file has under 500 lines."
+        },
+        {
+          "id": "TC-SKILL-003",
+          "title": ".agents/skills/<name>/SKILL.md and .claude/skills/<name>/SKILL.md exist for all five skills with identical content including generated-by: cclinic and a hash."
+        },
+        {
+          "id": "TC-SKILL-004",
+          "title": "AGENTS.md is created with start and end markers listing the five skills and the documents folder."
+        },
+        {
+          "id": "TC-SKILL-005",
+          "title": "Exit 0, documents exist, and skill folders and AGENTS.md exist."
+        },
+        {
+          "id": "TC-SKILL-006",
+          "title": "Documents exist but no .agents, .claude skill folders or skills AGENTS.md section are created."
+        },
+        {
+          "id": "TC-SKILL-007",
+          "title": "No skill folders and no AGENTS.md are created."
+        },
+        {
+          "id": "TC-SKILL-008",
+          "title": "Exit code 0, documents are created and a warning about skills is shown."
+        },
+        {
+          "id": "TC-SKILL-009",
+          "title": "Exit 0 and the skills are installed."
+        },
+        {
+          "id": "TC-SKILL-010",
+          "title": "Installed skills mention docs/sdd and do not mention .cclinic/sdd."
+        },
+        {
+          "id": "TC-SKILL-011",
+          "title": "First output lists each location as installed; second lists them as unchanged; output is valid JSON."
+        },
+        {
+          "id": "TC-SKILL-012",
+          "title": "The file content is byte-identical afterwards in both runs and the location is reported as skipped with a reason."
+        },
+        {
+          "id": "TC-SKILL-013",
+          "title": "Without --force the edit is kept and reported skipped; with --force the file is restored to the cclinic content."
+        },
+        {
+          "id": "TC-SKILL-014",
+          "title": "Files are not rewritten (modification times unchanged) and reported unchanged."
+        },
+        {
+          "id": "TC-SKILL-015",
+          "title": "The file is replaced with the current content and reported updated."
+        },
+        {
+          "id": "TC-SKILL-016",
+          "title": "It is classified as managed and unedited."
+        },
+        {
+          "id": "TC-SKILL-017",
+          "title": "Text outside the markers is byte-identical and the section is updated."
+        },
+        {
+          "id": "TC-SKILL-018",
+          "title": "AGENTS.md is unchanged and the result reports the problem."
+        },
+        {
+          "id": "TC-SKILL-019",
+          "title": "Files under .agents and .claude are not analysed and the cclinic section is absent from the AGENTS.md content; an AGENTS.md with only the section is ignored."
+        },
+        {
+          "id": "TC-SKILL-020",
+          "title": "Zero new Claude calls are recorded and all Markdown files are byte-identical."
+        },
+        {
+          "id": "TC-SKILL-021",
+          "title": "No specific agent's tools or commands are named."
+        },
+        {
+          "id": "TC-SKILL-022",
+          "title": "It mentions three files per spec, permanent IDs, a VAL and a TC per requirement, evidence, statuses, open questions, and a warning about `cclinic --force`."
+        },
+        {
+          "id": "TC-SKILL-023",
+          "title": "It requires reading stack, architecture, guidelines and nearby code, small changes and matching conventions, and contains no instruction to hide AI use."
+        },
+        {
+          "id": "TC-SKILL-024",
+          "title": "It requires going in order, stopping on blocking open questions, writing tests from test cases, running real commands and never claiming unrun results."
+        },
+        {
+          "id": "TC-SKILL-025",
+          "title": "It requires mapping each test case to a test named with its TC ID or manual steps, running them, reporting defects with reproduction steps, and forbids weakening tests or changing production code."
+        },
+        {
+          "id": "TC-SKILL-030",
+          "title": "All five skills are discovered in each agent; agents without skill support find them through AGENTS.md."
+        },
+        {
+          "id": "TC-SKILL-031",
+          "title": "The spec follows the required format, code is consistent and small, every requirement has tests, and results are reported honestly."
+        }
+      ]
+    },
+    {
+      "name": "cli-commands",
+      "area": "CLI",
+      "ids": [
+        {
+          "id": "FR-CLI-001",
+          "title": "The CLI must provide the commands `cclinic [path]` (generate), `model`, `doctor [path]`, `skills [path]`, `clean [path]`, `guide` and `help [command]`, with the target defaulting to the current directory."
+        },
+        {
+          "id": "FR-CLI-002",
+          "title": "The CLI must exit with code 2 when the target path is missing or is not a directory."
+        },
+        {
+          "id": "FR-CLI-003",
+          "title": "The CLI must accept the general options -h/--help, -v/--version, -q/--quiet, -d/--debug, --debug-file <path>, --json and --color auto|always|never (default auto)."
+        },
+        {
+          "id": "FR-CLI-004",
+          "title": "The generate command must accept the options --out, --provider, --model, --effort, repeatable --include and --exclude, --dry-run, --force, --yes, --no-cache, --no-skills, --no-git and --allow-broad-target, with --out defaulting to <target>/.cclinic/sdd."
+        },
+        {
+          "id": "FR-CLI-005",
+          "title": "The CLI must validate limit options against their ranges and defaults (--max-files 10000 >=1; --max-input-tokens 2000000 >=1; --max-file-size-mib 1 in 1-50; --max-budget-usd >0 with no default; --concurrency 4 in 1-16; --timeout-minutes 30 in 1-120; --max-retries 2 in 0-10) and exit with code 2 on invalid values before any scan."
+        },
+        {
+          "id": "FR-CLI-006",
+          "title": "Option values must take precedence over environment variables (CCLINIC_PROVIDER, CCLINIC_MODEL, CCLINIC_EFFORT), which must take precedence over saved defaults."
+        },
+        {
+          "id": "FR-CLI-007",
+          "title": "With --dry-run the CLI must print a summary and skipped totals by reason without any LLM generation call and without writing files."
+        },
+        {
+          "id": "FR-CLI-008",
+          "title": "Before any LLM call the CLI must show a summary (target, provider, auth, model, effort, file counts, skipped count, token estimate, cost estimate where applicable, Git status and a notice that content is sent to Anthropic)."
+        },
+        {
+          "id": "FR-CLI-009",
+          "title": "The CLI must ask for confirmation before sending unless --yes is given; declining must exit 0 sending and writing nothing, and without a TTY and without --yes it must exit 2 without waiting."
+        },
+        {
+          "id": "FR-CLI-010",
+          "title": "Progress, prompts and menus must go to stderr and the final result to stdout, and normal output must never include scanned file contents."
+        },
+        {
+          "id": "FR-CLI-011",
+          "title": "With --json stdout must be exactly one JSON object with status (dry-run, success, declined or error); errors include exitCode, errorType and message, and the object's exit code must match the process exit code."
+        },
+        {
+          "id": "FR-CLI-012",
+          "title": "Using --quiet together with --debug must be a usage error (exit 2); --quiet must show only the final result, and --debug and --debug-file must never reveal file contents, prompts, keys or secrets."
+        },
+        {
+          "id": "FR-CLI-013",
+          "title": "Color must be off when the stream is not a TTY, NO_COLOR is non-empty or TERM is dumb, each stream checked separately, and --color always/never must override."
+        },
+        {
+          "id": "FR-CLI-014",
+          "title": "The CLI must use the exit codes 0 (success or declined), 1 (internal), 2 (usage), 3 (no provider), 4 (LLM failure or budget), 5 (validation failure), 130 (SIGINT) and 143 (SIGTERM)."
+        },
+        {
+          "id": "FR-CLI-015",
+          "title": "The executable must exit with code 2 and a stderr message naming the required version when Node.js is older than 22.18."
+        },
+        {
+          "id": "FR-CLI-016",
+          "title": "On LLM failure the error message must say that re-running the same command continues where it stopped."
+        },
+        {
+          "id": "FR-CLI-017",
+          "title": "`cclinic doctor` must report pass/fail/skipped checks with fixes, support --json, never call a model, print the API key value or read project contents, skip the npm update check after 5 seconds, and exit 0 if a provider is usable else 3."
+        },
+        {
+          "id": "FR-CLI-018",
+          "title": "`cclinic clean` must delete only .cclinic/cache and .cclinic/failed, leave .cclinic/sdd untouched, report space freed, and ask for confirmation unless --yes is given."
+        },
+        {
+          "id": "FR-CLI-019",
+          "title": "`cclinic guide` must print an offline walkthrough with exit 0, and help (help [command], -h/--help in any position) must show examples and defaults and suggest the closest match for typos with exit 2."
+        },
+        {
+          "id": "FR-CLI-020",
+          "title": "On SIGINT or SIGTERM the CLI must print a message at once, stop calls, remove temp files and exit 130 or 143 within 5 seconds, a second Ctrl+C must exit immediately, and completed summaries must stay cached."
+        },
+        {
+          "id": "FR-CLI-021",
+          "title": "Output and cache folders must be writable before any LLM call, otherwise the CLI must exit 2."
+        },
+        {
+          "id": "FR-CLI-022",
+          "title": "Only one run per target must be allowed using .cclinic/.lock holding the PID; a second run must exit 2 naming the process, stale locks must be replaced, and dry-run and doctor must not need the lock."
+        },
+        {
+          "id": "FR-CLI-023",
+          "title": "A home folder or filesystem root target must be refused unless --allow-broad-target is given, even with --yes."
+        },
+        {
+          "id": "FR-CLI-024",
+          "title": "Exceeding --max-files or --max-input-tokens, or finding no files, must stop before generation with exit 2 showing the actual number, the limit, the flag and how to exclude files; cached modules must not count toward the token limit."
+        },
+        {
+          "id": "FR-CLI-025",
+          "title": "The CLI must not send telemetry and must connect only to the chosen Anthropic provider and, for doctor, to npm."
+        },
+        {
+          "id": "FR-CLI-026",
+          "title": "`cclinic model` must list, choose or reset the saved default model and reasoning level."
+        },
+        {
+          "id": "FR-CLI-027",
+          "title": "`cclinic skills [path]` must install the agent skills without using any LLM, supporting --out, --force and --json."
+        },
+        {
+          "id": "VAL-CLI-001",
+          "title": "Running cclinic, cclinic <path> and --help works for each command, and a wrong path or typo gives a helpful message with no other action."
+        },
+        {
+          "id": "VAL-CLI-002",
+          "title": "Documented options are accepted, out-of-range values are rejected with a clear message before any work, and options override environment settings which override saved defaults."
+        },
+        {
+          "id": "VAL-CLI-003",
+          "title": "A dry run shows included and skipped files and leaves the project unchanged with no Claude usage."
+        },
+        {
+          "id": "VAL-CLI-004",
+          "title": "Before sending, the user sees destination, volume, model and login, can answer no with nothing sent, and scripts without a terminal never hang."
+        },
+        {
+          "id": "VAL-CLI-005",
+          "title": "Results are separate from progress, JSON output is one readable object including failures, exit codes reflect the outcome, and failure messages say re-running continues."
+        },
+        {
+          "id": "VAL-CLI-006",
+          "title": "Quiet and debug modes behave as described, conflicting use is rejected, no secrets or file contents appear, and no color codes appear in logs or files."
+        },
+        {
+          "id": "VAL-CLI-007",
+          "title": "An old Node.js shows a message naming the required version and exits with the usage error."
+        },
+        {
+          "id": "VAL-CLI-008",
+          "title": "doctor lists checks with fixes, never shows the key, uses no Claude usage, and the only network use is the provider and npm version check."
+        },
+        {
+          "id": "VAL-CLI-009",
+          "title": "clean removes cache and failed drafts after confirmation, reports space freed and leaves generated documents unchanged."
+        },
+        {
+          "id": "VAL-CLI-010",
+          "title": "Ctrl+C stops quickly keeping finished work, unwritable folders are caught before sending, and a second run on the same folder is refused."
+        },
+        {
+          "id": "VAL-CLI-011",
+          "title": "Home, root or oversized projects stop before sending, with an explanation of how to proceed deliberately."
+        },
+        {
+          "id": "VAL-CLI-012",
+          "title": "cclinic guide works offline and covers steps, commands, skills, limits and exit codes."
+        },
+        {
+          "id": "VAL-CLI-013",
+          "title": "model lists, sets and resets the default, and skills installs the skills without Claude usage."
+        },
+        {
+          "id": "TC-CLI-001",
+          "title": "Both exit with code 2 with a message about the path, and nothing is written."
+        },
+        {
+          "id": "TC-CLI-002",
+          "title": "Each exits 0 and prints help (with examples/defaults) or the version on stdout."
+        },
+        {
+          "id": "TC-CLI-003",
+          "title": "Each exits 2, suggests `doctor` / `--dry-run`, and runs nothing."
+        },
+        {
+          "id": "TC-CLI-004",
+          "title": "Each exits 2 with a clear message before any scan starts."
+        },
+        {
+          "id": "TC-CLI-005",
+          "title": "The values reach the pipeline and output is written to <dir>."
+        },
+        {
+          "id": "TC-CLI-006",
+          "title": "The option wins over the environment variable; with the variable only, the env provider is used."
+        },
+        {
+          "id": "TC-CLI-007",
+          "title": "Exit 0, no generate calls, .cclinic is unchanged, summary and skipped totals by reason are printed."
+        },
+        {
+          "id": "TC-CLI-008",
+          "title": "Stdout is a single JSON object with status dry-run, included paths and skipped paths with reasons."
+        },
+        {
+          "id": "TC-CLI-009",
+          "title": "Summary lists target, provider, auth, model, effort, counts, tokens, Git status and an Anthropic notice; cost shown for API, not for subscription."
+        },
+        {
+          "id": "TC-CLI-010",
+          "title": "Exit 0, no generate calls, no files written."
+        },
+        {
+          "id": "TC-CLI-011",
+          "title": "First exits 2 immediately without provider calls; second proceeds."
+        },
+        {
+          "id": "TC-CLI-012",
+          "title": "Progress is on stderr, result on stdout, and the marker appears in neither."
+        },
+        {
+          "id": "TC-CLI-013",
+          "title": "Stdout is one JSON object with status error, exitCode 4, errorType and message; process exit is 4."
+        },
+        {
+          "id": "TC-CLI-014",
+          "title": "First exits 2; second prints only the final result; debug output and file contain no MARKER-CONTENT-123, prompts or API key."
+        },
+        {
+          "id": "TC-CLI-015",
+          "title": "ANSI codes appear only for TTY with empty NO_COLOR or --color always; never otherwise."
+        },
+        {
+          "id": "TC-CLI-016",
+          "title": "Exit codes are 0, 3 and 5 respectively; an internal fault gives 1."
+        },
+        {
+          "id": "TC-CLI-017",
+          "title": "Stderr names the needed version 22.18 and exit code is 2."
+        },
+        {
+          "id": "TC-CLI-018",
+          "title": "Exit 4 and message states re-running the same command continues where it stopped."
+        },
+        {
+          "id": "TC-CLI-019",
+          "title": "Exit 0, key reported as set but its value never printed, no generate calls, no project content."
+        },
+        {
+          "id": "TC-CLI-020",
+          "title": "Exit 3 with fixes listed."
+        },
+        {
+          "id": "TC-CLI-021",
+          "title": "The npm check is skipped after 5 seconds and doctor still completes."
+        },
+        {
+          "id": "TC-CLI-022",
+          "title": "cache and failed are removed, sdd unchanged, space freed reported, exit 0."
+        },
+        {
+          "id": "TC-CLI-023",
+          "title": "Exits without deleting anything and with a usage error."
+        },
+        {
+          "id": "TC-CLI-024",
+          "title": "Exit 0; output covers steps, commands, five skills, skipped items, limits with defaults matching real options, problems and exit codes."
+        },
+        {
+          "id": "TC-CLI-025",
+          "title": "Message printed at once; exits 130/143 within 5 seconds with no child processes or temp files; finished summaries remain cached; second SIGINT exits immediately."
+        },
+        {
+          "id": "TC-CLI-026",
+          "title": "Exit 2 before any provider call."
+        },
+        {
+          "id": "TC-CLI-027",
+          "title": "Second run exits 2 naming the PID; dry-run and doctor ignore the lock."
+        },
+        {
+          "id": "TC-CLI-028",
+          "title": "Lock is replaced and the run proceeds."
+        },
+        {
+          "id": "TC-CLI-029",
+          "title": "Refused with exit 2 without the flag; accepted with it; a normal folder is accepted."
+        },
+        {
+          "id": "TC-CLI-030",
+          "title": "Each exits 2 before generation, message includes actual number, limit, flag name and exclusion advice."
+        },
+        {
+          "id": "TC-CLI-031",
+          "title": "The token limit is not exceeded because cached modules do not count."
+        },
+        {
+          "id": "TC-CLI-032",
+          "title": "Stops before sending because no files remain."
+        },
+        {
+          "id": "TC-CLI-033",
+          "title": "No connections other than the provider (and the npm check for doctor) are attempted."
+        },
+        {
+          "id": "TC-CLI-034",
+          "title": "List shows models; config.json under XDG_CONFIG_HOME/cclinic holds model and effort after setting; reset removes them."
+        },
+        {
+          "id": "TC-CLI-035",
+          "title": "Skills are installed in .agents/skills and .claude/skills, no LLM call, and stdout is one JSON object."
+        },
+        {
+          "id": "TC-CLI-036",
+          "title": "It is treated as the target path, not the model command."
+        },
+        {
+          "id": "TC-CLI-037",
+          "title": "All options are accepted and no unknown-option error occurs."
+        }
+      ]
+    },
+    {
+      "name": "content-extraction",
+      "area": "EXT",
+      "ids": [
+        {
+          "id": "FR-EXT-001",
+          "title": "The system must read code, config, Markdown and plain-text files (.txt, .rst, .adoc) as UTF-8 text keeping line numbers, and must replace invalid UTF-8 bytes and record a per-file warning instead of failing."
+        },
+        {
+          "id": "FR-EXT-002",
+          "title": "The system must extract PDF text with pdfjs-dist and keep the page number of each piece of text."
+        },
+        {
+          "id": "FR-EXT-003",
+          "title": "The system must extract DOCX text with mammoth, keeping headings and table contents, and must map each piece of text to its nearest heading so it can be cited as document.docx#Heading."
+        },
+        {
+          "id": "FR-EXT-004",
+          "title": "The system must treat a PDF averaging under 20 non-space characters per page as having no extractable text, produce a warning naming the file, and continue without its content."
+        },
+        {
+          "id": "FR-EXT-005",
+          "title": "For a partly scanned PDF the system must extract the pages that have text and must warn listing the pages that had no text."
+        },
+        {
+          "id": "FR-EXT-006",
+          "title": "The system must produce a warning in scan-report.md for encrypted, password-protected or corrupt PDF/DOCX files and for legacy .doc files, and must continue the run without them."
+        },
+        {
+          "id": "FR-EXT-007",
+          "title": "The system must split files too large for one request into chunks that keep their line or page positions, must never silently truncate content, and the chunks must join back to the original text exactly."
+        },
+        {
+          "id": "FR-EXT-008",
+          "title": "Each extracted file must record its path, type, SHA-256 hash of the original bytes and text with positions, and later stages must use only this form."
+        },
+        {
+          "id": "FR-EXT-009",
+          "title": "Extraction must run locally with no network access."
+        },
+        {
+          "id": "FR-EXT-010",
+          "title": "A failure while extracting one file must not stop extraction of the other files."
+        },
+        {
+          "id": "FR-EXT-011",
+          "title": "The system must remove cclinic's own managed section from AGENTS.md before hashing and analysis."
+        },
+        {
+          "id": "FR-EXT-012",
+          "title": "Empty files must be recorded as included with nothing to send, and images inside PDF and DOCX files must be ignored."
+        },
+        {
+          "id": "VAL-EXT-001",
+          "title": "A requirement that exists only in a text or Markdown file shows up in the specs with a line citation that leads to the source; a file with bad characters or an empty file does not stop the run."
+        },
+        {
+          "id": "VAL-EXT-002",
+          "title": "A requirement only in a PDF appears in the specs with a page citation, and for real multi-column and table-heavy PDFs the text is good enough for useful specs; otherwise the PDF library choice is reopened."
+        },
+        {
+          "id": "VAL-EXT-003",
+          "title": "A requirement only in a DOCX, including in a table, appears in the specs citing the nearest heading."
+        },
+        {
+          "id": "VAL-EXT-004",
+          "title": "For scanned, partly scanned, encrypted, corrupt and legacy .doc files the report names each file with a warning, and the other files are still processed."
+        },
+        {
+          "id": "VAL-EXT-005",
+          "title": "Content near the end of a very large file is reflected in the generated specs and no truncation notice or loss occurs."
+        },
+        {
+          "id": "VAL-EXT-006",
+          "title": "Reading and extracting files works with no network connection."
+        },
+        {
+          "id": "VAL-EXT-007",
+          "title": "Each analysed file is identified by a fingerprint of its original content, and adding or changing only cclinic's AGENTS.md section does not change that file's fingerprint."
+        },
+        {
+          "id": "TC-EXT-001",
+          "title": "Each result has the file's text split into lines numbered from 1 with content matching the source, and no warnings."
+        },
+        {
+          "id": "TC-EXT-002",
+          "title": "Invalid bytes are replaced, a warning names the file, no error is thrown and the remaining text keeps correct line numbers."
+        },
+        {
+          "id": "TC-EXT-003",
+          "title": "Each text piece is attributed to the page it appears on."
+        },
+        {
+          "id": "TC-EXT-004",
+          "title": "The text is judged good enough to derive requirements; otherwise the PDF library choice is raised."
+        },
+        {
+          "id": "TC-EXT-005",
+          "title": "Headings and table text are present, and each piece maps to its nearest heading so it can be cited as file.docx#Heading."
+        },
+        {
+          "id": "TC-EXT-006",
+          "title": "No text is returned and a warning naming the file is recorded."
+        },
+        {
+          "id": "TC-EXT-007",
+          "title": "Text of pages 1 and 3 is returned and the warning lists page 2."
+        },
+        {
+          "id": "TC-EXT-008",
+          "title": "scan-report.md has a warning for each bad file, the valid text file is extracted, and the run does not fail."
+        },
+        {
+          "id": "TC-EXT-009",
+          "title": "There is more than one chunk, joining the chunks reproduces the original text exactly, and each chunk's line numbers match the original lines."
+        },
+        {
+          "id": "TC-EXT-010",
+          "title": "Every page's text appears in exactly one chunk with its page number, and none is dropped."
+        },
+        {
+          "id": "TC-EXT-011",
+          "title": "The result contains the path, type, and a hash equal to SHA-256 of the original bytes (computed independently), and the positioned text."
+        },
+        {
+          "id": "TC-EXT-012",
+          "title": "Extraction succeeds and zero network attempts are observed."
+        },
+        {
+          "id": "TC-EXT-013",
+          "title": "All good files produce results and only the corrupt file produces a warning."
+        },
+        {
+          "id": "TC-EXT-014",
+          "title": "The result text and hash exclude the managed section, and changing only that section leaves the hash unchanged."
+        },
+        {
+          "id": "TC-EXT-015",
+          "title": "The empty file is recorded as included with no text and no error; images produce no content."
+        }
+      ]
+    },
+    {
+      "name": "file-discovery",
+      "area": "DISC",
+      "ids": [
+        {
+          "id": "FR-DISC-001",
+          "title": "Each path must be checked against the exclusion rules in a fixed order (secrets, tool folders, --exclude, --include, ignore files, dependency/build folders, binaries, lockfiles/minified/generated/oversized, otherwise keep), and the first matching rule must decide and supply the skip reason."
+        },
+        {
+          "id": "FR-DISC-002",
+          "title": "Secret files (.env*, *.pem, *.key, id_rsa etc., .npmrc, anything in .ssh or .aws) and tool folders such as .git and .cclinic must never be read or included, and no option including --include \"**\" may override this."
+        },
+        {
+          "id": "FR-DISC-003",
+          "title": "--exclude patterns must take precedence over --include patterns, and --include must force-keep files that would otherwise be skipped by ignore, dependency, binary, lockfile, minified or size rules (but not secrets or tool folders)."
+        },
+        {
+          "id": "FR-DISC-004",
+          "title": "The scan must honour .gitignore files at every level and an optional .cclinicignore in the target root, using gitignore syntax, with or without a Git repository."
+        },
+        {
+          "id": "FR-DISC-005",
+          "title": "Folders with known dependency or build names must be skipped at any depth by exact name match, except that lib, bin and src are never skipped by name and packages is skipped only when it contains .nupkg files directly or in an immediate subfolder."
+        },
+        {
+          "id": "FR-DISC-006",
+          "title": "Binary files must be skipped by known binary extension or by a NUL byte in the first 8 KB, while .pdf and .docx must be treated as documents and not skipped as binary."
+        },
+        {
+          "id": "FR-DISC-007",
+          "title": "Lockfiles, minified files (.min.js, .min.css), source maps, and bundled files with average line length above 500 characters must be skipped unless forced in."
+        },
+        {
+          "id": "FR-DISC-008",
+          "title": "Files containing @generated or DO NOT EDIT within their first 20 lines must be skipped as generated."
+        },
+        {
+          "id": "FR-DISC-009",
+          "title": "Text files above the size limit (default 1 MiB, configurable with --max-file-size-mib from 1 to 50) and documents above 50 MiB must be skipped, while files exactly at the limit are kept."
+        },
+        {
+          "id": "FR-DISC-010",
+          "title": "Secret-shaped text in included files (at least AWS keys, Anthropic/OpenAI keys, GitHub tokens, Slack tokens, JWTs, private key blocks and connection-string credentials) must be replaced with [REDACTED:<type>] before content is used, preserving line numbers, and reports must show only file and count, never the secret."
+        },
+        {
+          "id": "FR-DISC-011",
+          "title": "Redaction of 1 MB of adversarial input must complete in under 1 second and must leave non-secret lookalikes such as Git commit hashes unchanged."
+        },
+        {
+          "id": "FR-DISC-012",
+          "title": "Symlinks must not be followed, so files outside the target are never read and symlink loops do not hang the scan."
+        },
+        {
+          "id": "FR-DISC-013",
+          "title": "Files must be processed in sorted path order, producing the same result for an unchanged project, and each included file must be classified as code, config or document."
+        },
+        {
+          "id": "FR-DISC-014",
+          "title": "Every skipped file must be recorded with a reason (a skipped folder may be a single entry), unreadable files (e.g. permission denied, or a forced-in binary that is not readable as text) must be recorded as skipped without stopping the scan, and the records must feed scan-report.md."
+        },
+        {
+          "id": "FR-DISC-015",
+          "title": "When no files remain after discovery, cclinic must report this clearly, exit with code 2 (usage error) and not call an LLM."
+        },
+        {
+          "id": "VAL-DISC-001",
+          "title": "On Node, .NET, Python, Java and Go projects, the list of included files contains no dependency code, binaries, lockfiles, minified, generated or build output files."
+        },
+        {
+          "id": "VAL-DISC-002",
+          "title": "Files in lib/, bin/, src/ and a packages/ folder without NuGet packages appear as included, and PDF, DOCX and Markdown documents are included and labelled as documents."
+        },
+        {
+          "id": "VAL-DISC-003",
+          "title": "Environment files and keys are never read, even when forced with include patterns, and known secret formats in code appear only as [REDACTED:<type>] with reports showing just file and count."
+        },
+        {
+          "id": "VAL-DISC-004",
+          "title": ".gitignore and .cclinicignore are respected, --include restores skipped files, --exclude wins over --include, and none of these can expose secrets."
+        },
+        {
+          "id": "VAL-DISC-005",
+          "title": "The report gives a reason for every skipped file or folder, oversized files are skipped by default and kept when I raise the size limit."
+        },
+        {
+          "id": "VAL-DISC-006",
+          "title": "Scans stay within the chosen folder, do not hang on symlink loops, continue past unreadable files, and give the same result for an unchanged project."
+        },
+        {
+          "id": "VAL-DISC-007",
+          "title": "For a folder with nothing analysable, a clear message is shown, the command fails with a usage error and nothing is sent to Claude."
+        },
+        {
+          "id": "TC-DISC-001",
+          "title": "The result is from the first matching rule in the documented order and includes that rule's reason."
+        },
+        {
+          "id": "TC-DISC-002",
+          "title": "None of the secret or tool-folder files are included, each is recorded as skipped with a reason, and the spies show none were opened."
+        },
+        {
+          "id": "TC-DISC-003",
+          "title": "The file is skipped as excluded; a file matched only by --include inside an ignored or dependency folder is kept."
+        },
+        {
+          "id": "TC-DISC-004",
+          "title": "Ignored files are skipped per gitignore syntax, negated files are kept, and .cclinicignore entries are skipped, in both folders."
+        },
+        {
+          "id": "TC-DISC-005",
+          "title": "node_modules and vendor are skipped; my_vendor, build file, lib, bin, src and packages are kept."
+        },
+        {
+          "id": "TC-DISC-006",
+          "title": "Both packages folders are skipped with a reason; with --include \"packages/**\" files are kept."
+        },
+        {
+          "id": "TC-DISC-007",
+          "title": "The .dll, .png and NUL-byte file are skipped as binary; the .pdf and .docx are included as documents."
+        },
+        {
+          "id": "TC-DISC-008",
+          "title": "The .dll is reported as skipped because it cannot be read as text."
+        },
+        {
+          "id": "TC-DISC-009",
+          "title": "All five are skipped with distinct reasons; a normal file with short lines is kept."
+        },
+        {
+          "id": "TC-DISC-010",
+          "title": "The first two are skipped as generated; the third is included."
+        },
+        {
+          "id": "TC-DISC-011",
+          "title": "The exact-limit files are kept; the larger ones are skipped with a size reason."
+        },
+        {
+          "id": "TC-DISC-012",
+          "title": "The file is listed as skipped by default and as included with the raised limit."
+        },
+        {
+          "id": "TC-DISC-013",
+          "title": "Each secret is replaced with [REDACTED:<type>], the line count is unchanged, and the original secret strings are absent from the output."
+        },
+        {
+          "id": "TC-DISC-014",
+          "title": "The secret appears in no prompt or report; the report shows the file name and redaction count only."
+        },
+        {
+          "id": "TC-DISC-015",
+          "title": "It finishes in under 1 second and the commit hash is unchanged."
+        },
+        {
+          "id": "TC-DISC-016",
+          "title": "The outside file's content is never read, the scan finishes without hanging, and links are not followed."
+        },
+        {
+          "id": "TC-DISC-017",
+          "title": "Both runs return identical lists sorted by path, with files classified as code, config or document."
+        },
+        {
+          "id": "TC-DISC-018",
+          "title": "The unreadable file is recorded as skipped with a reason and the other files are still discovered."
+        },
+        {
+          "id": "TC-DISC-019",
+          "title": "Every file is either in the included list or covered by a skipped entry (file or folder) with a non-empty reason."
+        },
+        {
+          "id": "TC-DISC-020",
+          "title": "A clear message about no files is printed, exit code is 2, and the fake claude is never invoked."
+        },
+        {
+          "id": "TC-DISC-021",
+          "title": "No third-party or binary files are included and no first-party files are wrongly skipped."
+        }
+      ]
+    },
+    {
+      "name": "git-setup",
+      "area": "GIT",
+      "ids": [
+        {
+          "id": "FR-GIT-001",
+          "title": "cclinic must detect whether Git is installed, whether the target is inside a repository (including a parent-folder repository) and whether the repository has a remote, without changing anything and without needing Claude or the network."
+        },
+        {
+          "id": "FR-GIT-002",
+          "title": "cclinic must report the detected Git status (Git, repository, remote) and the planned Git action in the pre-run summary and in --dry-run output without creating a .git folder."
+        },
+        {
+          "id": "FR-GIT-003",
+          "title": "cclinic doctor must report Git installed, repository present and remote present, and a missing repository or remote must not make doctor report cclinic as not ready."
+        },
+        {
+          "id": "FR-GIT-004",
+          "title": "When no repository exists, cclinic must run git init in the target only after the user confirms (or --yes is given) and before the first Claude call, using init.defaultBranch and falling back to main."
+        },
+        {
+          "id": "FR-GIT-005",
+          "title": "cclinic must not run git init when the user declines confirmation or when the scan finds nothing to analyse."
+        },
+        {
+          "id": "FR-GIT-006",
+          "title": "cclinic must not create a nested repository when the target is inside an existing repository, and a submodule or subfolder repository must not count as the parent."
+        },
+        {
+          "id": "FR-GIT-007",
+          "title": "cclinic must never stage files, make commits, change Git config, create a .gitignore, add or create a remote, or push."
+        },
+        {
+          "id": "FR-GIT-008",
+          "title": "When a repository has no remote, cclinic must include in the run result a non-failing alert with GitHub, GitLab and Bitbucket instructions to create a remote, add it and push, and the exit code must be unchanged."
+        },
+        {
+          "id": "FR-GIT-009",
+          "title": "cclinic must not show the remote alert when a remote exists or when --no-git is used, and --quiet must hide the alert while --json must still include it."
+        },
+        {
+          "id": "FR-GIT-010",
+          "title": "cclinic must show only the remote name and host, never URL credentials, and must not send remote URLs to Claude."
+        },
+        {
+          "id": "FR-GIT-011",
+          "title": "The --no-git option must disable repository creation, history reading and the remote alert for the run."
+        },
+        {
+          "id": "FR-GIT-012",
+          "title": "cclinic must read commits from the last 14 days on the current branch that touch the target folder, excluding merges, with short hash, date, message and changed file paths only."
+        },
+        {
+          "id": "FR-GIT-013",
+          "title": "cclinic must not read or send diffs, author names or author emails from Git history."
+        },
+        {
+          "id": "FR-GIT-014",
+          "title": "cclinic must exclude commits touching only .cclinic, .agents, .claude or AGENTS.md, remove secret, dependency and skipped paths from changed paths using file-discovery rules, and redact secrets in messages."
+        },
+        {
+          "id": "FR-GIT-015",
+          "title": "cclinic must limit history to the newest 300 commits and 100,000 characters, warn how many were omitted, and count the history size toward the token estimate and --max-input-tokens."
+        },
+        {
+          "id": "FR-GIT-016",
+          "title": "cclinic must provide the history to the combine step and each spec generation call, but not to module summary calls, as delimited untrusted context."
+        },
+        {
+          "id": "FR-GIT-017",
+          "title": "Generated requirements must not rest on a commit message alone or cite commit hashes as evidence, and conflicts between history and code or documents must be recorded as open questions."
+        },
+        {
+          "id": "FR-GIT-018",
+          "title": "Combine and spec cache keys must use the newest commit hash of the whole history rather than the 14-day window, keys with no history must match a no-repo run, and module summaries must not depend on history."
+        },
+        {
+          "id": "FR-GIT-019",
+          "title": "Commit counts and dates must not appear in generated Markdown, only in the run result and --json output, so output is byte-identical when the newest commit is unchanged."
+        },
+        {
+          "id": "FR-GIT-020",
+          "title": "Git failures (missing Git, corrupt or shallow repository, unsafe ownership, timeout) must produce a warning and let the run continue without history, and a shallow clone must warn that history may be incomplete."
+        },
+        {
+          "id": "FR-GIT-021",
+          "title": "cclinic must never bypass Git's dubious-ownership protection."
+        },
+        {
+          "id": "FR-GIT-022",
+          "title": "cclinic must invoke Git with an argument array and no shell, a timeout, a cleaned environment and hardening options (--no-ext-diff, --no-textconv, core.fsmonitor=false) so repository config cannot run programs, and must pass paths literally."
+        },
+        {
+          "id": "FR-GIT-023",
+          "title": "The 14-day window, history limits, excluded paths and provider links must be defined only as named constants in src/core/constants/git.ts."
+        },
+        {
+          "id": "FR-GIT-024",
+          "title": "cclinic must recommend adding a .gitignore when one is missing in a newly created repository without creating it."
+        },
+        {
+          "id": "VAL-GIT-001",
+          "title": "The summary, dry run and doctor tell me whether Git, a repository and a remote exist and what cclinic will do, and nothing is created; a missing repo or remote does not make doctor say cclinic is not ready."
+        },
+        {
+          "id": "VAL-GIT-002",
+          "title": "A project without a repository gets one only after I agree, with nothing staged or committed, no nested repository inside an existing one, and a declined run leaves the project untouched; I am advised about a .gitignore but none is created."
+        },
+        {
+          "id": "VAL-GIT-003",
+          "title": "With --no-git, cclinic does not create a repository, read history or show a remote alert."
+        },
+        {
+          "id": "VAL-GIT-004",
+          "title": "With no remote I see steps for GitHub, GitLab or Bitbucket, the run still succeeds, nothing is created or pushed, and no tokens from remote URLs are shown."
+        },
+        {
+          "id": "VAL-GIT-005",
+          "title": "In a project with recent commits the specs reflect recent work, while diffs, author names and emails, secret paths and cclinic's own output never reach Claude, and very large histories are trimmed with a warning."
+        },
+        {
+          "id": "VAL-GIT-006",
+          "title": "A commit describing something the code does not do does not become a confirmed requirement and is raised as an open question; no requirement cites a commit."
+        },
+        {
+          "id": "VAL-GIT-007",
+          "title": "Re-running on an unchanged project makes no Claude calls and leaves documents identical; committing cclinic's own output changes nothing; a new relevant commit refreshes the combined results; no commit counts or dates appear in documents."
+        },
+        {
+          "id": "VAL-GIT-008",
+          "title": "Broken, unsafe, shallow or missing Git only produces warnings and the run succeeds; a malicious repository setting cannot run programs; Git ownership safety is not bypassed."
+        },
+        {
+          "id": "TC-GIT-001",
+          "title": "Each reports correct installed/repository/remote values (parent repo detected for the subfolder) and no files or .git are created or modified."
+        },
+        {
+          "id": "TC-GIT-002",
+          "title": "Git is reported as not installed, a warning is shown, the run exits 0 and no history is used."
+        },
+        {
+          "id": "TC-GIT-003",
+          "title": "Output states a repository would be created and the Git status; no .git folder exists afterwards and no Claude call occurs."
+        },
+        {
+          "id": "TC-GIT-004",
+          "title": "Doctor reports Git installed, repository absent and remote absent with fixes, creates no .git, and Git items alone do not cause a not-ready exit code."
+        },
+        {
+          "id": "TC-GIT-005",
+          "title": ".git exists with branch trunk, created before the first fake claude call; with no setting the branch is main."
+        },
+        {
+          "id": "TC-GIT-006",
+          "title": "No .git folder exists in either folder."
+        },
+        {
+          "id": "TC-GIT-007",
+          "title": "No .git is created in the subfolder and the parent repository is used."
+        },
+        {
+          "id": "TC-GIT-008",
+          "title": "Recorded commands contain no add, commit, config, remote or push; no .gitignore is created; the output recommends one; repo has zero commits and nothing staged."
+        },
+        {
+          "id": "TC-GIT-009",
+          "title": "Normal run shows alert with GitHub, GitLab, Bitbucket links and remote add and push commands and exit code 0; --quiet hides the alert; --json includes the alert."
+        },
+        {
+          "id": "TC-GIT-010",
+          "title": "No remote alert is shown in either."
+        },
+        {
+          "id": "TC-GIT-011",
+          "title": "Neither stdout, stderr, debug output nor captured prompts contain SECRETTOKEN; only remote name and host appear."
+        },
+        {
+          "id": "TC-GIT-012",
+          "title": "No .git created, no remote alert, and prompts contain no history section."
+        },
+        {
+          "id": "TC-GIT-013",
+          "title": "Only the 13-day non-merge commit on the current branch is returned with short hash, date, message and paths."
+        },
+        {
+          "id": "TC-GIT-014",
+          "title": "Only commits touching a/ appear; with detached HEAD history comes from the checked-out commit; repo with zero commits yields no history without error."
+        },
+        {
+          "id": "TC-GIT-015",
+          "title": "Prompts contain neither author name, email nor diff content marker."
+        },
+        {
+          "id": "TC-GIT-016",
+          "title": "The cclinic-only commits are absent; changed paths include src/app.ts only; the message shows a redaction marker not the key."
+        },
+        {
+          "id": "TC-GIT-017",
+          "title": "Newest 300 commits / 100,000 chars kept with warning stating omitted count; size counts to the estimate; exceeding --max-input-tokens exits 2 with no Claude call."
+        },
+        {
+          "id": "TC-GIT-018",
+          "title": "Combine and each spec prompt contain a delimited history block; module summary prompts do not; a message containing a closing project_content tag is escaped."
+        },
+        {
+          "id": "TC-GIT-019",
+          "title": "The commit-hash-only evidence is rejected; file evidence is accepted; the prompt text states history is context only and conflicts become open questions."
+        },
+        {
+          "id": "TC-GIT-020",
+          "title": "First two reruns make zero calls; new commit reruns combine and spec but not summaries; module change regenerates only that module's summary."
+        },
+        {
+          "id": "TC-GIT-021",
+          "title": "No Claude calls are made because cache keys match the no-history run."
+        },
+        {
+          "id": "TC-GIT-022",
+          "title": "Generated Markdown files are byte-identical and contain no commit counts or dates; --json includes Git status and commit count."
+        },
+        {
+          "id": "TC-GIT-023",
+          "title": "Exit code 0, warnings shown (shallow warns history may be incomplete), documents generated."
+        },
+        {
+          "id": "TC-GIT-024",
+          "title": "A warning is shown, run continues without history, and no safe.directory setting is added to any Git config."
+        },
+        {
+          "id": "TC-GIT-025",
+          "title": "Marker file is not created; recorded Git calls use no shell, include --no-ext-diff, --no-textconv and core.fsmonitor=false, and pass the path literally."
+        },
+        {
+          "id": "TC-GIT-026",
+          "title": "The call is terminated, a warning is produced and the run continues without history."
+        },
+        {
+          "id": "TC-GIT-027",
+          "title": "No hard-coded 14-day window, 300, 100000, excluded path names or provider links appear outside src/core/constants/git.ts."
+        }
+      ]
+    },
+    {
+      "name": "llm-providers",
+      "area": "LLM",
+      "ids": [
+        {
+          "id": "FR-LLM-001",
+          "title": "With --provider auto, cclinic must pick the Claude CLI if it is installed and logged in, else the Anthropic API if ANTHROPIC_API_KEY is set and non-empty, else exit with code 3 and print setup instructions for both options."
+        },
+        {
+          "id": "FR-LLM-002",
+          "title": "When a provider is chosen explicitly (claude-cli or anthropic-api), cclinic must never substitute the other provider. If the explicit provider is unavailable it must exit with code 3, and a failure during a run must not switch providers."
+        },
+        {
+          "id": "FR-LLM-003",
+          "title": "The Claude CLI provider must run `claude -p` with --output-format stream-json, --json-schema, --tools \"\", --no-session-persistence, --safe-mode, --max-turns 3 and a system prompt file, send the prompt on stdin, and never pass --bare."
+        },
+        {
+          "id": "FR-LLM-004",
+          "title": "The Claude CLI provider must run each call from a fresh empty temporary directory outside the target project and remove it afterwards."
+        },
+        {
+          "id": "FR-LLM-005",
+          "title": "The environment passed to claude processes must drop ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN and set CLAUDE_CODE_MAX_RETRIES, CLAUDE_CODE_MAX_OUTPUT_TOKENS=64000 and CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1."
+        },
+        {
+          "id": "FR-LLM-006",
+          "title": "A Claude CLI call must count as successful only when the process exit code is 0, the last result event has is_error false, and structured_output is present and passes the schema; subtype and stop_reason must not decide success."
+        },
+        {
+          "id": "FR-LLM-007",
+          "title": "Claude CLI failures must be classified as authentication, budget, unavailable model, rate/usage limit, truncation or refusal, with messages that say how to fix them: login or --provider anthropic-api (mentioning a possible --bare default) for auth, and the model name plus `cclinic model` for an unavailable model."
+        },
+        {
+          "id": "FR-LLM-008",
+          "title": "The Anthropic API provider must send streaming requests with max_tokens 64000, adaptive thinking, output_config.effort always set, JSON-schema structured output and a fixed cached system prompt (cache_control, no per-run values), and must not send temperature, top_p, top_k or budget_tokens."
+        },
+        {
+          "id": "FR-LLM-009",
+          "title": "For Sonnet, Opus and Fable the API provider must use the beta messages endpoint with the server-side fallback beta and fallbacks \"default\"; Haiku requests must not include these fields. The model that actually answered must be recorded."
+        },
+        {
+          "id": "FR-LLM-010",
+          "title": "The API provider must raise RefusalError when stop_reason is refusal and TruncatedError when it is max_tokens, and must not use partial content."
+        },
+        {
+          "id": "FR-LLM-011",
+          "title": "The API provider must retry only connection errors and statuses 408, 409, 429 and 5xx, up to --max-retries (default 2, 0 means none) with exponential backoff and jitter, honour retry-after, pause all parallel calls during a 429 backoff, and never retry authentication, 404/400 invalid model, refusal or budget errors."
+        },
+        {
+          "id": "FR-LLM-012",
+          "title": "The Claude CLI provider must leave retries to the CLI by setting CLAUDE_CODE_MAX_RETRIES from --max-retries and must not add its own retries on top, and must show retry events with their causes as progress."
+        },
+        {
+          "id": "FR-LLM-013",
+          "title": "Each provider call must time out after --timeout-minutes (default 30, range 1 to 120), and a timed-out Claude CLI call must kill its child process."
+        },
+        {
+          "id": "FR-LLM-014",
+          "title": "On Ctrl+C (SIGINT) cclinic must cancel in-flight provider calls, leave no child claude process running, and exit with code 130."
+        },
+        {
+          "id": "FR-LLM-015",
+          "title": "Output that fails schema validation must be retried once; a second failure must raise SchemaError."
+        },
+        {
+          "id": "FR-LLM-016",
+          "title": "cclinic must sum the cost of each call and show it, but for subscription logins (claude.ai, oauth_token) it must label spend as an estimate and hide dollar figures, showing tokens only."
+        },
+        {
+          "id": "FR-LLM-017",
+          "title": "With --max-budget-usd, cclinic must split the remaining budget across calls in flight, start no new call once estimated spend reaches the limit, keep completed cached summaries, and exit with code 4."
+        },
+        {
+          "id": "FR-LLM-018",
+          "title": "Before sending, cclinic must estimate input tokens (count_tokens on the API, falling back to 1 token per 4 characters offline; 1 per 4 characters on the CLI) and cost from the model price table assuming output is 25% of input, labelled as an estimate."
+        },
+        {
+          "id": "FR-LLM-019",
+          "title": "Project content must be wrapped in <project_content> delimiters (closing tags inside content escaped), the system prompt must declare it untrusted data, and no tools may be given to the model on either provider."
+        },
+        {
+          "id": "FR-LLM-020",
+          "title": "API keys and prompt contents must not appear in logs, errors, cache or generated files, and no key-shaped text may appear in constants files."
+        },
+        {
+          "id": "FR-LLM-021",
+          "title": "On a persistent usage or rate limit, cclinic must stop starting calls, keep completed summaries, exit with code 4, tell the user the limit, the reset time if known, and that re-running resumes; if a model-specific limit is named it must suggest another model."
+        },
+        {
+          "id": "FR-LLM-022",
+          "title": "If the Claude CLI version is older than 2.1.319 or cannot be read, cclinic must warn but still run."
+        },
+        {
+          "id": "FR-LLM-023",
+          "title": "All model IDs, CLI values, labels, efforts, defaults and prices must be defined in src/core/constants/models.ts, and other provider constants (64000, beta name, CLAUDE_CODE_ names, timeouts) in src/core/constants/llm.ts, with no such literals elsewhere in source; the Claude default is Sonnet at medium effort."
+        },
+        {
+          "id": "FR-LLM-024",
+          "title": "Codex model entries may be defined but must not appear in menus, `cclinic model --list` or be accepted as values (for example --model gpt-6.1-sol exits with code 2)."
+        },
+        {
+          "id": "FR-LLM-025",
+          "title": "The run summary must show which login or auth method (for example claude.ai) is in use, obtained from `claude auth status --json`."
+        },
+        {
+          "id": "VAL-LLM-001",
+          "title": "With only a Claude login a full run completes; with only an API key it completes; with neither it stops with a message explaining both ways to set up."
+        },
+        {
+          "id": "VAL-LLM-002",
+          "title": "The summary shows the login in use; choosing a provider that is unavailable stops with a clear message and never uses the other provider."
+        },
+        {
+          "id": "VAL-LLM-003",
+          "title": "A run with both a login and an API key uses the login only, the target project is not modified by Claude, and no API charges appear."
+        },
+        {
+          "id": "VAL-LLM-004",
+          "title": "Login failures explain how to log in or use the API key; an unavailable model is named with a suggestion to run `cclinic model`; refused or cut-off answers stop the run with an error and no partial document."
+        },
+        {
+          "id": "VAL-LLM-005",
+          "title": "A full run with only an API key produces a document set comparable in quality to the CLI route for every model family."
+        },
+        {
+          "id": "VAL-LLM-006",
+          "title": "Brief rate limits or network failures recover without my action with visible retry reasons; permanent errors stop at once; badly formed answers are retried once before a clear error."
+        },
+        {
+          "id": "VAL-LLM-007",
+          "title": "A stalled call ends with a timeout message after the configured minutes with no leftover Claude process, and pressing Ctrl+C stops the run promptly with no leftover process."
+        },
+        {
+          "id": "VAL-LLM-008",
+          "title": "An estimate labelled as such is shown before starting; subscription users see tokens rather than dollars; a budgeted run stops near the limit and keeps finished work for the next run."
+        },
+        {
+          "id": "VAL-LLM-009",
+          "title": "A project containing text telling Claude to act causes no action, and no API key or prompt text appears in output, logs, errors, cache or generated files."
+        },
+        {
+          "id": "VAL-LLM-010",
+          "title": "The run stops with a message naming the limit and reset time if known, says re-running resumes, and a re-run processes only the unfinished work."
+        },
+        {
+          "id": "VAL-LLM-011",
+          "title": "An older or unreadable version shows a warning and the run still proceeds."
+        },
+        {
+          "id": "VAL-LLM-012",
+          "title": "Editing the single model constants file updates menus, errors and estimates everywhere; only Claude models are listed and accepted, and no keys are stored in that file."
+        },
+        {
+          "id": "TC-LLM-001",
+          "title": "The Claude CLI provider is returned."
+        },
+        {
+          "id": "TC-LLM-002",
+          "title": "The Anthropic API provider is returned."
+        },
+        {
+          "id": "TC-LLM-003",
+          "title": "Exit code is 3 and the output explains both setup routes (claude auth login and ANTHROPIC_API_KEY)."
+        },
+        {
+          "id": "TC-LLM-004",
+          "title": "It fails with the no-provider error (exit 3) and the API provider is not used."
+        },
+        {
+          "id": "TC-LLM-005",
+          "title": "The run stops with exit code 4 and no API client call is made."
+        },
+        {
+          "id": "TC-LLM-006",
+          "title": "Arguments include -p, --output-format stream-json, --json-schema, --tools \"\", --no-session-persistence, --safe-mode, --max-turns 3 and --system-prompt-file; --bare is absent; the prompt appears on stdin and not in arguments; --max-budget-usd appears only when a budget is set."
+        },
+        {
+          "id": "TC-LLM-007",
+          "title": "The recorded directory was empty, outside the target project, and no longer exists afterwards."
+        },
+        {
+          "id": "TC-LLM-008",
+          "title": "The fake claude's environment lacks both variables and has CLAUDE_CODE_MAX_RETRIES=1, CLAUDE_CODE_MAX_OUTPUT_TOKENS=64000 and CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1."
+        },
+        {
+          "id": "TC-LLM-009",
+          "title": "The call succeeds with the structured output and the actual model from modelUsage."
+        },
+        {
+          "id": "TC-LLM-010",
+          "title": "Each call fails."
+        },
+        {
+          "id": "TC-LLM-011",
+          "title": "The model error names the model and suggests `cclinic model`; the auth failure raises AuthError mentioning login, --provider anthropic-api and the -p/--bare cause."
+        },
+        {
+          "id": "TC-LLM-012",
+          "title": "RateLimitError is raised and the message suggests another model."
+        },
+        {
+          "id": "TC-LLM-013",
+          "title": "The request streams, max_tokens is 64000, thinking is adaptive, output_config.effort is medium, output_config.format is JSON schema, the system block has cache_control and is byte-identical across two different projects, and temperature, top_p, top_k, budget_tokens and tools are absent."
+        },
+        {
+          "id": "TC-LLM-014",
+          "title": "Sonnet, Opus and Fable use the beta endpoint with the fallback beta and fallbacks \"default\"; Haiku has neither; actualModel records the model that answered."
+        },
+        {
+          "id": "TC-LLM-015",
+          "title": "RefusalError and TruncatedError are raised respectively and no partial content is returned."
+        },
+        {
+          "id": "TC-LLM-016",
+          "title": "At most 2 retries occur with growing delays, retry-after is honoured, and --max-retries 0 yields no retry."
+        },
+        {
+          "id": "TC-LLM-017",
+          "title": "It fails immediately after one attempt."
+        },
+        {
+          "id": "TC-LLM-018",
+          "title": "No new call starts until the pause ends."
+        },
+        {
+          "id": "TC-LLM-019",
+          "title": "Progress shows each retry with its cause and cclinic itself makes only one spawn."
+        },
+        {
+          "id": "TC-LLM-020",
+          "title": "The call fails with a timeout error and the child process is killed."
+        },
+        {
+          "id": "TC-LLM-021",
+          "title": "The timeout is 30 minutes; values outside 1 to 120 are rejected."
+        },
+        {
+          "id": "TC-LLM-022",
+          "title": "Exit code is 130 and no fake claude process remains."
+        },
+        {
+          "id": "TC-LLM-023",
+          "title": "A second attempt is made and succeeds."
+        },
+        {
+          "id": "TC-LLM-024",
+          "title": "SchemaError is raised after exactly two attempts."
+        },
+        {
+          "id": "TC-LLM-025",
+          "title": "The summary shows authMethod claude.ai, the cost is labelled an estimate and no dollar figure is shown; with an API key provider the summed cost is shown."
+        },
+        {
+          "id": "TC-LLM-026",
+          "title": "Each CLI call receives the remaining budget divided by calls in flight, no new calls start, exit code is 4 and completed summaries remain in the cache."
+        },
+        {
+          "id": "TC-LLM-027",
+          "title": "CLI estimate is 1000 tokens; the API falls back to 1000 with a notice; cost uses the price table with output at 25% of input and is labelled an estimate; the Haiku tier above 100K tokens applies the higher price."
+        },
+        {
+          "id": "TC-LLM-028",
+          "title": "The closing tag in the content is escaped, content sits inside project_content delimiters, the system prompt states it is untrusted, the CLI args include --tools \"\" and API requests contain no tools field."
+        },
+        {
+          "id": "TC-LLM-029",
+          "title": "The key and the prompt text appear in none of them."
+        },
+        {
+          "id": "TC-LLM-030",
+          "title": "No key-shaped text is found."
+        },
+        {
+          "id": "TC-LLM-031",
+          "title": "The first run exits 4 with a message about the limit, reset time if known and how to continue, starts no further calls; the re-run processes only the remaining modules."
+        },
+        {
+          "id": "TC-LLM-032",
+          "title": "The first two print a version warning and the run continues; the third prints none."
+        },
+        {
+          "id": "TC-LLM-033",
+          "title": "None are found (tests excepted); the Claude default is Sonnet at medium."
+        },
+        {
+          "id": "TC-LLM-034",
+          "title": "It passes with no provider SDK import outside the allowed adapters."
+        },
+        {
+          "id": "TC-LLM-035",
+          "title": "The list contains no Codex models and the second command exits with code 2."
+        },
+        {
+          "id": "TC-LLM-036",
+          "title": "It completes, the summary shows the real authMethod, and the real output can be added to test/fixtures/recorded-cli-output."
+        }
+      ]
+    },
+    {
+      "name": "model-selection",
+      "area": "MODEL",
+      "ids": [
+        {
+          "id": "FR-MODEL-001",
+          "title": "When no option, environment variable or saved default supplies a value, cclinic must use model sonnet (claude-sonnet-5-5) and reasoning level medium, without asking the user."
+        },
+        {
+          "id": "FR-MODEL-002",
+          "title": "cclinic must resolve model and reasoning level independently, each in the order: command-line option, environment variable (CCLINIC_MODEL / CCLINIC_EFFORT), saved default, built-in default."
+        },
+        {
+          "id": "FR-MODEL-003",
+          "title": "`cclinic model` must open the model menu and then the reasoning menu, save both choices as the default, and must not scan any files."
+        },
+        {
+          "id": "FR-MODEL-004",
+          "title": "`--model` or `--effort` given without a value must open the matching menu for this run only (model menu first when both are bare) and must not change the saved default."
+        },
+        {
+          "id": "FR-MODEL-005",
+          "title": "`--model <value>` and `--effort <value>` must skip the menus and accept the alias (sonnet, opus, haiku, fable; low, medium, high, xhigh, max) and, for models, also the full API model ID."
+        },
+        {
+          "id": "FR-MODEL-006",
+          "title": "An invalid model or effort value, from an option or an environment variable, must print the valid options and exit with the usage error code (2) before any scan or LLM call."
+        },
+        {
+          "id": "FR-MODEL-007",
+          "title": "When a menu is needed but no interactive terminal is available (including `cclinic model`), cclinic must print the valid options and exit with the usage error code (2) instead of waiting."
+        },
+        {
+          "id": "FR-MODEL-008",
+          "title": "When the value after `--model` or `--effort` is not a valid option but is an existing directory, cclinic must treat it as the target path and open the menu."
+        },
+        {
+          "id": "FR-MODEL-009",
+          "title": "`cclinic model --list` must print every model and reasoning option with label, value and hint and mark the current choice; with `--json` it must print parseable JSON; it must work without a terminal."
+        },
+        {
+          "id": "FR-MODEL-010",
+          "title": "`cclinic model --reset` must remove the saved model and reasoning level, confirm it, and succeed even if nothing was saved."
+        },
+        {
+          "id": "FR-MODEL-011",
+          "title": "Cancelling a menu with Ctrl+C must exit with code 130 and must leave the saved default unchanged."
+        },
+        {
+          "id": "FR-MODEL-012",
+          "title": "Menus must list all options with labels and hints, support arrow keys and Enter, and start on the current choice; options must come from the single shared model constants."
+        },
+        {
+          "id": "FR-MODEL-013",
+          "title": "The saved default must be stored as JSON with only `model` and `effort` at $XDG_CONFIG_HOME/cclinic/config.json (or ~/.config/cclinic/config.json); an unreadable file or unknown saved value must produce a warning and fall back to the built-in default for the bad setting only."
+        },
+        {
+          "id": "FR-MODEL-014",
+          "title": "`--dry-run` with a bare `--model` must still open the model menu, and the dry-run summary must show the resolved model and effort."
+        },
+        {
+          "id": "VAL-MODEL-001",
+          "title": "With no setup, a run uses Sonnet at medium reasoning and no model question appears."
+        },
+        {
+          "id": "VAL-MODEL-002",
+          "title": "A command-line choice overrides an environment setting, which overrides the saved default, which overrides the built-in default; a broken saved setting produces a warning and the run continues with the default."
+        },
+        {
+          "id": "VAL-MODEL-003",
+          "title": "Running the model command shows a model menu then a reasoning menu with labels and hints, the current choice highlighted, and later runs use the saved choices; no project files are scanned."
+        },
+        {
+          "id": "VAL-MODEL-004",
+          "title": "Asking for a menu in a run lets the user choose, the run uses the choice, and the saved default is the same afterwards; giving a folder after the option still works; a dry run shows the chosen values."
+        },
+        {
+          "id": "VAL-MODEL-005",
+          "title": "Supplying both values directly runs with those values and no menu appears; short names and full model IDs both work."
+        },
+        {
+          "id": "VAL-MODEL-006",
+          "title": "A wrong value or a menu request with no terminal shows the valid options, ends with a usage failure, and nothing is scanned or sent."
+        },
+        {
+          "id": "VAL-MODEL-007",
+          "title": "The list command shows all options and marks the current choice (also as machine-readable output); the reset command returns to Sonnet at medium, even when nothing was saved."
+        },
+        {
+          "id": "VAL-MODEL-008",
+          "title": "Pressing Ctrl+C in a menu ends the command as cancelled and the previously saved choice is unchanged."
+        },
+        {
+          "id": "TC-MODEL-001",
+          "title": "No menu is opened and the output shows model sonnet / claude-sonnet-5-5 and effort medium; exit code 0."
+        },
+        {
+          "id": "TC-MODEL-002",
+          "title": "Model is sonnet (option beats env and saved); effort is high (env beats saved)."
+        },
+        {
+          "id": "TC-MODEL-003",
+          "title": "First run resolves haiku/low; second resolves sonnet/medium. Model and effort resolve independently when only one is saved."
+        },
+        {
+          "id": "TC-MODEL-004",
+          "title": "Model menu appears before reasoning menu; config.json contains model opus and effort high; no files scanned and no provider called; exit 0."
+        },
+        {
+          "id": "TC-MODEL-005",
+          "title": "Menu opened once for model; dry-run summary shows haiku; config.json still contains opus/high."
+        },
+        {
+          "id": "TC-MODEL-006",
+          "title": "The model menu opens first, then the reasoning menu; saved config unchanged."
+        },
+        {
+          "id": "TC-MODEL-007",
+          "title": "No menu is attempted, summary shows opus and high, exit 0."
+        },
+        {
+          "id": "TC-MODEL-008",
+          "title": "The value is accepted and resolves to the opus model; exit 0."
+        },
+        {
+          "id": "TC-MODEL-009",
+          "title": "Each exits with code 2, output lists the valid options (sonnet, opus, haiku, fable / low, medium, high, xhigh, max), and no scan happens."
+        },
+        {
+          "id": "TC-MODEL-010",
+          "title": "Exit code 2 and valid options are printed; no scan or LLM call."
+        },
+        {
+          "id": "TC-MODEL-011",
+          "title": "Each prints the valid options and exits 2 within a short time (does not hang)."
+        },
+        {
+          "id": "TC-MODEL-012",
+          "title": "<project> is the target folder, the matching menu opens, and no invalid-value error occurs."
+        },
+        {
+          "id": "TC-MODEL-013",
+          "title": "Output lists all four models and five effort levels with label, value and hint, marks opus and high as current; exit 0."
+        },
+        {
+          "id": "TC-MODEL-014",
+          "title": "Stdout is valid JSON containing all options and the current choice sonnet/medium."
+        },
+        {
+          "id": "TC-MODEL-015",
+          "title": "Confirmation message printed; saved values are removed; current choice shows sonnet/medium."
+        },
+        {
+          "id": "TC-MODEL-016",
+          "title": "Exit code 0 with a confirmation, no error."
+        },
+        {
+          "id": "TC-MODEL-017",
+          "title": "Exit code 130 both times and config.json is unchanged."
+        },
+        {
+          "id": "TC-MODEL-018",
+          "title": "Every option shows label and hint, the initial highlight is opus then high, arrows move, Enter selects."
+        },
+        {
+          "id": "TC-MODEL-019",
+          "title": "All three contain exactly the same set of options."
+        },
+        {
+          "id": "TC-MODEL-020",
+          "title": "<temp>/cclinic/config.json exists with only keys model and effort."
+        },
+        {
+          "id": "TC-MODEL-021",
+          "title": "Config written to <HOME>/.config/cclinic/config.json."
+        },
+        {
+          "id": "TC-MODEL-022",
+          "title": "A warning is shown, the run succeeds with sonnet/medium."
+        },
+        {
+          "id": "TC-MODEL-023",
+          "title": "Warning about the model; model is sonnet; effort remains high."
+        },
+        {
+          "id": "TC-MODEL-024",
+          "title": "The model menu opens even in dry-run, and the summary shows opus and high; nothing scanned for sending or written."
+        }
+      ]
+    },
+    {
+      "name": "quality-tooling",
+      "area": "QUAL",
+      "ids": [
+        {
+          "id": "FR-QUAL-001",
+          "title": "The architecture check must fail when src/core imports from adapters, application, cli, or Node built-ins (fs, path, os, child_process, net, http, https, process, node:*)."
+        },
+        {
+          "id": "FR-QUAL-002",
+          "title": "The architecture check must fail when non-test code in src/core depends on an npm package other than zod."
+        },
+        {
+          "id": "FR-QUAL-003",
+          "title": "The architecture check must fail when non-test code in src/application imports anything other than src/core or src/application."
+        },
+        {
+          "id": "FR-QUAL-004",
+          "title": "The architecture check must fail when an adapter imports from application, cli, or another adapter."
+        },
+        {
+          "id": "FR-QUAL-005",
+          "title": "The architecture check must fail when @anthropic-ai/sdk is imported from anywhere other than src/adapters/llm/anthropic-api."
+        },
+        {
+          "id": "FR-QUAL-006",
+          "title": "The architecture check must treat circular dependencies as errors."
+        },
+        {
+          "id": "FR-QUAL-007",
+          "title": "Linting must fail on magic numbers (other than 0, 1, -1) in src outside tests and src/core/constants, and must restrict default exports except in tool config files."
+        },
+        {
+          "id": "FR-QUAL-008",
+          "title": "Type-checking must run in strict mode with the extra strict options (noUncheckedIndexedAccess, exactOptionalPropertyTypes, verbatimModuleSyntax) and ESM NodeNext resolution, and the typecheck script must run tsc --noEmit."
+        },
+        {
+          "id": "FR-QUAL-009",
+          "title": "The test coverage run must fail when coverage is below 80% lines and branches globally or below 90% in src/core."
+        },
+        {
+          "id": "FR-QUAL-010",
+          "title": "Mutation testing must mutate src/core (excluding test files and guidelines-baseline.ts) using the Vitest runner, with score thresholds high 85 and low 70 and without breaking the build."
+        },
+        {
+          "id": "FR-QUAL-011",
+          "title": "The verify script must run lint, typecheck, architecture check, coverage tests and e2e tests, and must not run mutation testing."
+        },
+        {
+          "id": "FR-QUAL-012",
+          "title": "Commit messages must be validated against the Conventional Commits configuration."
+        },
+        {
+          "id": "FR-QUAL-013",
+          "title": "The lint script must check formatting with Prettier (printWidth 120), ignoring dist, coverage, reports, .stryker-tmp, sdd/, test/fixtures and package-lock.json."
+        },
+        {
+          "id": "FR-QUAL-014",
+          "title": "Unit tests must be co-located as src/**/*.test.ts, and integration and e2e tests must live under test/, with e2e tests running the built binary bin/cclinic.js after a build."
+        },
+        {
+          "id": "FR-QUAL-015",
+          "title": "E2E tests must run against a fake claude executable, a sandboxed HOME/XDG_CONFIG_HOME and a restricted PATH, so no real Claude or network is used."
+        },
+        {
+          "id": "FR-QUAL-016",
+          "title": "Every test that touches the filesystem must use a fresh temp folder that is cleaned up after each test."
+        },
+        {
+          "id": "FR-QUAL-017",
+          "title": "Test names must start with the traceable test-case ID (e.g. TC-CLI-001)."
+        },
+        {
+          "id": "FR-QUAL-018",
+          "title": "Parser contract tests must use recorded real claude output fixtures for success, budget exhaustion and invalid model."
+        },
+        {
+          "id": "FR-QUAL-019",
+          "title": "The fake claude must support failure modes (fail-after-1, hang, slow, invalid-model, auth-error, invalid-output, usage-limit, retry-events) selected by FAKE_CLAUDE_MODE and record each call."
+        },
+        {
+          "id": "FR-QUAL-020",
+          "title": "The build must bundle src/cli/main.ts into a single ESM dist/main.js with sourcemaps, launched by bin/cclinic.js."
+        },
+        {
+          "id": "VAL-QUAL-001",
+          "title": "A change that breaks any layering rule, uses the SDK outside its adapter, or creates a circular dependency is reported as an error, while the current code reports no violations."
+        },
+        {
+          "id": "VAL-QUAL-002",
+          "title": "Hardcoded numbers, disallowed default exports, type errors and badly formatted files are each reported by the lint and typecheck steps, and clean code passes."
+        },
+        {
+          "id": "VAL-QUAL-003",
+          "title": "The coverage run fails when overall coverage drops under 80% or core coverage under 90%, and passes otherwise."
+        },
+        {
+          "id": "VAL-QUAL-004",
+          "title": "Mutation testing on core logic produces a score report that is judged against the 70 and 85 thresholds without blocking the build."
+        },
+        {
+          "id": "VAL-QUAL-005",
+          "title": "Running the verify command runs all checks except mutation testing and fails if any fails; non-conventional commit messages are rejected."
+        },
+        {
+          "id": "VAL-QUAL-006",
+          "title": "The whole suite runs offline with a stand-in Claude, leaves no leftover temp folders, and can simulate failures such as login errors, timeouts and usage limits."
+        },
+        {
+          "id": "VAL-QUAL-007",
+          "title": "Automated tests carry their test-case IDs in their names, and recorded real outputs for success, budget and invalid model are checked by tests."
+        },
+        {
+          "id": "VAL-QUAL-008",
+          "title": "After a build the cclinic command starts from the bundled output."
+        },
+        {
+          "id": "TC-QUAL-001",
+          "title": "It exits non-zero and reports a violation for x.ts; with the file removed it exits 0 and reports no dependency violations."
+        },
+        {
+          "id": "TC-QUAL-002",
+          "title": "Only the commander import is reported; the zod import is not."
+        },
+        {
+          "id": "TC-QUAL-003",
+          "title": "No violation is reported for that file."
+        },
+        {
+          "id": "TC-QUAL-004",
+          "title": "A violation is reported."
+        },
+        {
+          "id": "TC-QUAL-005",
+          "title": "Both are reported as violations."
+        },
+        {
+          "id": "TC-QUAL-006",
+          "title": "A violation is reported, while the anthropic-api adapter import is not."
+        },
+        {
+          "id": "TC-QUAL-007",
+          "title": "A circular dependency error is reported."
+        },
+        {
+          "id": "TC-QUAL-008",
+          "title": "A magic-number error is reported for the src/cli file only; `0`, `1`, `-1` literals produce no error."
+        },
+        {
+          "id": "TC-QUAL-009",
+          "title": "A default-export lint error is reported; tsup.config.ts and vitest.config.ts pass."
+        },
+        {
+          "id": "TC-QUAL-010",
+          "title": "tsc reports errors and exits non-zero; without the file it exits 0."
+        },
+        {
+          "id": "TC-QUAL-011",
+          "title": "It exits non-zero citing the threshold; without the module it exits 0."
+        },
+        {
+          "id": "TC-QUAL-012",
+          "title": "Only files under src/core are mutated, test files and guidelines-baseline.ts are not, and the score is compared to 70 (low) and 85 (high); a lower score does not make the command exit non-zero."
+        },
+        {
+          "id": "TC-QUAL-013",
+          "title": "It exits non-zero; with the error removed it runs lint, typecheck, check:arch, coverage tests and e2e, does not start Stryker, and exits 0."
+        },
+        {
+          "id": "TC-QUAL-014",
+          "title": "The first passes; the second fails with a type/subject error."
+        },
+        {
+          "id": "TC-QUAL-015",
+          "title": "Only the src file is reported by Prettier; ignored paths are not checked."
+        },
+        {
+          "id": "TC-QUAL-016",
+          "title": "The build creates dist/main.js (and a sourcemap) first, then the e2e tests run bin/cclinic.js; running the e2e tests directly without a build fails."
+        },
+        {
+          "id": "TC-QUAL-017",
+          "title": "The src/**/*.test.ts and test/integration tests are discovered and executed."
+        },
+        {
+          "id": "TC-QUAL-018",
+          "title": "The fake is the only claude called, the call is recorded to the FAKE_CLAUDE_RECORD file with args and prompt, the real HOME is untouched, and each mode yields the expected failure outcome."
+        },
+        {
+          "id": "TC-QUAL-019",
+          "title": "The temp folder no longer exists and each test got a different folder path."
+        },
+        {
+          "id": "TC-QUAL-020",
+          "title": "Each automated TC has a test whose name starts with its ID, and manual TCs have written steps."
+        },
+        {
+          "id": "TC-QUAL-021",
+          "title": "success yields a parsed result, budget yields the budget-exhausted error, invalid-model yields the invalid-model error; a malformed line is rejected without crashing."
+        }
+      ]
+    },
+    {
+      "name": "spec-analysis",
+      "area": "ANA",
+      "ids": [
+        {
+          "id": "FR-ANA-001",
+          "title": "The system must group code and config files into modules by nearest package manifest, otherwise by first-level folder, otherwise into a root module."
+        },
+        {
+          "id": "FR-ANA-002",
+          "title": "The system must treat each document (PDF, DOCX, text document) as its own module."
+        },
+        {
+          "id": "FR-ANA-003",
+          "title": "The system must split modules and oversized files into chunks so that no request exceeds 150,000 estimated tokens, keeping files together where possible and splitting oversized files on line or page boundaries."
+        },
+        {
+          "id": "FR-ANA-004",
+          "title": "The system must run module LLM calls in parallel up to the --concurrency value and must sort results by module before the next stage so completion order does not change output."
+        },
+        {
+          "id": "FR-ANA-005",
+          "title": "The system must validate each chunk summary against the module summary schema and merge the chunk results of a module into one summary."
+        },
+        {
+          "id": "FR-ANA-006",
+          "title": "The system must reject module summary items that lack evidence."
+        },
+        {
+          "id": "FR-ANA-007",
+          "title": "The system must combine all module summaries into project-wide data (overview, stack, architecture, guideline tailoring, spec list with relevant modules, open questions), combining in stages when the summaries exceed the request limit."
+        },
+        {
+          "id": "FR-ANA-008",
+          "title": "The prompts must require evidence for every statement, require behaviour-level descriptions and forbid invented requirements, commands, test frameworks and paths."
+        },
+        {
+          "id": "FR-ANA-009",
+          "title": "The system must treat project content as untrusted by wrapping it in <project_content> tags, escaping closing tags inside content, and instructing the model not to follow instructions found in it."
+        },
+        {
+          "id": "FR-ANA-010",
+          "title": "Each generated spec must have a unique kebab-case name that becomes its folder name."
+        },
+        {
+          "id": "FR-ANA-011",
+          "title": "Every requirement must cite evidence in one of the accepted formats (path:line, path:start-end, path:page, path.docx#Heading); only open questions may cite a whole analysed file, and commit hashes must be rejected."
+        },
+        {
+          "id": "FR-ANA-012",
+          "title": "Every requirement must have a status of exactly confirmed, code-only or docs-only, and conflicting evidence must not produce confirmed."
+        },
+        {
+          "id": "FR-ANA-013",
+          "title": "Disagreements between documents and code, or between documents, must be recorded as open questions citing both sides rather than silently resolved."
+        },
+        {
+          "id": "FR-ANA-014",
+          "title": "Every requirement must have at least one acceptance criterion (VAL) with an outcome and at least one test case (TC) with level (unit, integration, e2e or manual), Given, When and Then."
+        },
+        {
+          "id": "FR-ANA-015",
+          "title": "When no test tools or commands are found in the project, the system must not invent them and must record an open question about the missing test setup."
+        },
+        {
+          "id": "FR-ANA-016",
+          "title": "Stack items must include versions and evidence, and the architecture description must report the actual architecture including problems such as circular dependencies, without invented technologies."
+        },
+        {
+          "id": "FR-ANA-017",
+          "title": "Guidelines must combine the fixed language-neutral baseline, which tailoring must not remove or change, with model-tailored sections labelled observed or recommended, where observed items require evidence."
+        },
+        {
+          "id": "FR-ANA-018",
+          "title": "The system must pass previous manifest spec names, IDs and titles to the combine step so unchanged requirements keep their IDs."
+        },
+        {
+          "id": "FR-ANA-019",
+          "title": "Removed requirement IDs must be recorded as retired and never reused; new requirements must get new IDs."
+        },
+        {
+          "id": "FR-ANA-020",
+          "title": "IDs must follow FR-<AREA>-NNN, VAL-<AREA>-NNN and TC-<AREA>-NNN with an AREA of 2-8 uppercase letters unique per spec and NNN of at least three digits."
+        },
+        {
+          "id": "FR-ANA-021",
+          "title": "The system must cache module summaries, combine results and per-spec results in .cclinic/cache/, keyed by file hashes, prompt version, model and reasoning level, so changes to any of these re-analyse only affected items."
+        },
+        {
+          "id": "FR-ANA-022",
+          "title": "The system must ignore corrupt or invalid cache entries and replace them."
+        },
+        {
+          "id": "FR-ANA-023",
+          "title": "The system must save each result to the cache as it completes so that a failed run resumes without redoing finished work, and an unchanged re-run must skip the combine call and make no provider calls."
+        },
+        {
+          "id": "FR-ANA-024",
+          "title": "With --no-cache the system must call the provider for every module, and --force must not clear the cache or regenerate summaries."
+        },
+        {
+          "id": "FR-ANA-025",
+          "title": "The system must generate each spec in its own LLM call that includes the project spec list, cache each spec result separately, and regenerate only specs that use a changed module."
+        },
+        {
+          "id": "FR-ANA-026",
+          "title": "When a spec output is truncated, the system must retry once asking to split it into two specs, and on a second truncation must stop with exit code 4 naming the spec."
+        },
+        {
+          "id": "FR-ANA-027",
+          "title": "When a spec result has validation problems, the system must retry once with the problems, must not cache results with problems, and must regenerate cached results that have problems."
+        },
+        {
+          "id": "FR-ANA-028",
+          "title": "If a module LLM call fails after retries, the run must stop with exit code 4 and keep completed summaries cached."
+        },
+        {
+          "id": "FR-ANA-029",
+          "title": "Document-only projects must yield docs-only requirements with a stack stating no code found, and code-only projects must yield code-only requirements."
+        },
+        {
+          "id": "VAL-ANA-001",
+          "title": "A large project with code and documents is analysed fully, and no part is cut off or silently left out."
+        },
+        {
+          "id": "VAL-ANA-002",
+          "title": "Running twice on the same project yields identical documents, and a provider failure stops the run with a clear failure and keeps finished work."
+        },
+        {
+          "id": "VAL-ANA-003",
+          "title": "Overview, stack, architecture and open questions reflect all modules, and no statement lacks a source."
+        },
+        {
+          "id": "VAL-ANA-004",
+          "title": "A sample of statements all trace to project text, no unknown commands or tools appear, and instructions planted in project files are not obeyed."
+        },
+        {
+          "id": "VAL-ANA-005",
+          "title": "Each spec has a unique readable name, every requirement has one of three clear statuses, and all IDs follow the documented pattern."
+        },
+        {
+          "id": "VAL-ANA-006",
+          "title": "In a sample of 20 requirements, each citation leads to text that supports it."
+        },
+        {
+          "id": "VAL-ANA-007",
+          "title": "Conflicts between documents and code, and items present in only one, are listed in open questions with both sources; document-only and code-only projects are labelled accordingly."
+        },
+        {
+          "id": "VAL-ANA-008",
+          "title": "Each requirement has a plain-language acceptance criterion and a test case, including a failure scenario, that a tester can automate without further information."
+        },
+        {
+          "id": "VAL-ANA-009",
+          "title": "The project owner confirms stack and architecture are correct and no technology is invented."
+        },
+        {
+          "id": "VAL-ANA-010",
+          "title": "Guidelines include the full baseline unchanged and clearly separate what the project already does from what is recommended."
+        },
+        {
+          "id": "VAL-ANA-011",
+          "title": "After a small code change and re-run, existing requirement IDs are unchanged and no removed ID is reused."
+        },
+        {
+          "id": "VAL-ANA-012",
+          "title": "A re-run reprocesses only what changed, an unchanged re-run makes no model calls, a damaged cache does not break the run, and a failed run resumes where it stopped."
+        },
+        {
+          "id": "VAL-ANA-013",
+          "title": "One option makes everything be analysed again, and the forced run produces fresh results."
+        },
+        {
+          "id": "VAL-ANA-014",
+          "title": "Large projects produce complete specs; if a spec is too long it is split, and if that still fails the run says which spec failed."
+        },
+        {
+          "id": "VAL-ANA-015",
+          "title": "A bad citation or missing test case in one spec is corrected automatically where possible, and invalid results are never kept for later runs."
+        },
+        {
+          "id": "TC-ANA-001",
+          "title": "a/* is one module (nearest manifest), b/y.ts is in module b (first-level folder), z.ts is in the root module."
+        },
+        {
+          "id": "TC-ANA-002",
+          "title": "Each document forms its own single-file module separate from code modules."
+        },
+        {
+          "id": "TC-ANA-003",
+          "title": "Every chunk is at most 150,000 estimated tokens, files are not split unless oversized, the oversized file is split on line boundaries, and an oversized PDF splits on page boundaries."
+        },
+        {
+          "id": "TC-ANA-004",
+          "title": "Never more than 3 module calls are in flight, and the combine request input is identical across both runs."
+        },
+        {
+          "id": "TC-ANA-005",
+          "title": "One summary containing items of both chunks is produced and passes the module summary schema."
+        },
+        {
+          "id": "TC-ANA-006",
+          "title": "Validation fails and the summary is rejected."
+        },
+        {
+          "id": "TC-ANA-007",
+          "title": "Summaries are merged in more than one stage and the final project data contains overview, stack, architecture, guideline tailoring, spec list and open questions."
+        },
+        {
+          "id": "TC-ANA-008",
+          "title": "It requires evidence, behaviour-level descriptions, forbids invention of requirements, commands, frameworks and paths, and asks for an open question when no test setup exists."
+        },
+        {
+          "id": "TC-ANA-009",
+          "title": "The closing tag inside content is escaped, only one real closing tag exists, and the system prompt tells the model not to follow instructions in project content."
+        },
+        {
+          "id": "TC-ANA-010",
+          "title": "Both the non-kebab-case name and the duplicate are reported as problems."
+        },
+        {
+          "id": "TC-ANA-011",
+          "title": "The first four are accepted; the whole-file cite and the commit hash are rejected for requirements; the whole-file cite is accepted for an open question."
+        },
+        {
+          "id": "TC-ANA-012",
+          "title": "'maybe' is rejected by the schema; only confirmed, code-only and docs-only are accepted."
+        },
+        {
+          "id": "TC-ANA-013",
+          "title": "open-questions.md has an entry citing both the README and code lines, and the related requirement status is not confirmed."
+        },
+        {
+          "id": "TC-ANA-014",
+          "title": "Problems are reported for the missing VAL, the missing TC and the incomplete TC."
+        },
+        {
+          "id": "TC-ANA-015",
+          "title": "A tester can write each test without more information, failure cases are present, and commands match the project's actual ones."
+        },
+        {
+          "id": "TC-ANA-016",
+          "title": "No test commands are invented and an open question notes the missing test setup."
+        },
+        {
+          "id": "TC-ANA-017",
+          "title": "Each technology has version (or unknown) and evidence, none are invented, and the circular dependency is reported."
+        },
+        {
+          "id": "TC-ANA-018",
+          "title": "Baseline sections remain exactly as in the baseline; the unlabelled and the evidence-less observed items are reported as problems."
+        },
+        {
+          "id": "TC-ANA-019",
+          "title": "The request recorded by FakeLlmProvider contains those names, IDs and titles."
+        },
+        {
+          "id": "TC-ANA-020",
+          "title": "Reuse of the retired ID is reported as a problem, and a successful run lists FR-X-002 in retiredIds of the new manifest."
+        },
+        {
+          "id": "TC-ANA-021",
+          "title": "IDs of unaffected requirements are unchanged."
+        },
+        {
+          "id": "TC-ANA-022",
+          "title": "Only FR-AB-001 is accepted; the others and the shared area code are reported."
+        },
+        {
+          "id": "TC-ANA-023",
+          "title": "Unchanged re-run makes zero provider calls; a file change re-calls only that module's summary (and dependent combine/specs); model, reasoning level and prompt version changes each cause re-analysis of all."
+        },
+        {
+          "id": "TC-ANA-024",
+          "title": "Both are ignored without error, the provider is called for those items, and the entries are replaced with valid ones."
+        },
+        {
+          "id": "TC-ANA-025",
+          "title": "The first run exits with code 4 and modules already finished are cached; the second run calls the provider only for unfinished modules."
+        },
+        {
+          "id": "TC-ANA-026",
+          "title": "The combine call is skipped and the provider records zero requests."
+        },
+        {
+          "id": "TC-ANA-027",
+          "title": "--no-cache calls the provider for every module; --force does not clear the cache and does not re-summarise modules."
+        },
+        {
+          "id": "TC-ANA-028",
+          "title": "One call per spec is recorded, each containing the full spec list; per-spec results are cached separately; only the spec using the changed module is regenerated."
+        },
+        {
+          "id": "TC-ANA-029",
+          "title": "A second request asking for a split into two specs is recorded and both specs are produced."
+        },
+        {
+          "id": "TC-ANA-030",
+          "title": "The run stops with exit code 4 and the error message names spec 'x'."
+        },
+        {
+          "id": "TC-ANA-031",
+          "title": "The second request includes the problems, the final spec is valid and cached."
+        },
+        {
+          "id": "TC-ANA-032",
+          "title": "The first run exits with code 5 (validation failure) and caches nothing invalid, a draft is saved in .cclinic/failed; the second run regenerates only that spec, and the problem cached result is regenerated."
+        },
+        {
+          "id": "TC-ANA-033",
+          "title": "Document-only requirements have status docs-only and stack states no code was found; code-only project requirements have status code-only."
+        },
+        {
+          "id": "TC-ANA-034",
+          "title": "All major capabilities have specs and none are truncated or silently omitted."
+        },
+        {
+          "id": "TC-ANA-035",
+          "title": "Each cited location contains supporting text."
+        }
+      ]
+    },
+    {
+      "name": "spec-output",
+      "area": "OUT",
+      "ids": [
+        {
+          "id": "FR-OUT-001",
+          "title": "The tool must write the project-level documents README.md, overview.md, stack.md, architecture.md, developer-guidelines.md, open-questions.md, scan-report.md and manifest.json into <target>/.cclinic/sdd/, or into the --out folder when given."
+        },
+        {
+          "id": "FR-OUT-002",
+          "title": "The tool must create, for each spec, a folder specs/<spec-name>/ containing exactly spec.md, validation.md and verification.md."
+        },
+        {
+          "id": "FR-OUT-003",
+          "title": "The tool must always create open-questions.md, stating explicitly when there are no open questions."
+        },
+        {
+          "id": "FR-OUT-004",
+          "title": "The tool must render validation.md as a table with columns ID, Covers, User need, Accepted when, and verification.md with test setup first followed by a table with columns ID, Covers, Level, Given, When, Then."
+        },
+        {
+          "id": "FR-OUT-005",
+          "title": "The tool must validate the generated data before saving, checking schema, ID format and uniqueness, that every requirement has at least one VAL and one TC, that every VAL and TC references an existing requirement, evidence citations pointing to analysed files within range, required guideline sections and link resolution."
+        },
+        {
+          "id": "FR-OUT-006",
+          "title": "When validation fails, the tool must list all failures, leave existing documents unchanged, save the rejected draft under .cclinic/failed/ and exit with code 5."
+        },
+        {
+          "id": "FR-OUT-007",
+          "title": "The tool must publish documents by writing to a temporary folder on the same filesystem and swapping it into place only after validation passes, so that an interrupted run leaves either the complete old or the complete new folder."
+        },
+        {
+          "id": "FR-OUT-008",
+          "title": "The tool must recover from an interrupted write on a later run, succeeding and leaving no leftover temporary folders."
+        },
+        {
+          "id": "FR-OUT-009",
+          "title": "The tool must refuse to regenerate when any generated file's hash differs from manifest.json, listing the changed files and exiting with the usage error code (2), unless --force is given."
+        },
+        {
+          "id": "FR-OUT-010",
+          "title": "The tool must refuse to write into an existing non-empty output folder that has no valid manifest.json unless --force is given."
+        },
+        {
+          "id": "FR-OUT-011",
+          "title": "The overwrite-protection check must run before any LLM call is made."
+        },
+        {
+          "id": "FR-OUT-012",
+          "title": "With --force, the tool must fully replace hand-edited documents and its final message must list what was overwritten."
+        },
+        {
+          "id": "FR-OUT-013",
+          "title": "A failed run with no previous documents must leave .cclinic/failed/ and the cache but no sdd/ folder."
+        },
+        {
+          "id": "FR-OUT-014",
+          "title": "The tool must create a .gitignore containing * in .cclinic/cache/ and .cclinic/failed/."
+        },
+        {
+          "id": "FR-OUT-015",
+          "title": "The tool must produce deterministic Markdown with stable ordering and no timestamps outside manifest.json, so that unchanged re-runs using the cache differ only in the manifest generation time."
+        },
+        {
+          "id": "FR-OUT-016",
+          "title": "The tool must escape pipe characters and line breaks in text from the target project and from Claude when rendering Markdown tables, so the column count stays correct."
+        },
+        {
+          "id": "FR-OUT-017",
+          "title": "manifest.json must record the cclinic version, prompt version, generation time, provider, requested and actual model, reasoning level, hashes of analysed and generated files, and spec names, IDs and titles."
+        },
+        {
+          "id": "FR-OUT-018",
+          "title": "scan-report.md must include included and skipped totals, skipped paths with reasons, extraction warnings and per-file redaction counts, must exclude tool folders (.cclinic, .agents), and must never contain secret values."
+        },
+        {
+          "id": "FR-OUT-019",
+          "title": "developer-guidelines.md must contain the unchanged language-neutral baseline template with stack-specific guidance added and labelled separately, and must still contain the baseline with a note when no language is detected."
+        },
+        {
+          "id": "FR-OUT-020",
+          "title": "stack.md must list technologies by category with version and evidence, and state when a category was not found; README.md must contain a table of all specs and explain IDs, statuses and reading order."
+        },
+        {
+          "id": "VAL-OUT-001",
+          "title": "After a run, the output folder contains the overview, stack, architecture, guidelines, open-questions, scan report and manifest, and the README lists every spec and explains how to read the set."
+        },
+        {
+          "id": "VAL-OUT-002",
+          "title": "Each spec folder has exactly three files, with the acceptance and test tables showing the expected columns and the test setup coming first in the test file."
+        },
+        {
+          "id": "VAL-OUT-003",
+          "title": "A faulty draft stops the run with a complete list of problems and a failure exit, previous documents are unchanged, and the rejected draft can be inspected."
+        },
+        {
+          "id": "VAL-OUT-004",
+          "title": "After an interrupted or failed run the folder holds either the complete old or the complete new set, a later run works, and no leftover temporary folders remain."
+        },
+        {
+          "id": "VAL-OUT-005",
+          "title": "Without --force, edited documents or an unrelated non-empty folder cause an immediate refusal naming the problem and no Claude usage; with --force they are replaced and the overwritten files are reported."
+        },
+        {
+          "id": "VAL-OUT-006",
+          "title": "Cache and failed drafts do not show up in git status, two runs on an unchanged project give identical Markdown apart from the manifest time, and table text with pipes or line breaks stays in its cell."
+        },
+        {
+          "id": "VAL-OUT-007",
+          "title": "The scan report and manifest show totals, skipped paths with reasons, warnings, redaction counts, model and provider, and contain no secret values."
+        },
+        {
+          "id": "VAL-OUT-008",
+          "title": "Guidelines always contain the standard baseline with labelled stack-specific advice (and a note if no language was found), and stack.md says when a category was not found."
+        },
+        {
+          "id": "TC-OUT-001",
+          "title": ".cclinic/sdd contains README.md, overview.md, stack.md, architecture.md, developer-guidelines.md, open-questions.md (stating there are no open questions), scan-report.md and manifest.json; manifest hashes match the files on disk."
+        },
+        {
+          "id": "TC-OUT-002",
+          "title": "The documents appear in <custom-dir> and not in .cclinic/sdd."
+        },
+        {
+          "id": "TC-OUT-003",
+          "title": "specs/ holds one folder per spec with exactly spec.md, validation.md, verification.md; validation.md header has 4 columns (ID, Covers, User need, Accepted when); verification.md has test setup before a 6-column table (ID, Covers, Level, Given, When, Then)."
+        },
+        {
+          "id": "TC-OUT-004",
+          "title": "Each fault is reported by name; valid data reports no problems."
+        },
+        {
+          "id": "TC-OUT-005",
+          "title": "Both faults are listed, existing docs are byte-identical, a draft exists in .cclinic/failed/, and the exit code is 5."
+        },
+        {
+          "id": "TC-OUT-006",
+          "title": "No sdd/ folder exists; .cclinic/failed/ holds the draft; the cache exists."
+        },
+        {
+          "id": "TC-OUT-007",
+          "title": "After the kill the folder is either the complete old or complete new set; the rerun succeeds and no temp or backup folders remain."
+        },
+        {
+          "id": "TC-OUT-008",
+          "title": "Exit code is 2, the changed file is listed, and the fake claude was not invoked."
+        },
+        {
+          "id": "TC-OUT-009",
+          "title": "Exit code is 0, the edited file is replaced by generated content, and the final message lists it as overwritten."
+        },
+        {
+          "id": "TC-OUT-010",
+          "title": "The first run is refused with exit code 2 and the files are untouched; the second run proceeds."
+        },
+        {
+          "id": "TC-OUT-011",
+          "title": "Both folders contain a .gitignore with * and are ignored."
+        },
+        {
+          "id": "TC-OUT-012",
+          "title": "All Markdown files are byte-identical; only generatedAt in manifest.json differs."
+        },
+        {
+          "id": "TC-OUT-013",
+          "title": "Each rendered row parses with the correct column count and the text is preserved."
+        },
+        {
+          "id": "TC-OUT-014",
+          "title": "It lists totals, skipped paths with reasons, the warning and the redaction count, does not contain the secret value, and does not list .cclinic or .agents paths."
+        },
+        {
+          "id": "TC-OUT-015",
+          "title": "Both contain the identical baseline text; the first adds a labelled stack-specific section; the second contains a note that no language was detected."
+        },
+        {
+          "id": "TC-OUT-016",
+          "title": "stack.md lists items with version and evidence and states the empty category was not found; README.md has a table of all specs and sections on IDs, statuses and reading order."
+        },
+        {
+          "id": "TC-OUT-017",
+          "title": "It finds and uses the correct documents from the README."
+        }
+      ]
+    }
+  ],
+  "retiredIds": [],
+  "newestCommit": "eb36543be0081b1f2d8b260ecefe5ad8db54fd20"
+}

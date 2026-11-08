@@ -21,6 +21,7 @@ Accuracy rules:
   - PDFs: path:page, such as docs/design.pdf:3
   - DOCX files: path#Heading, such as docs/brief.docx#Scope
 - When documents and code disagree, or something is unclear, say so as an open question. Don't silently choose.
+- Open questions are for decisions a person must make: real conflicts between sources, and real unknowns about intended behaviour. Don't raise questions about how IDs are numbered, about what you couldn't see in the content you were given, or about details a developer can check in the project's files.
 
 Respond only with data that matches the requested schema.`;
 
@@ -41,6 +42,19 @@ export function buildSummaryPrompt(chunk: Chunk): string {
 <${CONTENT_TAG}>
 ${files}
 </${CONTENT_TAG}>`;
+}
+
+/**
+ * History is context only: a message can describe work that was later changed or reverted (FR-GIT-018).
+ * It sits inside the content tags, because commit messages are untrusted.
+ */
+function historyContent(history: string): string {
+  if (history === "") return "";
+  return `
+
+Recent Git history, newest first. Use it only as context on recent work: which capabilities are active, what recently changed and why. Never base a requirement on a commit message alone. Requirements must cite project files as evidence, never commits. If history conflicts with the code or documents, record an open question.
+
+${escapeContent(history)}`;
 }
 
 function serialize(value: unknown): string {
@@ -65,6 +79,7 @@ export function buildCombinePrompt(
   summaries: readonly (ModuleSummary & { readonly moduleId: string })[],
   analysedFiles: readonly string[],
   manifest: Manifest | undefined,
+  history = "",
 ): string {
   return `Combine these module summaries into project-wide data.
 
@@ -79,7 +94,7 @@ Files analysed, which are the only valid evidence paths:
 ${analysedFiles.map((path) => `- ${escapeContent(path)}`).join("\n")}
 
 <${CONTENT_TAG}>
-${serialize(summaries)}
+${serialize(summaries)}${historyContent(history)}
 </${CONTENT_TAG}>`;
 }
 
@@ -122,6 +137,7 @@ export function buildSpecPrompt(
   analysedFiles: readonly string[],
   manifest: Manifest | undefined,
   project?: Pick<ProjectData, "stack" | "openQuestions">,
+  history = "",
 ): string {
   const others = allSpecs.filter((spec) => spec.name !== entry.name).map(({ name, goal }) => ({ name, goal }));
   const known = project === undefined ? [] : project.openQuestions.map((item) => item.question);
@@ -142,7 +158,7 @@ ${analysedFiles.map((path) => `- ${escapeContent(path)}`).join("\n")}
 
 <${CONTENT_TAG}>
 Project stack: ${serialize(project?.stack ?? [])}
-Summaries: ${serialize(summaries)}
+Summaries: ${serialize(summaries)}${historyContent(history)}
 </${CONTENT_TAG}>`;
 }
 

@@ -53,8 +53,15 @@ export function checkEvidence(evidence: string, index: FileIndex): string | unde
 const KEBAB_CASE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const AREA = /^[A-Z]{2,8}$/;
 
-function checkEvidenceList(evidence: readonly string[], index: FileIndex, owner: string): string[] {
+function checkEvidenceList(
+  evidence: readonly string[],
+  index: FileIndex,
+  owner: string,
+  allowsWholeFile = false,
+): string[] {
   return evidence.flatMap((item) => {
+    // An open question can be about a whole document. A requirement must cite a position (FR-ANA-009).
+    if (allowsWholeFile && index.has(item)) return [];
     const problem = checkEvidence(item, index);
     return problem === undefined ? [] : [`${owner}: ${problem}`];
   });
@@ -126,7 +133,7 @@ export function validateSpec(spec: GeneratedSpec, index: FileIndex, retiredIds: 
     if (!coveredByTc.has(id)) add(`${id} has no TC`);
   }
   for (const question of spec.openQuestions) {
-    problems.push(...checkEvidenceList(question.evidence, index, `${spec.name}: open question`));
+    problems.push(...checkEvidenceList(question.evidence, index, `${spec.name}: open question`, true));
   }
   return problems;
 }
@@ -147,7 +154,7 @@ export function validateProject(project: ProjectData, index: FileIndex): string[
     problems.push(...checkEvidenceList(part.evidence, index, `architecture: ${part.name}`));
   }
   for (const question of project.openQuestions) {
-    problems.push(...checkEvidenceList(question.evidence, index, "open question"));
+    problems.push(...checkEvidenceList(question.evidence, index, "open question", true));
   }
   if (project.specs.length === 0) problems.push("specs: the project has no specs");
   problems.push(...validateSpecEntries(project.specs));

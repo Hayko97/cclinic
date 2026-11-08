@@ -34,7 +34,7 @@ describe("installing", () => {
       expect(readFileSync(path.join(root, ".claude/skills", name, "SKILL.md"), "utf8")).toBe(shared);
       expect(shared).toContain(`name: ${name}\n`);
     }
-    expect(entries).toHaveLength(AGENT_SKILLS.length * 2 + 1);
+    expect(entries).toHaveLength(AGENT_SKILLS.length * 2 + 2);
     expect(entries.every((entry) => entry.status === "installed")).toBe(true);
     await expect(hasInstalledSkills(root)).resolves.toBe(true);
     await expect(hasInstalledSkills(makeTempFolder())).resolves.toBe(false);
@@ -54,8 +54,8 @@ describe("installing", () => {
 
   it("TC-SKILL-010: the summary counts each outcome", async () => {
     const root = makeTempFolder();
-    expect(summarizeInstall(await install(root))).toContain("11 installed");
-    expect(summarizeInstall(await install(root))).toContain("11 unchanged");
+    expect(summarizeInstall(await install(root))).toContain("14 installed");
+    expect(summarizeInstall(await install(root))).toContain("14 unchanged");
     writeFileSync(path.join(root, AGENTS_COPY), "mine");
     expect(summarizeInstall(await install(root))).toContain("1 skipped");
   });
@@ -170,5 +170,106 @@ describe("staying out of the analysis", () => {
     });
     expect(result.units.map((unit) => unit.text).join("\n")).toContain("cclinic:start");
     expect(existsSync(path.join(root, "AGENTS.md"))).toBe(false);
+  });
+});
+
+describe("agent instructions", () => {
+  const CLAUDE = "CLAUDE.md";
+  const AGENTS = "AGENTS.md";
+
+  it("TC-INSTR-001: AGENTS.md has the lifecycle and the skills", async () => {
+    const root = makeTempFolder();
+    await install(root);
+    const agents = readFileSync(path.join(root, AGENTS), "utf8");
+    for (const stage of ["1. Understand the prompt", "2. Refine the spec", "3. Implement", "4. Ask to commit"]) {
+      expect(agents).toContain(stage);
+    }
+    for (const { name } of AGENT_SKILLS) expect(agents).toContain(`| \`${name}\` |`);
+    expect(agents).toContain(".cclinic/sdd/specs/");
+  });
+
+  it("TC-INSTR-003: CLAUDE.md only imports AGENTS.md", async () => {
+    const root = makeTempFolder();
+    await install(root);
+    const claude = readFileSync(path.join(root, CLAUDE), "utf8");
+    expect(claude).toMatch(/^@AGENTS\.md$/m);
+    expect(claude).not.toContain("`@AGENTS.md`");
+    expect(claude).not.toContain("lifecycle");
+  });
+
+  it("TC-INSTR-007: only the sections change when the documents folder moves", async () => {
+    const root = makeTempFolder();
+    await installSkills({ target: root, out: path.join(root, ".cclinic/sdd"), isForced: false });
+    for (const file of [AGENTS, CLAUDE]) {
+      const section = readFileSync(path.join(root, file), "utf8").trim();
+      writeFileSync(path.join(root, file), `# Before ${file}\n\n${section}\n\nAfter ${file}\n`);
+    }
+    const entries = await installSkills({ target: root, out: path.join(root, "docs/sdd"), isForced: false });
+    const agents = readFileSync(path.join(root, AGENTS), "utf8");
+    expect(agents.startsWith(`# Before ${AGENTS}\n\n`)).toBe(true);
+    expect(agents.endsWith(`\n\nAfter ${AGENTS}\n`)).toBe(true);
+    expect(agents).toContain("docs/sdd/specs/");
+    expect(agents).not.toContain(".cclinic/sdd");
+    expect(statusOf(entries, AGENTS)).toBe("updated");
+    expect(statusOf(entries, CLAUDE)).toBe("unchanged");
+  });
+
+  it("TC-INSTR-008: an existing CLAUDE.md is preserved, with the section after it", async () => {
+    const root = makeTempFolder();
+    const original = "# Our rules\n\nUse tabs.\n";
+    writeProject(root, { [CLAUDE]: original });
+    expect(statusOf(await install(root), CLAUDE)).toBe("updated");
+    const merged = readFileSync(path.join(root, CLAUDE), "utf8");
+    expect(merged.startsWith(original)).toBe(true);
+    expect(merged).toMatch(/^@AGENTS\.md$/m);
+  });
+
+  it("TC-INSTR-009: damaged markers leave only that file alone", async () => {
+    const root = makeTempFolder();
+    const damaged = "<!-- cclinic:start -->\nno end\n";
+    writeProject(root, { [CLAUDE]: damaged });
+    const entries = await install(root);
+    expect(statusOf(entries, CLAUDE)).toBe("skipped: damaged markers");
+    expect(readFileSync(path.join(root, CLAUDE), "utf8")).toBe(damaged);
+    expect(statusOf(entries, AGENTS)).toBe("installed");
+  });
+
+  it("TC-INSTR-010: up-to-date files aren't rewritten", async () => {
+    const root = makeTempFolder();
+    await install(root);
+    const old = new Date("2020-01-01");
+    for (const file of [AGENTS, CLAUDE]) utimesSync(path.join(root, file), old, old);
+    const entries = await install(root);
+    for (const file of [AGENTS, CLAUDE]) {
+      expect(statusOf(entries, file)).toBe("unchanged");
+      expect(statSync(path.join(root, file)).mtime).toEqual(old);
+    }
+  });
+
+  it("TC-INSTR-011: the CLAUDE.md section doesn't affect its hash or text for analysis", async () => {
+    const root = makeTempFolder();
+    writeProject(root, { [CLAUDE]: "# Our rules\n" });
+    const file = { path: CLAUDE, absolutePath: path.join(root, CLAUDE), kind: "document" as const, sizeBytes: 1 };
+    const before = await createExtractor().extract(file);
+    await install(root);
+    expect(readFileSync(file.absolutePath, "utf8")).toContain("@AGENTS.md");
+    const after = await createExtractor().extract(file);
+    expect(after.sha256).toBe(before.sha256);
+    expect(after.units).toEqual(before.units);
+  });
+
+  it("TC-INSTR-012: a CLAUDE.md holding only the section isn't scanned or listed", async () => {
+    const root = makeTempFolder();
+    writeProject(root, { "src/a.ts": "a" });
+    await install(root);
+    const result = await scanFolder({
+      target: root,
+      outFolder: path.join(root, ".cclinic/sdd"),
+      include: [],
+      exclude: [],
+      maxFileSizeMib: 1,
+    });
+    expect(result.included.map((item) => item.path)).toEqual(["src/a.ts"]);
+    expect(result.skipped.map((item) => item.path)).not.toContain(CLAUDE);
   });
 });

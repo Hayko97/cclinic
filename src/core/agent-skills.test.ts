@@ -2,12 +2,14 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   AGENT_SKILLS,
+  AGENT_WORKFLOW,
   classifySkill,
   isSameSkill,
-  mergeAgentsFile,
+  mergeManagedSection,
   renderAgentsBlock,
+  renderClaudeBlock,
   renderSkill,
-  stripAgentsBlock,
+  stripManagedSection,
   type AgentSkill,
 } from "./agent-skills.js";
 
@@ -20,13 +22,14 @@ const skill = (name: string): AgentSkill => {
 const render = (name: string): string => renderSkill(skill(name), ".cclinic/sdd", hash);
 
 describe("skill format", () => {
-  it("TC-SKILL-001: provides the five skills", () => {
+  it("TC-SKILL-001: provides the six skills", () => {
     expect(AGENT_SKILLS.map((item) => item.name)).toEqual([
       "create-spec",
       "refine-spec",
       "write-code",
       "implement-spec",
       "test-spec",
+      "devops",
     ]);
   });
 
@@ -66,7 +69,7 @@ describe("protecting existing work", () => {
 
   it("TC-SKILL-018: only the marked section changes", () => {
     const original = `# Mine\n\n${renderAgentsBlock("old/path")}\n\nMore of mine.\n`;
-    const merged = mergeAgentsFile(original, renderAgentsBlock("new/path")) ?? "";
+    const merged = mergeManagedSection(original, renderAgentsBlock("new/path")) ?? "";
     expect(merged.startsWith("# Mine\n\n")).toBe(true);
     expect(merged.endsWith("\n\nMore of mine.\n")).toBe(true);
     expect(merged).toContain("new/path");
@@ -75,20 +78,20 @@ describe("protecting existing work", () => {
 
   it("creates the section when the file is missing or blank, and refuses damaged markers", () => {
     const block = renderAgentsBlock("docs");
-    expect(mergeAgentsFile(undefined, block)).toBe(`${block}\n`);
-    expect(mergeAgentsFile("  \n", block)).toBe(`${block}\n`);
-    expect(mergeAgentsFile("<!-- cclinic:start -->\nno end", block)).toBeUndefined();
-    expect(mergeAgentsFile("no start\n<!-- cclinic:end -->", block)).toBeUndefined();
-    expect(mergeAgentsFile("<!-- cclinic:end --> <!-- cclinic:start -->", block)).toBeUndefined();
+    expect(mergeManagedSection(undefined, block)).toBe(`${block}\n`);
+    expect(mergeManagedSection("  \n", block)).toBe(`${block}\n`);
+    expect(mergeManagedSection("<!-- cclinic:start -->\nno end", block)).toBeUndefined();
+    expect(mergeManagedSection("no start\n<!-- cclinic:end -->", block)).toBeUndefined();
+    expect(mergeManagedSection("<!-- cclinic:end --> <!-- cclinic:start -->", block)).toBeUndefined();
   });
 
   it("TC-SKILL-022: stripping leaves only the user's text", () => {
     const block = renderAgentsBlock("docs");
-    expect(stripAgentsBlock(`# Mine\n\n${block}\n`)).toBe("# Mine\n");
-    expect(stripAgentsBlock(`${block}\n`)).toBe("");
-    expect(stripAgentsBlock(`# Mine\n\n${block}\n\nEnd\n`)).toBe("# Mine\n\nEnd\n");
-    expect(stripAgentsBlock("# Only mine\n")).toBe("# Only mine\n");
-    expect(stripAgentsBlock(mergeAgentsFile("# Mine\n", block) ?? "")).toBe("# Mine\n");
+    expect(stripManagedSection(`# Mine\n\n${block}\n`)).toBe("# Mine\n");
+    expect(stripManagedSection(`${block}\n`)).toBe("");
+    expect(stripManagedSection(`# Mine\n\n${block}\n\nEnd\n`)).toBe("# Mine\n\nEnd\n");
+    expect(stripManagedSection("# Only mine\n")).toBe("# Only mine\n");
+    expect(stripManagedSection(mergeManagedSection("# Mine\n", block) ?? "")).toBe("# Mine\n");
   });
 
   it("TC-SKILL-004: the section lists every skill and the documents folder", () => {
@@ -191,5 +194,65 @@ describe("skill content", () => {
     ]) {
       expect(body).toContain(text);
     }
+  });
+});
+
+describe("agent workflow", () => {
+  const workflow = AGENT_WORKFLOW;
+
+  it("TC-INSTR-006: the section stays under 200 lines", () => {
+    expect(renderAgentsBlock("docs").split("\n").length).toBeLessThan(200);
+  });
+
+  it("TC-INSTR-015: every rule is stated", () => {
+    for (const text of [
+      "If it's a question, an explanation or a review with no change requested, just answer",
+      "work out which spec it belongs to, and tell the user",
+      "`refine-spec`",
+      "`create-spec`",
+      "Add a test case that reproduces it",
+      "Ask the user to approve or reject it, and stop",
+      "Don't change production code until they clearly approve",
+      "`implement-spec`",
+      "`write-code`",
+      "go back to stage 2",
+      "real results",
+      "No behaviour change",
+      "say which stage was skipped",
+      "run `cclinic` first",
+      "stop at stage 2",
+      "ask whether to commit",
+      "Only if they agree",
+      "spec, code and tests for this change together",
+      "referencing the requirement IDs",
+      "Stage only files that belong to this change",
+      "Don't push unless asked",
+      "leave the changes uncommitted",
+    ]) {
+      expect(workflow).toContain(text);
+    }
+  });
+
+  it.each(["create-spec", "refine-spec"])("TC-INSTR-016: %s asks for review and doesn't implement", (name) => {
+    const body = skill(name).body;
+    expect(body).toContain("Ask for review, and stop");
+    expect(body).toContain("approve or reject");
+    expect(body).toContain("Don't implement it in this skill");
+  });
+
+  it("TC-INSTR-016: implement-spec checks approval, asks for review, then asks to commit", () => {
+    const body = skill("implement-spec").body;
+    const order = ["Check that it's approved", "Report and ask for review", "Ask to commit"].map((text) =>
+      body.indexOf(text),
+    );
+    expect(order.every((position) => position >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((left, right) => left - right));
+    expect(body).toContain("Never push unless the user asks");
+    expect(body).toContain("State any test that failed or wasn't run before asking");
+    expect(body).not.toContain("Don't commit or push unless");
+  });
+
+  it("the import sits outside any code span, so Claude Code reads it", () => {
+    expect(renderClaudeBlock().split("\n")).toContain("@AGENTS.md");
   });
 });

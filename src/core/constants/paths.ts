@@ -11,6 +11,9 @@ export const BACKUP_FOLDER_SUFFIX = ".cclinic-old-";
 export const GITIGNORE_FILE = ".gitignore";
 export const CCLINIC_IGNORE_FILE = ".cclinicignore";
 export const AGENTS_FILE = "AGENTS.md";
+export const CLAUDE_FILE = "CLAUDE.md";
+/** Root files where cclinic owns a marked section, which is removed before analysis (FR-INSTR-007). */
+export const MANAGED_INSTRUCTION_FILES: readonly string[] = [AGENTS_FILE, CLAUDE_FILE];
 export const SKILL_FILE = "SKILL.md";
 export const SKILL_FOLDERS = [".agents/skills", ".claude/skills"] as const;
 

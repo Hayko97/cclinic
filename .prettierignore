@@ -2,6 +2,10 @@ dist/
 coverage/
 reports/
 .stryker-tmp/
-sdd/
 test/fixtures/
 package-lock.json
+.cclinic/
+.agents/
+.claude/
+AGENTS.md
+CLAUDE.md

@@ -5,6 +5,7 @@ import { LIMITS, SHUTDOWN_TIMEOUT_MS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ARGV_OFFSET } from "../core/constants/terminal.js";
 import { EXIT_CODES, exitCodeFor, RESUME_HINT, LlmError, UsageError, ValidationFailedError } from "../core/errors.js";
+import { runEnvironmentCommand, type EnvironmentCommandOptions } from "./environment-command.js";
 import { runGenerate, type CommandContext, type GenerateOptions } from "./generate-command.js";
 import { commandHelp, GUIDE_TEXT, HELP_HOW_IT_WORKS } from "./guide.js";
 import { collect, integerInRange, oneOf, positiveNumber } from "./options.js";
@@ -94,6 +95,9 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .option("-y, --yes", "skip the confirmation prompt")
     .option("--no-cache", "re-analyse everything, ignoring cached results")
     .option("--no-skills", "don't install the agent skills")
+    .option("--environment", "set up the local environment without asking")
+    .option("--no-environment", "don't offer to set up the local environment")
+    .option("--no-git", "don't create a repository, use Git history, or alert about a remote")
     .option("--allow-broad-target", "allow running on a home folder or filesystem root")
     .optionsGroup("Limits:")
     .option(
@@ -118,6 +122,12 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
       const options = command.opts<GenerateOptions & { quiet?: boolean; debug?: boolean }>();
       if (options.quiet === true && options.debug === true)
         throw new UsageError("--quiet and --debug can't be used together.");
+      // Commander keeps only the last of a negatable pair, so the conflict is only visible in the arguments.
+      if (
+        process.argv.includes("--environment") &&
+        (process.argv.includes("--no-environment") || process.argv.includes("--no-skills"))
+      )
+        throw new UsageError("--environment can't be used with --no-environment or --no-skills.");
       await runGenerate(given, options, context);
     });
 
@@ -159,6 +169,23 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .addHelpText("after", commandHelp("cclinic skills", "cclinic skills ./my-project --out docs/sdd --json"))
     .action(async (given: string | undefined, options: SkillsCommandOptions) => {
       await runSkillsCommand(given, options, context);
+    });
+
+  program
+    .command("environment")
+    .description("Set up a local environment for previewing changes, using Claude")
+    .argument("[path]", "project folder (default: the current folder)")
+    .option("-o, --out <dir>", "where the project documents are (default: <path>/.cclinic/sdd)")
+    .option("-m, --model [value]", "model to use. With no value, opens a menu")
+    .option("--effort [value]", "reasoning level. With no value, opens a menu")
+    .option("--max-budget-usd <n>", "stop at this estimated spend (default: 2)", positiveNumber)
+    .option("-y, --yes", "skip the confirmation prompt")
+    .option("-f, --force", "set up the environment again")
+    .option("--allow-broad-target", "allow running on a home folder or filesystem root")
+    .option("--json", "print JSON")
+    .addHelpText("after", commandHelp("cclinic environment", "cclinic environment ./my-project --yes --json"))
+    .action(async (given: string | undefined, options: EnvironmentCommandOptions) => {
+      await runEnvironmentCommand(given, options, context);
     });
 
   program

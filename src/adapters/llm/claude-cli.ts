@@ -1,4 +1,4 @@
-/** Runs Claude through the `claude` command. See sdd/decisions/0002-claude-cli-integration.md. */
+/** Runs Claude through the `claude` command. */
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -99,7 +99,7 @@ function findResult(events: readonly unknown[]): ResultEvent | undefined {
   return undefined;
 }
 
-function resultMessage(result: ResultEvent): string {
+export function resultMessage(result: ResultEvent): string {
   const errors = (result.errors ?? []).filter((item): item is string => typeof item === "string");
   return [result.result ?? "", ...errors].join(" ").trim();
 }
@@ -149,16 +149,25 @@ export interface ClaudeOutcome {
  * Decides success from the result event (FR-LLM-008). `subtype` and `stop_reason` aren't reliable:
  * an invalid model reports subtype "success", and a good structured call reports stop_reason "tool_use".
  */
-export function interpretOutcome(
+export function requireSuccessfulResult(
   events: readonly unknown[],
   exitCode: number | null,
   model: ModelChoice,
-): ClaudeOutcome {
+): ResultEvent {
   const result = findResult(events);
   if (result === undefined) {
     throw new ProviderError(`The Claude CLI ended without a result (exit code ${exitCode ?? "unknown"}).`);
   }
   if (exitCode !== 0 || result.is_error === true) throw classifyFailure(result, exitCode, model);
+  return result;
+}
+
+export function interpretOutcome(
+  events: readonly unknown[],
+  exitCode: number | null,
+  model: ModelChoice,
+): ClaudeOutcome {
+  const result = requireSuccessfulResult(events, exitCode, model);
   if (result.structured_output === undefined || result.structured_output === null) {
     if (result.stop_reason === "refusal") throw new RefusalError("Claude declined this request.");
     if (result.stop_reason === "max_tokens") throw new TruncatedError("Claude's response was cut off.");
@@ -277,11 +286,12 @@ interface ProcessOptions {
   readonly cwd: string;
   readonly environment: NodeJS.ProcessEnv;
   readonly timeoutMs: number;
+  readonly timeoutMessage?: string;
   readonly signal?: AbortSignal;
   readonly onEvent: (event: unknown) => void;
 }
 
-function runProcess(
+export function runProcess(
   args: readonly string[],
   stdin: string,
   options: ProcessOptions,
@@ -308,7 +318,8 @@ function runProcess(
     const timer = setTimeout(() => {
       stop(
         new ProviderError(
-          `The Claude CLI call timed out after ${options.timeoutMs / MS_PER_MINUTE} minutes. Use --timeout-minutes to allow longer.`,
+          options.timeoutMessage ??
+            `The Claude CLI call timed out after ${options.timeoutMs / MS_PER_MINUTE} minutes. Use --timeout-minutes to allow longer.`,
         ),
       );
     }, options.timeoutMs);

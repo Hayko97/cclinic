@@ -2,8 +2,9 @@
 import { realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { scanFolder } from "../adapters/discovery/file-walker.js";
+import { createPathFilter, scanFolder } from "../adapters/discovery/file-walker.js";
 import { createExtractor } from "../adapters/extraction/extract.js";
+import { createRepository, detectGit, hasGitignore, readRawHistory } from "../adapters/git/git-repository.js";
 import { selectProvider, type ProviderChoice } from "../adapters/llm/select-provider.js";
 import { readSavedSettings } from "../adapters/config/user-config.js";
 import {
@@ -24,6 +25,7 @@ import {
   promptForChunk,
   type PreparedRun,
 } from "../application/pipeline.js";
+import { GIT_INSTALL_LINK } from "../core/constants/git.js";
 import { ESTIMATION_CONCURRENCY, EXTRACTION_CONCURRENCY, MS_PER_SECOND } from "../core/constants/limits.js";
 import { ENV_VARS, PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { USD_DECIMAL_PLACES } from "../core/constants/terminal.js";
@@ -42,7 +44,16 @@ import {
   type Effort,
   type ModelChoice,
 } from "../core/models.js";
+import {
+  buildHistoryContext,
+  describeGitStatus,
+  formatRemoteAlert,
+  type GitStatus,
+  type HistoryContext,
+} from "../core/git-history.js";
 import type { LlmProvider, ScanResult } from "../core/ports.js";
+import type { CommandContext } from "./command-context.js";
+import { formatEnvironmentOutcome, setUpAfterGenerate } from "./environment-step.js";
 import { NEXT_STEPS } from "./guide.js";
 import { askToConfirm, chooseEffort, chooseModel, isInteractive } from "./menus.js";
 import { closestCommand, oneOf, requireEffort, requireModel } from "./options.js";
@@ -69,14 +80,12 @@ export interface GenerateOptions {
   readonly maxRetries: number;
   readonly json?: boolean;
   readonly skills?: boolean;
+  readonly environment?: boolean;
+  readonly git?: boolean;
+  readonly quiet?: boolean;
 }
 
-export interface CommandContext {
-  readonly reporter: Reporter;
-  readonly environment: NodeJS.ProcessEnv;
-  readonly signal: AbortSignal;
-  readonly version: string;
-}
+export type { CommandContext } from "./command-context.js";
 
 async function isDirectory(target: string): Promise<boolean> {
   try {
@@ -114,7 +123,7 @@ export async function resolveAmbiguousValues(
   return { path: target, model, effort };
 }
 
-async function resolveTarget(given: string | undefined, allowBroad: boolean): Promise<string> {
+export async function resolveTarget(given: string | undefined, allowBroad: boolean): Promise<string> {
   const absolute = path.resolve(given ?? process.cwd());
   if (!(await isDirectory(absolute))) {
     const suggestion = given === undefined ? undefined : closestCommand(given);
@@ -130,7 +139,7 @@ async function resolveTarget(given: string | undefined, allowBroad: boolean): Pr
   return target;
 }
 
-async function resolveModelAndEffort(
+export async function resolveModelAndEffort(
   values: { model: string | true | undefined; effort: string | true | undefined },
   context: CommandContext,
 ): Promise<{ model: ModelChoice; effort: Effort }> {
@@ -157,7 +166,10 @@ async function resolveModelAndEffort(
   return { model, effort };
 }
 
-function resolveProviderChoice(option: ProviderChoice | undefined, environment: NodeJS.ProcessEnv): ProviderChoice {
+export function resolveProviderChoice(
+  option: ProviderChoice | undefined,
+  environment: NodeJS.ProcessEnv,
+): ProviderChoice {
   if (option !== undefined) return option;
   const value = environment[ENV_VARS.PROVIDER];
   if (value === undefined || value === "") return "auto";
@@ -187,6 +199,7 @@ interface SummaryInput {
   readonly tokens: number;
   readonly cachedChunks: number;
   readonly showCost: boolean;
+  readonly gitDescription: string;
 }
 
 function formatUsd(value: number): string {
@@ -204,10 +217,13 @@ export function formatSummary(input: SummaryInput): string {
     `Reasoning:  ${labelForEffort(input.effort)}`,
     `Files:      ${count("code")} code, ${count("config")} config, ${count("document")} documents`,
     `Skipped:    ${input.scan.skipped.length} files and folders`,
-    `Tokens:     about ${input.tokens.toLocaleString("en-US")} to summarise, plus combining (${input.cachedChunks} chunks already cached)`,
+    `Git:        ${input.gitDescription}`,
+    `Tokens:     about ${input.tokens.toLocaleString("en-US")} to summarise (${input.cachedChunks} chunks already cached). Combining and writing specs use more, often several times this`,
   ];
   if (input.showCost && cost !== null)
-    lines.push(`Cost:       about ${formatUsd(cost)} (estimate, assuming output is 25% of input)`);
+    lines.push(
+      `Cost:       about ${formatUsd(cost)} for summarising only (estimate). Use --max-budget-usd to set a limit`,
+    );
   lines.push("", "Project content will be sent to Anthropic.");
   return lines.join("\n");
 }
@@ -226,6 +242,48 @@ async function estimateTokens(
       : provider.estimateTokens(prompt, model);
   });
   return counts.reduce((total, count) => total + count, 0);
+}
+
+function warnAboutGit(status: GitStatus, reporter: Reporter): void {
+  if (status.kind === "not-installed") {
+    reporter.warn(`Git isn't installed, so history can't be used. Install it from ${GIT_INSTALL_LINK}.`);
+  } else if (status.kind === "unavailable") {
+    reporter.warn(`Git can't be used here, so continuing without history: ${status.reason}.`);
+  } else if (status.kind === "repository" && status.isShallow) {
+    reporter.warn("This is a shallow clone, so Git history may be incomplete.");
+  }
+}
+
+interface LoadedHistory {
+  readonly newestCommit: string;
+  readonly context: HistoryContext;
+}
+
+/** Git problems never stop a run (FR-GIT-022). */
+async function loadHistory(
+  status: GitStatus,
+  target: string,
+  outFolder: string,
+  options: GenerateOptions,
+  { environment, reporter }: CommandContext,
+): Promise<LoadedHistory | undefined> {
+  if (status.kind !== "repository" || !status.hasCommits) return undefined;
+  const relativeOut = path.relative(target, outFolder).split(path.sep).join("/");
+  const raw = await readRawHistory(target, {
+    environment,
+    now: new Date(),
+    ...(relativeOut.startsWith("..") ? {} : { outFolder: relativeOut }),
+  });
+  if (raw === undefined) {
+    reporter.warn("Couldn't read the Git history, so continuing without it.");
+    return undefined;
+  }
+  const isPathAllowed = createPathFilter({ target, outFolder, include: options.include, exclude: options.exclude });
+  const context = buildHistoryContext(raw.commits, raw.totalInWindow, isPathAllowed);
+  if (context.omittedCount > 0) {
+    reporter.warn(`Git history is above the limit, so ${context.omittedCount} older commits were left out.`);
+  }
+  return { newestCommit: raw.newestCommit, context };
 }
 
 function limitMessage(what: string, actual: number, limit: number, flag: string): string {
@@ -259,6 +317,9 @@ export async function runGenerate(
     if (!(error instanceof NoProviderError && isDryRun && providerChoice === "auto")) throw error;
   }
 
+  let gitStatus: GitStatus = options.git === false ? { kind: "disabled" } : await detectGit(target, { environment });
+  warnAboutGit(gitStatus, reporter);
+
   reporter.info(`Scanning ${target}...`);
   const scan = await scanFolder({
     target,
@@ -286,7 +347,12 @@ export async function runGenerate(
     { scan, extracted, settings: { model, effort, noCache: !options.cache } },
     { hash: sha256, cache },
   );
-  const tokens = await estimateTokens(prepared, provider, model, signal);
+  const history = await loadHistory(gitStatus, target, paths.out, options, context);
+  const previousManifest = await createDocumentStore(paths, () => new Date()).readManifest();
+  // Unchanged history is already in cached results, so it costs nothing to re-run (FR-GIT-019).
+  const isHistoryNew = history !== undefined && history.newestCommit !== previousManifest?.newestCommit;
+  const historyTokens = isHistoryNew ? estimateTokensFromChars(history.context.text) : 0;
+  const tokens = (await estimateTokens(prepared, provider, model, signal)) + historyTokens;
   if (tokens > options.maxInputTokens) {
     throw new UsageError(limitMessage("estimated input tokens", tokens, options.maxInputTokens, "--max-input-tokens"));
   }
@@ -301,6 +367,7 @@ export async function runGenerate(
     tokens,
     cachedChunks: prepared.chunks.filter((chunk) => chunk.isCached).length,
     showCost: provider?.isSubscription !== true,
+    gitDescription: describeGitStatus(gitStatus, history?.context.commitCount ?? 0),
   });
 
   if (isDryRun) {
@@ -316,6 +383,7 @@ export async function runGenerate(
           estimatedCostUsd: provider?.isSubscription === true ? null : estimateCostUsd(model, tokens),
           included: scan.included.map((file) => ({ path: file.path, kind: file.kind })),
           skipped: scan.skipped,
+          git: { status: gitStatus.kind, commitsUsed: history?.context.commitCount ?? 0 },
         }),
       );
     } else {
@@ -346,6 +414,16 @@ export async function runGenerate(
   await checkWritable(paths);
   const releaseLock = await acquireLock(paths.lock);
   try {
+    let wasRepositoryCreated = false;
+    if (gitStatus.kind === "no-repository") {
+      wasRepositoryCreated = await createRepository(target, { environment });
+      if (wasRepositoryCreated) {
+        reporter.info("Created a local Git repository.");
+        gitStatus = await detectGit(target, { environment });
+      } else {
+        reporter.warn("Couldn't create a Git repository, so continuing without one.");
+      }
+    }
     const now = (): Date => new Date();
     const start = Date.now();
     const result = await generateDocuments(
@@ -357,6 +435,9 @@ export async function runGenerate(
         noCache: !options.cache,
         cclinicVersion: context.version,
         ...(options.maxBudgetUsd === undefined ? {} : { maxBudgetUsd: options.maxBudgetUsd }),
+        ...(history === undefined
+          ? {}
+          : { history: { newestCommit: history.newestCommit, text: history.context.text } }),
       },
       {
         llm: provider,
@@ -379,7 +460,38 @@ export async function runGenerate(
         reporter.warn(`Couldn't install the agent skills: ${reason}. Run "cclinic skills" to try again.`);
       }
     }
+    const remoteAlert =
+      gitStatus.kind === "repository" && gitStatus.remote === undefined
+        ? formatRemoteAlert({
+            hasCommits: gitStatus.hasCommits,
+            hasGitignore: await hasGitignore(gitStatus.root),
+            wasCreated: wasRepositoryCreated,
+          })
+        : undefined;
+    const gitResult = {
+      status: gitStatus.kind,
+      createdRepository: wasRepositoryCreated,
+      remote: gitStatus.kind === "repository" ? (gitStatus.remote ?? null) : null,
+      commitsUsed: history?.context.commitCount ?? 0,
+      ...(remoteAlert === undefined ? {} : { remoteAlert }),
+    };
+    const setUpEnvironment = () =>
+      setUpAfterGenerate(
+        {
+          target,
+          out: paths.out,
+          model,
+          effort,
+          maxBudgetUsd: options.maxBudgetUsd,
+          isClaudeCli: provider.name === "claude-cli",
+          wereSkillsInstalled: skills.length > 0,
+          requested: options.environment,
+          mayAsk: options.yes !== true && options.quiet !== true && options.json !== true,
+        },
+        context,
+      );
     if (options.json === true) {
+      const environmentOutcome = await setUpEnvironment();
       reporter.result(
         JSON.stringify({
           status: "success",
@@ -395,6 +507,8 @@ export async function runGenerate(
           cachedChunks: result.cachedChunks,
           overwritten,
           skills,
+          git: gitResult,
+          environment: environmentOutcome,
         }),
       );
       return;
@@ -415,8 +529,14 @@ export async function runGenerate(
           .map((entry) => `Warning: ${entry.path} ${entry.status}`),
         ...(overwritten.length === 0 ? [] : [`Overwrote hand-edited files: ${overwritten.join(", ")}`]),
         ...result.warnings.map((warning) => `Warning: ${warning}`),
+        ...(gitResult.commitsUsed === 0
+          ? []
+          : [`Git context: ${gitResult.commitsUsed} recent ${gitResult.commitsUsed === 1 ? "commit" : "commits"}.`]),
+        ...(remoteAlert === undefined || options.quiet === true ? [] : ["", remoteAlert]),
       ].join("\n"),
     );
+    const environmentText = formatEnvironmentOutcome(await setUpEnvironment());
+    if (environmentText !== undefined) reporter.result(`\n${environmentText}`);
   } finally {
     await releaseLock();
   }

@@ -218,6 +218,8 @@ describe("running", () => {
       env: { ANTHROPIC_API_KEY: "sk-ant-test", ANTHROPIC_BASE_URL: "http://127.0.0.1:9" },
     });
     expect(api.stdout).toContain("Cost:");
+    expect(api.stdout).toContain("for summarising only");
+    expect(api.stdout).toContain("Combining and writing specs use more");
     expect(api.stderr).toContain("estimated from characters");
     expect((await cclinic([sampleProject(), "--dry-run"])).stdout).not.toContain("Cost:");
   });

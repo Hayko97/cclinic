@@ -117,5 +117,6 @@ export const manifestSchema = z.object({
     }),
   ),
   retiredIds: z.array(z.string()),
+  newestCommit: z.string().optional(),
 });
 export type Manifest = z.infer<typeof manifestSchema>;

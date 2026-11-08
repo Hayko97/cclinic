@@ -18,6 +18,8 @@ export class ValidationFailedError extends CclinicError {
   }
 }
 export class CancelledError extends CclinicError {}
+/** Exits like a Claude failure, but re-running starts this step again rather than continuing it. */
+export class EnvironmentStepError extends CclinicError {}
 
 export class LlmError extends CclinicError {}
 export class AuthError extends LlmError {}
@@ -49,7 +51,7 @@ export function exitCodeFor(error: unknown): number {
   if (error instanceof CancelledError) return EXIT_CODES.sigint;
   if (error instanceof UsageError) return EXIT_CODES.usage;
   if (error instanceof NoProviderError) return EXIT_CODES.noProvider;
-  if (error instanceof LlmError) return EXIT_CODES.llm;
+  if (error instanceof LlmError || error instanceof EnvironmentStepError) return EXIT_CODES.llm;
   if (error instanceof ValidationFailedError) return EXIT_CODES.validation;
   return EXIT_CODES.internal;
 }

@@ -353,6 +353,11 @@ describe("grouping and chunking", () => {
 describe("prompts", () => {
   const chunk = { moduleId: "m", index: 0, files: [file("a.ts")] };
 
+  it("TC-ANA-008: open questions are limited to decisions a person must make", () => {
+    expect(SYSTEM_PROMPT).toContain("decisions a person must make");
+    expect(SYSTEM_PROMPT).toContain("how IDs are numbered");
+  });
+
   it("TC-ANA-008: prompts require evidence and prohibit invention", () => {
     expect(SYSTEM_PROMPT).toContain("Never invent");
     expect(SYSTEM_PROMPT).toContain("evidence");
@@ -537,6 +542,16 @@ describe("validation", () => {
     expect(validateSpec(goodSpec(), index, [])).toEqual([]);
     expect(validateProject(goodProject(), index)).toEqual([]);
     expect(validateRendered(documents, ["login"])).toEqual([]);
+  });
+
+  it("TC-ANA-037: only an open question can cite a whole file", () => {
+    const question = { question: "Which is right?", evidence: ["src/a.ts"] };
+    expect(validateSpec(goodSpec({ openQuestions: [question] }), index, [])).toEqual([]);
+    expect(validateProject(goodProject({ openQuestions: [question] }), index)).toEqual([]);
+    const requirement = { id: "FR-AUTH-001", statement: "S", status: "code-only" as const, evidence: ["src/a.ts"] };
+    expect(validateSpec(goodSpec({ requirements: [requirement] }), index, []).join()).toContain("valid format");
+    const missing = { question: "Q", evidence: ["no/such/file.ts"] };
+    expect(validateSpec(goodSpec({ openQuestions: [missing] }), index, []).join()).toContain("valid format");
   });
 
   it("rejects a reused retired ID", () => {
