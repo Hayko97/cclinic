@@ -10,4 +10,11 @@ if (parts[0] < 22 || (parts[0] === 22 && parts[1] < 18)) {
   );
   process.exit(2);
 }
+// Node 22 marks node:sqlite as experimental. Its warning would break --json output (FR-TASK-013).
+var emitWarning = process.emitWarning;
+process.emitWarning = function (warning, options) {
+  var type = typeof options === "string" ? options : options && options.type;
+  if (type === "ExperimentalWarning" && String(warning).indexOf("SQLite") !== -1) return;
+  return emitWarning.apply(process, arguments);
+};
 import("../dist/main.js");

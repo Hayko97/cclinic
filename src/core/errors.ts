@@ -36,6 +36,9 @@ export class SchemaError extends LlmError {}
 export class BudgetError extends LlmError {}
 export class ProviderError extends LlmError {}
 
+/** The task database can't be used. It's expected, so it's reported without "unexpected" (FR-TASK-016). */
+export class TaskDatabaseError extends CclinicError {}
+
 export const EXIT_CODES = {
   success: 0,
   internal: 1,

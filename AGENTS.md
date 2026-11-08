@@ -5,7 +5,9 @@ This project uses spec-driven development. Specs are in `.cclinic/sdd/specs/`, a
 
 Analyse every prompt, and follow this lifecycle:
 
-**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask.
+**0. Check open tasks.** On every prompt, first run `cclinic tasks list --json`. If it lists tasks and the prompt isn't about one of them, list them (ID, title, status, spec), and wait for the user to choose: work on one of them, remove it with `cclinic tasks remove <id>` and continue with the prompt, or keep it and continue with the prompt. Once the user chooses to keep them, don't ask about the same tasks again in this conversation, only when a new task appears. If there are no tasks, don't mention them. If the command fails, say so in one line and continue.
+
+**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, use the `product-engineer` skill, and don't start spec or code work. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask. When work starts on a task, run `cclinic tasks start <id>`, and use the task's spec.
 
 **2. Refine the spec, and get it approved.**
 - **New feature:** use the `refine-spec` skill if it belongs in an existing spec, or the `create-spec` skill if not.
@@ -21,7 +23,7 @@ Show what changed in `spec.md`, `validation.md` and `verification.md`, and any o
 4. **Show a preview. Don't ask for approval until you've done this.** Run each `start` command in `.cclinic/environment/environment.json`, so the local environment includes this change, leave it running, and check it. A server you start yourself doesn't count. If the file doesn't exist, set it up with the `devops` skill. Give the user the link, simulator build or command to try. If there's nothing to run, or it can't start, say why.
 5. Ask the user to test it by hand, with steps for each `manual` test case QA didn't run. Ask the user to approve the implementation or request changes. If they request changes, make them, take them through QA again, show the preview again, and ask again.
 
-**4. Ask to commit.** Once the user approves the implementation, ask whether to commit it. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change. Don't push unless asked. If they decline, leave the changes uncommitted.
+**4. Ask to commit.** Once the user approves the implementation, run `cclinic tasks done <id>` if it was a task, then ask whether to commit it. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change. Don't push unless asked. If they decline, leave the changes uncommitted.
 
 If the user tells you to skip a stage, do as they ask, and say which stage was skipped. If `.cclinic/sdd` doesn't exist, ask the user to run `cclinic` first. If nobody can answer, as in an unattended run, stop at stage 2 and report the spec, because silence isn't approval.
 
@@ -39,6 +41,7 @@ Skills are in `.agents/skills/<name>/SKILL.md`. If your tool doesn't load skills
 | `implement-spec` | Builds a spec requirement by requirement, with tests from its test cases, and reports proof that each one works |
 | `test-spec` | Acts as QA for a spec or feature: automates its test cases, runs them, explores edge cases, and reports results and defects |
 | `devops` | Sets up a local environment suited to the project, and shows how to review each change, such as a link or a simulator build |
+| `product-engineer` | Helps the user decide what to build, by asking questions and proposing a roadmap of milestones and tasks, which it saves once approved |
 
 This section is managed by cclinic, so keep your own notes outside the markers.
 <!-- cclinic:end -->

@@ -4,13 +4,22 @@ import { Command, CommanderError, Option } from "commander";
 import { LIMITS, SHUTDOWN_TIMEOUT_MS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ARGV_OFFSET } from "../core/constants/terminal.js";
-import { EXIT_CODES, exitCodeFor, RESUME_HINT, LlmError, UsageError, ValidationFailedError } from "../core/errors.js";
+import {
+  EXIT_CODES,
+  exitCodeFor,
+  RESUME_HINT,
+  LlmError,
+  TaskDatabaseError,
+  UsageError,
+  ValidationFailedError,
+} from "../core/errors.js";
 import { runEnvironmentCommand, type EnvironmentCommandOptions } from "./environment-command.js";
 import { runGenerate, type CommandContext, type GenerateOptions } from "./generate-command.js";
 import { commandHelp, GUIDE_TEXT, HELP_HOW_IT_WORKS } from "./guide.js";
 import { collect, integerInRange, oneOf, positiveNumber } from "./options.js";
 import { runClean, runDoctor, runModelCommand, runSkillsCommand, type SkillsCommandOptions } from "./other-commands.js";
 import { createReporter, type ColorMode, type Reporter } from "./reporter.js";
+import { addTasksCommand } from "./tasks-command.js";
 
 const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
   version: string;
@@ -171,6 +180,8 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
       await runSkillsCommand(given, options, context);
     });
 
+  addTasksCommand(program, context);
+
   program
     .command("environment")
     .description("Set up a local environment for previewing changes, using Claude")
@@ -205,7 +216,7 @@ function reportFailure(error: unknown, code: number, isJson: boolean, reporter: 
   const message = error instanceof Error ? error.message : String(error);
   const problems = error instanceof ValidationFailedError ? error.problems : [];
   const hint = error instanceof LlmError && !message.includes(RESUME_HINT) ? ` ${RESUME_HINT}` : "";
-  const isExpected = code !== EXIT_CODES.internal;
+  const isExpected = code !== EXIT_CODES.internal || error instanceof TaskDatabaseError;
 
   reporter.error(`${isExpected ? message : `Something unexpected went wrong: ${message}`}${hint}`);
   for (const problem of problems) reporter.notice(`  - ${problem}`);

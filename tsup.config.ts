@@ -8,6 +8,8 @@ export const tsupConfig = defineConfig({
   clean: true,
   splitting: false,
   sourcemap: true,
+  // Keeps "node:sqlite", which only exists with the prefix.
+  removeNodeProtocol: false,
 });
 
 // tsup loads its configuration through the default export.
