@@ -57,6 +57,7 @@ Test cases for automation testers. Start each automated test's name with its `TC
 | TC-ENV-043 | FR-ENV-028 | manual | A running preview, and an approved change to visible text | Let the agent implement it, and open the link | The link shows the new text |
 | TC-ENV-044 | FR-ENV-029 | manual | The message from TC-ENV-043 | Read it | It has the link, the fallback, what to look at for this change, the stop command, and whether it was checked |
 | TC-ENV-045 | FR-ENV-030 | manual | Docker stopped, with an approved change | Let the agent implement it | It explains the failure, reports test results, and still asks for review |
+| TC-ENV-053 | FR-ENV-030 | unit | The rendered `devops` skill text | The failed-preview step is read | It still asks for review, except when QA failed 3 times, where it reports the failures and doesn't ask for approval |
 | TC-ENV-046 | FR-ENV-031 | manual | A request to fix a typo in a comment | Let the agent do it | It says no preview is needed, and nothing starts |
 | TC-ENV-047 | FR-ENV-032 | manual | A web preview with a database volume holding data | Ask for review, then ask to stop the preview | It's still running during review, and the data remains after stopping |
 | TC-ENV-048 | FR-ENV-033 | e2e | A Git project, and a fake `claude` that writes environment files | Run the step | No commits are added |

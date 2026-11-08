@@ -194,10 +194,11 @@ Turn a spec into working, tested code, and report honestly on each requirement.
    4. Run the tests, then the wider suite for what you touched.
 7. **Stay in scope.** Build only what the spec says. If the spec is wrong or incomplete, stop and tell the user, or use the \`refine-spec\` skill with their agreement. Don't quietly build something different.
 8. **Verify everything.** Run the project's full checks. Then read each \`VAL\`, and judge whether the result would really meet it.
-9. **Update the spec.** Set each finished requirement's status to \`confirmed\`, and update its evidence to point to the code. Only do this for requirements that work.
-10. **Show how to review it.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and give the user a link, build or command to try. If the file doesn't exist, set it up with the \`devops\` skill.
-11. **Report and ask for review,** using the format below. Ask the user to approve the implementation or request changes. If they request changes, make them and ask again.
-12. **Ask to commit.** Once they approve the implementation, ask whether to commit. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and don't include secrets. State any test that failed or wasn't run before asking. If they decline, leave the changes uncommitted.
+9. **Hand it to QA.** Test the change with the \`test-spec\` skill, in a separate agent if your tool can run one. For each defect, decide whether the code, the test or the spec is wrong. Fix wrong code with \`write-code\`, or a wrong test so it checks what the spec says, then run QA again. If the spec is wrong, stop and use the \`refine-spec\` skill with the user's agreement. QA runs at most 3 times for a change, counting every run, and the count starts again only after the user replies. If the 3rd QA run still fails, stop: report the failures and show how to review it if the preview can start, instead of asking for approval.
+10. **Update the spec.** Set each finished requirement's status to \`confirmed\`, and update its evidence to point to the code. Only do this for requirements that work.
+11. **Show how to review it.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and give the user a link, build or command to try. If the file doesn't exist, set it up with the \`devops\` skill.
+12. **Report and ask for review,** using the format below. Give the steps for each \`manual\` test case QA didn't run, so the user can test it by hand. Ask the user to approve the implementation or request changes. If they request changes, make them, run QA again, show how to review it again, and ask again.
+13. **Ask to commit.** Once they approve the implementation, ask whether to commit. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and don't include secrets. State any test that failed or wasn't run before asking. If they decline, leave the changes uncommitted.
 
 ## Report format
 
@@ -230,7 +231,7 @@ Work as an independent QA engineer. Your job is to find out whether the feature 
 
 ## Steps
 
-1. **Read the spec.** Read \`verification.md\`, then \`spec.md\` and \`validation.md\`, in \`{{DOCS}}/specs/<name>/\`. Testing a feature with no spec? Ask whether to use the \`create-spec\` skill first. ${MISSING_DOCS}
+1. **Read the spec.** Read \`verification.md\`, then \`spec.md\` and \`validation.md\`, in \`{{DOCS}}/specs/<name>/\`. Testing a feature with no spec? If you're running QA for the agent that implemented a change, run the project's full checks and report that no spec covers it. Otherwise, ask whether to use the \`create-spec\` skill first. ${MISSING_DOCS}
 2. **Learn the test setup.** Read the setup in \`verification.md\`, \`{{DOCS}}/stack.md\`, the testing section of \`developer-guidelines.md\`, and the existing tests. Use the project's test tools and patterns. If it has none, propose one to the user, and don't install anything without agreement.
 3. **Map every test case.** Find existing tests for each \`TC\`, by ID and by behaviour, and list what's missing.
 4. **Automate what's missing:**
@@ -242,7 +243,7 @@ Work as an independent QA engineer. Your job is to find out whether the feature 
 5. **Handle \`manual\` test cases.** Write clear steps and expected results, and run them if you can. Otherwise, mark them as not run.
 6. **Run everything.** Run the new tests and the wider suite. Run new tests more than once, to catch flakiness.
 7. **Explore beyond the list.** Try empty and very large values, invalid input, repeated actions, permission boundaries and failures of dependencies. If you find a behaviour the spec doesn't cover, report it, and suggest a new test case.
-8. **Investigate each failure.** Decide whether the code, the test or the spec is wrong, with evidence.
+8. **Investigate each failure.** Decide whether the code, the test or the spec is wrong, with evidence, and say which in the defect.
 9. **Report,** using the format below.
 
 ## Rules
@@ -274,6 +275,9 @@ Ready for acceptance: yes or no. X passed, Y failed, Z not run.
 
 ## Acceptance criteria
 For each VAL: met, not met, or not verified.
+
+## Manual testing
+Steps for each \`manual\` test case you didn't run, so the user can try it by hand.
 
 ## Gaps
 Behaviour with no test case, and anything you couldn't test.
@@ -380,7 +384,7 @@ Do this after the tests have run, and before asking the user to approve the impl
    - Checked: yes, the page returned the new text
    \`\`\`
 
-5. **If the preview can't start,** say why, report the test results anyway, and still ask for review. Never hide a failed preview, and never let it block the review.
+5. **If the preview can't start,** say why, report the test results anyway, and still ask for review. Never hide a failed preview, and never let it block the review. If the 3rd QA run failed, report the failures and don't ask for approval.
 `,
   },
 ];
@@ -443,10 +447,12 @@ Analyse every prompt, and follow this lifecycle:
 
 Show what changed in \`spec.md\`, \`validation.md\` and \`verification.md\`, and any open questions. Ask the user to approve or reject it, and stop. Don't change production code until they clearly approve. If they reject it or ask for changes, refine the spec and ask again.
 
-**3. Implement, and get it approved.** Use the \`implement-spec\` skill, with the \`write-code\` skill for all code. If the spec turns out to be wrong, go back to stage 2. Then, in this order:
-1. Report each requirement, the tests you ran and their real results.
-2. **Show a preview. Don't ask for approval until you've done this.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and check it. A server you start yourself doesn't count. If the file doesn't exist, set it up with the \`devops\` skill. Give the user the link, simulator build or command to try. If there's nothing to run, or it can't start, say why.
-3. Ask the user to approve the implementation or request changes. If they request changes, make them and ask again.
+**3. Implement, test, and get it approved.** Use the \`implement-spec\` skill, with the \`write-code\` skill for all code. If the spec turns out to be wrong, go back to stage 2. Then, in this order:
+1. **Test it as QA.** Use the \`test-spec\` skill to test the change against the spec's \`verification.md\` and \`validation.md\`, even if the spec didn't change. If no spec covers the change, QA runs the project's full checks and reports that. If your tool can run a separate agent, run QA there, so the code isn't checked by the agent that wrote it. If you're running QA for the agent that implemented the change, follow only the \`test-spec\` skill. Don't start this lifecycle, change the spec or stop at stage 2.
+2. **Fix what fails.** For each failed test case or unmet acceptance criterion, decide whether the code, the test or the spec is wrong. Fix wrong code with the \`write-code\` skill and send it back to QA. Fix a wrong test the same way, so it checks what the spec says. If the spec is wrong, go back to stage 2. Never weaken a test to get a pass. QA runs at most 3 times for a change, counting every run, whatever was fixed. If the 3rd QA run still fails, stop: report what fails, show the preview if it can start, and don't ask for approval. The count starts again only after the user replies, such as approving a spec change or requesting a change.
+3. Report each requirement, the tests you ran and their real results, including the QA rounds.
+4. **Show a preview. Don't ask for approval until you've done this.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and check it. A server you start yourself doesn't count. If the file doesn't exist, set it up with the \`devops\` skill. Give the user the link, simulator build or command to try. If there's nothing to run, or it can't start, say why.
+5. Ask the user to test it by hand, with steps for each \`manual\` test case QA didn't run. Ask the user to approve the implementation or request changes. If they request changes, make them, take them through QA again, show the preview again, and ask again.
 
 **4. Ask to commit.** Once the user approves the implementation, ask whether to commit it. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change. Don't push unless asked. If they decline, leave the changes uncommitted.
 

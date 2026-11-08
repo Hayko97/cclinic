@@ -4,7 +4,7 @@
 
 Install marked AGENTS.md and CLAUDE.md sections into a target project so coding agents follow a spec-first lifecycle (prompt, spec approval, implementation approval, optional commit), without disturbing the user's own instructions or triggering reprocessing by cclinic.
 
-Stage 3 also requires showing a preview before asking for approval. See FR-ENV-027 in [local-environment](../local-environment/spec.md).
+Stage 3 also requires a QA pass against the spec's test cases and acceptance criteria, fixing and re-testing until it passes, then a preview for the user to test by hand before asking for approval. For the preview, see FR-ENV-027 in [local-environment](../local-environment/spec.md).
 
 ## Requirements
 
@@ -30,6 +30,14 @@ Stage 3 also requires showing a preview before asking for approval. See FR-ENV-0
 | FR-INSTR-018 | The workflow must tell agents to skip a step when the user says so and state which step was skipped, to ask the user to run cclinic when the docs folder is missing, and to stop at spec review in unattended runs without treating silence as approval. | confirmed | `sdd/specs/agent-instructions/spec.md:83-84`, `sdd/decisions/0005-agent-instructions.md:23`, `sdd/decisions/0005-agent-instructions.md:24`, `sdd/specs/agent-instructions/verification.md:34`, `sdd/specs/agent-instructions/verification.md:35` |
 | FR-INSTR-019 | The workflow must tell agents to commit only if the user agrees (approval of a spec or implementation is not agreement), to put spec, code and tests in one commit that follows project conventions, references requirement IDs, stages only related files and excludes secrets, to state failing or unrun tests first, and never to push unless asked. | confirmed | `sdd/specs/agent-instructions/spec.md:92-94`, `sdd/decisions/0005-agent-instructions.md:20-22`, `sdd/specs/agent-instructions/verification.md:40`, `sdd/specs/agent-instructions/verification.md:41` |
 | FR-INSTR-020 | cclinic itself must never commit or push; only the coding agent may commit, at the user's request. | confirmed | `sdd/specs/agent-instructions/spec.md:108`, `sdd/specs/agent-instructions/spec.md:102` |
+| FR-INSTR-021 | After implementing and before showing a preview, the workflow must tell agents to test the change with the `test-spec` skill against the spec's `verification.md` and `validation.md`, including changes with no spec update. When the agent's tool can run a separate agent or session, QA must run there, so the agent that wrote the code isn't the one checking it. | confirmed | `src/core/agent-skills.ts:451`, `src/core/agent-skills.test.ts:255`, `user request` |
+| FR-INSTR-022 | When QA reports a failed test case or an unmet acceptance criterion, the workflow must tell agents to decide whether the code, the test or the spec is wrong; to fix wrong code with the `write-code` skill and send it back to QA; to go back to stage 2 if the spec is wrong; and never to weaken a test to pass. | confirmed | `src/core/agent-skills.ts:452`, `src/core/agent-skills.test.ts:255`, `user request` |
+| FR-INSTR-023 | The workflow must tell agents to stop the fix loop after 3 rounds of QA that still fail, and report the remaining failures to the user, with a preview if one can start, instead of asking for approval. | confirmed | `src/core/agent-skills.ts:452`, `src/core/agent-skills.test.ts:255`, `user request` |
+| FR-INSTR-024 | Only after QA passes must the workflow tell agents to show the preview and ask the user to test it by hand, giving the steps for each `manual` test case QA didn't run, and then to approve or request changes. A requested change must go through QA again before the next preview. | confirmed | `src/core/agent-skills.ts:454-455`, `src/core/agent-skills.test.ts:255`, `user request` |
+| FR-INSTR-025 | The workflow must tell agents that a QA run started by the implementing agent follows only the `test-spec` skill, and doesn't start the lifecycle, change the spec or stop at stage 2. | confirmed | `src/core/agent-skills.ts:451`, `src/core/agent-skills.test.ts:281`, QA report DEF-1, `user request` |
+| FR-INSTR-026 | When QA finds a test that doesn't check what the spec says, the workflow must tell agents to fix the test with the `write-code` skill so it matches the spec, without weakening it, and send it back to QA. | confirmed | `src/core/agent-skills.ts:452`, `src/core/agent-skills.test.ts:287`, `user request` |
+| FR-INSTR-027 | The 3-run QA limit must count every QA run for a change, whatever was fixed between runs, and must start again only after the user replies, such as approving a spec change or requesting a change. | confirmed | `src/core/agent-skills.ts:452`, `src/core/agent-skills.test.ts:287`, `user request` |
+| FR-INSTR-028 | When no spec covers a change, such as some refactors, the workflow must tell agents that QA runs the project's full checks and reports that no spec covers the change, without asking to create a spec. | confirmed | `src/core/agent-skills.ts:451`, `src/core/agent-skills.test.ts:302`, `user request` |
 
 ## Edge cases
 
@@ -46,6 +54,13 @@ Stage 3 also requires showing a preview before asking for approval. See FR-ENV-0
 - Unattended agent run: agent stops at spec review; no code changes.
 - Failing or unrun tests before commit question: stated first.
 - Remote exists: still no push.
+- QA still fails after 3 fix rounds: agent stops and reports the failures; it doesn't ask for approval.
+- The failure is in the spec, not the code: agent goes back to stage 2.
+- The agent's tool can't run a separate agent: QA runs in the same session.
+- Every test case is automated: the user still gets the preview to try.
+- QA alternates between a code fix and a test fix: every run counts, so it still stops after the 3rd run.
+- The agent returns to stage 2 and the user doesn't reply: no new QA runs start.
+- A refactor matches no spec: QA runs the full checks and says no spec covers it.
 
 ## Non-goals
 

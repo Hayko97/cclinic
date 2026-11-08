@@ -252,6 +252,103 @@ describe("agent workflow", () => {
     expect(body).not.toContain("Don't commit or push unless");
   });
 
+  it("TC-INSTR-029: stage 3 runs QA and fixes failures before the preview and manual testing", () => {
+    const stage3 = workflow.slice(workflow.indexOf("**3. Implement"), workflow.indexOf("**4. Ask"));
+    const order = [
+      "`implement-spec`",
+      "`test-spec`",
+      "`write-code` skill and send it back to QA",
+      "go back to stage 2. Never weaken",
+      "If the 3rd QA run still fails",
+      "show the preview if it can start, and don't ask for approval",
+      "Show a preview",
+      "test it by hand",
+      "Ask the user to approve",
+    ].map((text) => stage3.indexOf(text));
+    expect(order.every((position) => position >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((left, right) => left - right));
+    for (const text of [
+      "`verification.md` and `validation.md`, even if the spec didn't change",
+      "separate agent",
+      "Never weaken a test",
+      "`manual` test case",
+      "through QA again, show the preview again, and ask again",
+    ]) {
+      expect(stage3).toContain(text);
+    }
+  });
+
+  it("TC-INSTR-036: a QA run started by the implementing agent only follows test-spec", () => {
+    expect(workflow).toContain(
+      "If you're running QA for the agent that implemented the change, follow only the `test-spec` skill. Don't start this lifecycle, change the spec or stop at stage 2.",
+    );
+  });
+
+  it("TC-INSTR-038, TC-INSTR-039: wrong tests get fixed, and every QA run counts toward the limit", () => {
+    const step = workflow.slice(
+      workflow.indexOf("**Fix what fails.**"),
+      workflow.indexOf("3. Report each requirement"),
+    );
+    for (const text of [
+      "Fix a wrong test the same way, so it checks what the spec says",
+      "Never weaken a test",
+      "QA runs at most 3 times for a change, counting every run, whatever was fixed",
+      "The count starts again only after the user replies",
+    ]) {
+      expect(step).toContain(text);
+    }
+  });
+
+  it("TC-INSTR-040: a change no spec covers gets the project's full checks", () => {
+    const step = workflow.slice(workflow.indexOf("**Test it as QA.**"), workflow.indexOf("**Fix what fails.**"));
+    expect(step).toContain("If no spec covers the change, QA runs the project's full checks and reports that");
+  });
+
+  it("TC-SKILL-034: implement-spec fixes wrong tests and caps QA runs per change", () => {
+    const body = skill("implement-spec").body;
+    const step = body.slice(body.indexOf("Hand it to QA"), body.indexOf("Update the spec"));
+    for (const text of [
+      "a wrong test so it checks what the spec says",
+      "QA runs at most 3 times for a change, counting every run",
+      "the count starts again only after the user replies",
+    ]) {
+      expect(step).toContain(text);
+    }
+  });
+
+  it("TC-SKILL-035: test-spec runs the full checks when no spec covers the change", () => {
+    const body = skill("test-spec").body;
+    const step = body.slice(body.indexOf("1. **Read the spec.**"), body.indexOf("2. **Learn the test setup.**"));
+    const fullChecks = step.indexOf("run the project's full checks and report that no spec covers it");
+    expect(fullChecks).toBeGreaterThan(step.indexOf("running QA for the agent that implemented"));
+    expect(step.indexOf("Otherwise, ask whether to use the `create-spec` skill")).toBeGreaterThan(fullChecks);
+  });
+
+  it("TC-SKILL-032: implement-spec hands the change to QA and fixes defects before review", () => {
+    const body = skill("implement-spec").body;
+    const order = ["Verify everything", "Hand it to QA", "Show how to review it"].map((text) => body.indexOf(text));
+    expect(order.every((position) => position >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((left, right) => left - right));
+    const step = body.slice(order[1], body.indexOf("Update the spec"));
+    for (const text of [
+      "`test-spec`",
+      "separate agent",
+      "`write-code`",
+      "run QA again",
+      "spec is wrong",
+      "If the 3rd QA run still fails",
+      "instead of asking for approval",
+    ]) {
+      expect(step).toContain(text);
+    }
+  });
+
+  it("TC-SKILL-033: test-spec classifies failures and lists manual steps for the user", () => {
+    const body = skill("test-spec").body;
+    expect(body).toContain("code, the test or the spec");
+    expect(body).toContain("Steps for each `manual` test case you didn't run");
+  });
+
   it("the import sits outside any code span, so Claude Code reads it", () => {
     expect(renderClaudeBlock().split("\n")).toContain("@AGENTS.md");
   });

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "alias": "cclinic",
+  "parts": [
+    {
+      "name": "cli",
+      "type": "cli",
+      "start": "npm run build",
+      "review": "Run node bin/cclinic.js --help, or node bin/cclinic.js skills <empty folder> and read the AGENTS.md it creates"
+    }
+  ]
+}

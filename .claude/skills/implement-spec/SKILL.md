@@ -3,7 +3,7 @@ name: implement-spec
 description: "Builds a spec requirement by requirement, with tests from its test cases, and reports proof that each one works. Use when the user asks to implement, build or complete a spec, feature or requirement that has a spec folder."
 metadata:
   generated-by: cclinic
-  content-hash: "43f6033ab8a14159ce37a84c847aea0d1c76365d07ebf716034ebb5212198507"
+  content-hash: "2fc53176eecee9056ece45bad228d90da4780f6fea3bbfae9afbb7aaeb626c4d"
 ---
 
 # Implement a spec
@@ -24,10 +24,11 @@ Turn a spec into working, tested code, and report honestly on each requirement.
    4. Run the tests, then the wider suite for what you touched.
 7. **Stay in scope.** Build only what the spec says. If the spec is wrong or incomplete, stop and tell the user, or use the `refine-spec` skill with their agreement. Don't quietly build something different.
 8. **Verify everything.** Run the project's full checks. Then read each `VAL`, and judge whether the result would really meet it.
-9. **Update the spec.** Set each finished requirement's status to `confirmed`, and update its evidence to point to the code. Only do this for requirements that work.
-10. **Show how to review it.** Run each `start` command in `.cclinic/environment/environment.json`, so the local environment includes this change, leave it running, and give the user a link, build or command to try. If the file doesn't exist, set it up with the `devops` skill.
-11. **Report and ask for review,** using the format below. Ask the user to approve the implementation or request changes. If they request changes, make them and ask again.
-12. **Ask to commit.** Once they approve the implementation, ask whether to commit. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and don't include secrets. State any test that failed or wasn't run before asking. If they decline, leave the changes uncommitted.
+9. **Hand it to QA.** Test the change with the `test-spec` skill, in a separate agent if your tool can run one. For each defect, decide whether the code, the test or the spec is wrong. Fix wrong code with `write-code`, or a wrong test so it checks what the spec says, then run QA again. If the spec is wrong, stop and use the `refine-spec` skill with the user's agreement. QA runs at most 3 times for a change, counting every run, and the count starts again only after the user replies. If the 3rd QA run still fails, stop: report the failures and show how to review it if the preview can start, instead of asking for approval.
+10. **Update the spec.** Set each finished requirement's status to `confirmed`, and update its evidence to point to the code. Only do this for requirements that work.
+11. **Show how to review it.** Run each `start` command in `.cclinic/environment/environment.json`, so the local environment includes this change, leave it running, and give the user a link, build or command to try. If the file doesn't exist, set it up with the `devops` skill.
+12. **Report and ask for review,** using the format below. Give the steps for each `manual` test case QA didn't run, so the user can test it by hand. Ask the user to approve the implementation or request changes. If they request changes, make them, run QA again, show how to review it again, and ask again.
+13. **Ask to commit.** Once they approve the implementation, ask whether to commit. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and don't include secrets. State any test that failed or wasn't run before asking. If they decline, leave the changes uncommitted.
 
 ## Report format
 

@@ -3,7 +3,7 @@ name: devops
 description: "Sets up a local environment suited to the project, and shows how to review each change, such as a link or a simulator build. Use when the user asks to set up, run or preview the project locally, or after implementing a change, so the user can try it before approving it."
 metadata:
   generated-by: cclinic
-  content-hash: "f7b6d43d4cecdeb26e54319e189812301885f3c8c6d8f7d66ba552c056a9d21a"
+  content-hash: "f5a4f3a7ed66163acb5c23527cf3bb27b4439610927f3cf6e36a58f63a4ce1db"
 ---
 
 # Set up and use the local environment
@@ -102,4 +102,4 @@ Do this after the tests have run, and before asking the user to approve the impl
    - Checked: yes, the page returned the new text
    ```
 
-5. **If the preview can't start,** say why, report the test results anyway, and still ask for review. Never hide a failed preview, and never let it block the review.
+5. **If the preview can't start,** say why, report the test results anyway, and still ask for review. Never hide a failed preview, and never let it block the review. If the 3rd QA run failed, report the failures and don't ask for approval.

@@ -3,7 +3,7 @@ name: test-spec
 description: "Acts as QA for a spec or feature: automates its test cases, runs them, explores edge cases, and reports results and defects. Use when the user asks to test, QA, verify or write automation tests for a spec or feature, or to check whether it's ready to release."
 metadata:
   generated-by: cclinic
-  content-hash: "c55cb91a88b3b6400b9a50f93908e3a3bfd0c180ef13e546d13fdd1cf178e850"
+  content-hash: "ff69d35ba69c2b04fccd3efa68de30140bf645e9beec9924079fc8e9308372ef"
 ---
 
 # Test a spec
@@ -12,7 +12,7 @@ Work as an independent QA engineer. Your job is to find out whether the feature 
 
 ## Steps
 
-1. **Read the spec.** Read `verification.md`, then `spec.md` and `validation.md`, in `.cclinic/sdd/specs/<name>/`. Testing a feature with no spec? Ask whether to use the `create-spec` skill first. If `.cclinic/sdd` doesn't exist, stop and ask the user to run `cclinic` in the project root to generate it.
+1. **Read the spec.** Read `verification.md`, then `spec.md` and `validation.md`, in `.cclinic/sdd/specs/<name>/`. Testing a feature with no spec? If you're running QA for the agent that implemented a change, run the project's full checks and report that no spec covers it. Otherwise, ask whether to use the `create-spec` skill first. If `.cclinic/sdd` doesn't exist, stop and ask the user to run `cclinic` in the project root to generate it.
 2. **Learn the test setup.** Read the setup in `verification.md`, `.cclinic/sdd/stack.md`, the testing section of `developer-guidelines.md`, and the existing tests. Use the project's test tools and patterns. If it has none, propose one to the user, and don't install anything without agreement.
 3. **Map every test case.** Find existing tests for each `TC`, by ID and by behaviour, and list what's missing.
 4. **Automate what's missing:**
@@ -24,7 +24,7 @@ Work as an independent QA engineer. Your job is to find out whether the feature 
 5. **Handle `manual` test cases.** Write clear steps and expected results, and run them if you can. Otherwise, mark them as not run.
 6. **Run everything.** Run the new tests and the wider suite. Run new tests more than once, to catch flakiness.
 7. **Explore beyond the list.** Try empty and very large values, invalid input, repeated actions, permission boundaries and failures of dependencies. If you find a behaviour the spec doesn't cover, report it, and suggest a new test case.
-8. **Investigate each failure.** Decide whether the code, the test or the spec is wrong, with evidence.
+8. **Investigate each failure.** Decide whether the code, the test or the spec is wrong, with evidence, and say which in the defect.
 9. **Report,** using the format below.
 
 ## Rules
@@ -56,6 +56,9 @@ Ready for acceptance: yes or no. X passed, Y failed, Z not run.
 
 ## Acceptance criteria
 For each VAL: met, not met, or not verified.
+
+## Manual testing
+Steps for each `manual` test case you didn't run, so the user can try it by hand.
 
 ## Gaps
 Behaviour with no test case, and anything you couldn't test.

@@ -121,6 +121,12 @@ describe("the devops skill", () => {
     expect(body.indexOf("`devops`")).toBeLessThan(body.indexOf("Report and ask for review"));
   });
 
+  it("TC-ENV-053: a failed preview still asks for review, unless QA failed 3 times", () => {
+    const step = devops.slice(devops.indexOf("**If the preview can't start,**"));
+    expect(step).toContain("still ask for review");
+    expect(step).toContain("If the 3rd QA run failed, report the failures and don't ask for approval");
+  });
+
   it("states what to show after each implementation", () => {
     for (const text of [
       "no preview is needed",
