@@ -29,7 +29,7 @@ describe("skill format", () => {
       "write-code",
       "implement-spec",
       "test-spec",
-      "devops",
+      "local-env",
       "product-engineer",
       "review-doc",
     ]);

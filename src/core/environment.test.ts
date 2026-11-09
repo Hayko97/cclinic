@@ -20,7 +20,7 @@ const file = (overrides: Record<string, unknown> = {}): unknown => ({
   ...overrides,
 });
 const isValid = (value: unknown): boolean => environmentFileSchema.safeParse(value).success;
-const devops = AGENT_SKILLS.find((skill) => skill.name === "devops")?.body ?? "";
+const localEnv = AGENT_SKILLS.find((skill) => skill.name === "local-env")?.body ?? "";
 
 describe("the environment file", () => {
   it("TC-ENV-028: only a correct file passes", () => {
@@ -86,9 +86,9 @@ describe("what Claude may do", () => {
   });
 });
 
-describe("the devops skill", () => {
+describe("the local-env skill", () => {
   it("TC-ENV-003: prohibits committing and pushing", () => {
-    expect(devops).toContain("Don't commit or push");
+    expect(localEnv).toContain("Don't commit or push");
   });
 
   it("states the safety rules for new web environments", () => {
@@ -106,23 +106,23 @@ describe("the devops skill", () => {
       "<alias>.localhost",
       "already running under that project name",
     ]) {
-      expect(devops).toContain(text);
+      expect(localEnv).toContain(text);
     }
   });
 
   it("TC-ENV-041: the workflow and implement-spec require a preview before asking for approval", () => {
     const stage3 = AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf("**3. Implement"), AGENT_WORKFLOW.indexOf("**4. Ask"));
-    expect(stage3.indexOf("real results")).toBeLessThan(stage3.indexOf("`devops`"));
-    expect(stage3.indexOf("`devops`")).toBeLessThan(stage3.indexOf("Ask the user to approve"));
+    expect(stage3.indexOf("real results")).toBeLessThan(stage3.indexOf("`local-env`"));
+    expect(stage3.indexOf("`local-env`")).toBeLessThan(stage3.indexOf("Ask the user to approve"));
     expect(stage3).toContain(".cclinic/environment/environment.json");
     expect(stage3).toContain("A server you start yourself doesn't count");
     const body = AGENT_SKILLS.find((skill) => skill.name === "implement-spec")?.body ?? "";
-    expect(body.indexOf("`devops`")).toBeGreaterThan(body.indexOf("Verify everything"));
-    expect(body.indexOf("`devops`")).toBeLessThan(body.indexOf("Report and ask for review"));
+    expect(body.indexOf("`local-env`")).toBeGreaterThan(body.indexOf("Verify everything"));
+    expect(body.indexOf("`local-env`")).toBeLessThan(body.indexOf("Report and ask for review"));
   });
 
   it("TC-ENV-053: a failed preview still asks for review, unless QA failed 3 times", () => {
-    const step = devops.slice(devops.indexOf("**If the preview can't start,**"));
+    const step = localEnv.slice(localEnv.indexOf("**If the preview can't start,**"));
     expect(step).toContain("still ask for review");
     expect(step).toContain("If the 3rd QA run failed, report the failures and don't ask for approval");
   });
@@ -136,11 +136,11 @@ describe("the devops skill", () => {
       "Checked:",
       "still ask for review",
     ]) {
-      expect(devops).toContain(text);
+      expect(localEnv).toContain(text);
     }
   });
 
   it("TC-ENV-001: the AGENTS.md section lists the skill", () => {
-    expect(renderAgentsBlock("docs")).toContain("`devops`");
+    expect(renderAgentsBlock("docs")).toContain("`local-env`");
   });
 });

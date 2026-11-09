@@ -53,19 +53,19 @@ flowchart TD
     ENV --> Done([Done. Exit 0])
 ```
 
-| Step        | What happens                                                                   | Spec                                                                                                                         |
-| ----------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| Check path  | Must be a folder. Home folder or `/` is refused unless `--allow-broad-target`. | [cli-commands](.cclinic/sdd/specs/cli-commands/spec.md)                                                                      |
-| Pick model  | Option → env var → saved default → built-in (Sonnet, medium).                  | [model-selection](.cclinic/sdd/specs/model-selection/spec.md)                                                                |
-| Find Claude | Claude CLI if logged in, else `ANTHROPIC_API_KEY`, else exit 3.                | [llm-providers](.cclinic/sdd/specs/llm-providers/spec.md)                                                                    |
-| Check Git   | Only looks. Never commits, stages or pushes.                                   | [git-setup](.cclinic/sdd/specs/git-setup/spec.md)                                                                            |
-| Scan        | Finds the project's own files. Every skipped file gets a reason.               | [file-discovery](.cclinic/sdd/specs/file-discovery/spec.md)                                                                  |
-| Read        | Text from code, PDF, DOCX with line/page positions.                            | [content-extraction](.cclinic/sdd/specs/content-extraction/spec.md)                                                          |
-| Confirm     | Shows a summary, then asks. No terminal and no `--yes` → exit 2.               | [cli-commands](.cclinic/sdd/specs/cli-commands/spec.md)                                                                      |
-| Ask Claude  | The 3 LLM stages, below.                                                       | [spec-analysis](.cclinic/sdd/specs/spec-analysis/spec.md)                                                                    |
-| Write       | Validate first, then write all at once.                                        | [spec-output](.cclinic/sdd/specs/spec-output/spec.md)                                                                        |
-| Skills      | Six skills + workflow sections. No LLM.                                        | [agent-skills](.cclinic/sdd/specs/agent-skills/spec.md), [agent-instructions](.cclinic/sdd/specs/agent-instructions/spec.md) |
-| Environment | Claude sets up `environment.json` with the `devops` skill, only if you agree.  | [local-environment](.cclinic/sdd/specs/local-environment/spec.md)                                                            |
+| Step        | What happens                                                                     | Spec                                                                                                                         |
+| ----------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Check path  | Must be a folder. Home folder or `/` is refused unless `--allow-broad-target`.   | [cli-commands](.cclinic/sdd/specs/cli-commands/spec.md)                                                                      |
+| Pick model  | Option → env var → saved default → built-in (Sonnet, medium).                    | [model-selection](.cclinic/sdd/specs/model-selection/spec.md)                                                                |
+| Find Claude | Claude CLI if logged in, else `ANTHROPIC_API_KEY`, else exit 3.                  | [llm-providers](.cclinic/sdd/specs/llm-providers/spec.md)                                                                    |
+| Check Git   | Only looks. Never commits, stages or pushes.                                     | [git-setup](.cclinic/sdd/specs/git-setup/spec.md)                                                                            |
+| Scan        | Finds the project's own files. Every skipped file gets a reason.                 | [file-discovery](.cclinic/sdd/specs/file-discovery/spec.md)                                                                  |
+| Read        | Text from code, PDF, DOCX with line/page positions.                              | [content-extraction](.cclinic/sdd/specs/content-extraction/spec.md)                                                          |
+| Confirm     | Shows a summary, then asks. No terminal and no `--yes` → exit 2.                 | [cli-commands](.cclinic/sdd/specs/cli-commands/spec.md)                                                                      |
+| Ask Claude  | The 3 LLM stages, below.                                                         | [spec-analysis](.cclinic/sdd/specs/spec-analysis/spec.md)                                                                    |
+| Write       | Validate first, then write all at once.                                          | [spec-output](.cclinic/sdd/specs/spec-output/spec.md)                                                                        |
+| Skills      | Six skills + workflow sections. No LLM.                                          | [agent-skills](.cclinic/sdd/specs/agent-skills/spec.md), [agent-instructions](.cclinic/sdd/specs/agent-instructions/spec.md) |
+| Environment | Claude sets up `environment.json` with the `local-env` skill, only if you agree. | [local-environment](.cclinic/sdd/specs/local-environment/spec.md)                                                            |
 
 ---
 

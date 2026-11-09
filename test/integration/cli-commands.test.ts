@@ -246,7 +246,7 @@ describe("the environment step", () => {
   it("TC-ENV-004: asks after generating, says what will happen, and respects the answer", async () => {
     const declined = await environmentRun([true, false]);
     expect(declined.started).toEqual([]);
-    expect(declined.test.stdout()).toContain("Use the devops skill");
+    expect(declined.test.stdout()).toContain("Use the local-env skill");
     const prompt = confirmMock.mock.calls[1]?.[0] as { message: string; default: boolean };
     expect(prompt.message).toContain("create files in .cclinic/environment");
     expect(prompt.message).toContain("run this project's code");

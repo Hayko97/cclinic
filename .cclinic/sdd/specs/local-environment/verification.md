@@ -12,9 +12,9 @@ Test cases for automation testers. Start each automated test's name with its `TC
 
 | ID | Covers | Level | Given | When | Then |
 |---|---|---|---|---|---|
-| TC-ENV-001 | FR-ENV-001 | integration | An empty target | Run `cclinic skills` | `devops` is in both skill folders with identical content, and listed in the `AGENTS.md` table |
-| TC-ENV-002 | FR-ENV-001 | integration | An edited installed `devops` skill, and a user's own skill named `devops` | Install | Each is left alone and reported |
-| TC-ENV-003 | FR-ENV-002 | unit | The `devops` skill | Validate the format and search it | It passes the skill format checks, names no agent's tools, and prohibits committing and pushing |
+| TC-ENV-001 | FR-ENV-001 | integration | An empty target | Run `cclinic skills` | `local-env` is in both skill folders with identical content, and listed in the `AGENTS.md` table |
+| TC-ENV-002 | FR-ENV-001 | integration | An edited installed `local-env` skill, and a user's own skill named `local-env` | Install | Each is left alone and reported |
+| TC-ENV-003 | FR-ENV-002 | unit | The `local-env` skill | Validate the format and search it | It passes the skill format checks, names no agent's tools, and prohibits committing and pushing |
 | TC-ENV-004 | FR-ENV-003 | integration | An interactive terminal, mocked prompts, and the fake `claude` | Run setup, and answer no, then repeat and answer yes | The prompt says files will be created and commands run, and defaults to yes. No starts nothing, and yes starts it once |
 | TC-ENV-005 | FR-ENV-004 | e2e | The fake `claude` | Run `--yes`, `--json` and `--quiet` with no terminal, on separate projects | None start the environment step, and each has the next step or a `not-started` result |
 | TC-ENV-006 | FR-ENV-004 | e2e | The fake `claude` | Run `--yes --environment` | The environment step starts without asking |
@@ -57,7 +57,7 @@ Test cases for automation testers. Start each automated test's name with its `TC
 | TC-ENV-043 | FR-ENV-028 | manual | A running preview, and an approved change to visible text | Let the agent implement it, and open the link | The link shows the new text |
 | TC-ENV-044 | FR-ENV-029 | manual | The message from TC-ENV-043 | Read it | It has the link, the fallback, what to look at for this change, the stop command, and whether it was checked |
 | TC-ENV-045 | FR-ENV-030 | manual | Docker stopped, with an approved change | Let the agent implement it | It explains the failure, reports test results, and still asks for review |
-| TC-ENV-053 | FR-ENV-030 | unit | The rendered `devops` skill text | The failed-preview step is read | It still asks for review, except when QA failed 3 times, where it reports the failures and doesn't ask for approval |
+| TC-ENV-053 | FR-ENV-030 | unit | The rendered `local-env` skill text | The failed-preview step is read | It still asks for review, except when QA failed 3 times, where it reports the failures and doesn't ask for approval |
 | TC-ENV-046 | FR-ENV-031 | manual | A request to fix a typo in a comment | Let the agent do it | It says no preview is needed, and nothing starts |
 | TC-ENV-047 | FR-ENV-032 | manual | A web preview with a database volume holding data | Ask for review, then ask to stop the preview | It's still running during review, and the data remains after stopping |
 | TC-ENV-048 | FR-ENV-033 | e2e | A Git project, and a fake `claude` that writes environment files | Run the step | No commits are added |

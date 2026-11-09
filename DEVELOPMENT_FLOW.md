@@ -116,7 +116,7 @@ flowchart TD
 
 - **QA** runs in a separate agent, so the code isn't checked by the agent that wrote it.
 - **At most 3 QA runs** per change. After a failed 3rd run, the agent stops and reports.
-- **Preview** runs each `start` command in `.cclinic/environment/environment.json`. If it's missing, the `devops` skill sets it up.
+- **Preview** runs each `start` command in `.cclinic/environment/environment.json`. If it's missing, the `local-env` skill sets it up.
 - **Report** lists each requirement, the tests and their real results, and steps for any `manual` test case.
 
 ---
@@ -144,7 +144,7 @@ The agent never pushes unless you ask.
 | `implement-spec` | Stage 3 | Builds the spec, requirement by requirement |
 | `write-code`     | Stage 3 | Writes all code the project's way           |
 | `test-spec`      | Stage 3 | QA: automates and runs test cases           |
-| `devops`         | Stage 3 | Sets up and starts the preview              |
+| `local-env`      | Stage 3 | Sets up and starts the preview              |
 
 ## 8. Rules to remember
 

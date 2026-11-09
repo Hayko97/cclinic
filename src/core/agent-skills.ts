@@ -4,7 +4,7 @@
  * {{DOCS}} is replaced with the documents folder, relative to the project root.
  */
 
-import { DEVOPS_SKILL_NAME, ENVIRONMENT_FILE, ENVIRONMENT_FOLDER } from "./constants/environment.js";
+import { LOCAL_ENV_SKILL_NAME, ENVIRONMENT_FILE, ENVIRONMENT_FOLDER } from "./constants/environment.js";
 import { AGENTS_FILE, REVIEW_DOC_SKILL_NAME, REVIEWS_FOLDER } from "./constants/paths.js";
 export interface AgentSkill {
   readonly name: string;
@@ -203,7 +203,7 @@ Turn a spec into working, tested code, and report honestly on each requirement.
 8. **Verify everything.** Run the project's full checks. Then read each \`VAL\`, and judge whether the result would really meet it.
 9. **Hand it to QA.** Test the change with the \`test-spec\` skill, in a separate agent if your tool can run one. For each defect, decide whether the code, the test or the spec is wrong. Fix wrong code with \`write-code\`, or a wrong test so it checks what the spec says, then run QA again. If the spec is wrong, stop and use the \`refine-spec\` skill with the user's agreement. QA runs at most 3 times for a change, counting every run, and the count starts again only after the user replies. If the 3rd QA run still fails, stop: report the failures and show how to review it if the preview can start, instead of asking for approval.
 10. **Update the spec.** Set each finished requirement's status to \`confirmed\`, and update its evidence to point to the code. Only do this for requirements that work.
-11. **Show how to review it.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and give the user a link, build or command to try. If the file doesn't exist, set it up with the \`devops\` skill.
+11. **Show how to review it.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and give the user a link, build or command to try. If the file doesn't exist, set it up with the \`local-env\` skill.
 12. **Report and ask for review,** using the format below. Give the steps for each \`manual\` test case QA didn't run, so the user can test it by hand. Ask the user to approve the implementation or request changes. If they request changes, make them, run QA again, show how to review it again, and ask again.
 13. **Ask to commit.** Once they approve the implementation, ask whether to commit. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and don't include secrets. State any test that failed or wasn't run before asking. If they decline, leave the changes uncommitted.
 
@@ -292,7 +292,7 @@ Behaviour with no test case, and anything you couldn't test.
 `,
   },
   {
-    name: DEVOPS_SKILL_NAME,
+    name: LOCAL_ENV_SKILL_NAME,
     description:
       "Sets up a local environment suited to the project, and shows how to review each change, such as a link or a simulator build. Use when the user asks to set up, run or preview the project locally, or after implementing a change, so the user can try it before approving it.",
     body: `# Set up and use the local environment
@@ -551,7 +551,7 @@ Any other reply, such as a question, isn't approval: answer it, and offer the op
 1. **Test it as QA.** Use the \`test-spec\` skill to test the change against the spec's \`verification.md\` and \`validation.md\`, even if the spec didn't change. If no spec covers the change, QA runs the project's full checks and reports that. If your tool can run a separate agent, run QA there, so the code isn't checked by the agent that wrote it. If you're running QA for the agent that implemented the change, follow only the \`test-spec\` skill. Don't start this lifecycle, change the spec or stop at stage 2.
 2. **Fix what fails.** For each failed test case or unmet acceptance criterion, decide whether the code, the test or the spec is wrong. Fix wrong code with the \`write-code\` skill and send it back to QA. Fix a wrong test the same way, so it checks what the spec says. If the spec is wrong, go back to stage 2. Never weaken a test to get a pass. QA runs at most 3 times for a change, counting every run, whatever was fixed. If the 3rd QA run still fails, stop: report what fails, show the preview if it can start, and don't ask for approval. The count starts again only after the user replies, such as approving a spec change or requesting a change.
 3. Report each requirement, the tests you ran and their real results, including the QA rounds.
-4. **Show a preview. Don't ask for approval until you've done this.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and check it. A server you start yourself doesn't count. If the file doesn't exist, set it up with the \`devops\` skill. Give the user the link, simulator build or command to try. If there's nothing to run, or it can't start, say why.
+4. **Show a preview. Don't ask for approval until you've done this.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and check it. A server you start yourself doesn't count. If the file doesn't exist, set it up with the \`local-env\` skill. Give the user the link, simulator build or command to try. If there's nothing to run, or it can't start, say why.
 5. Ask the user to test it by hand, with steps for each \`manual\` test case QA didn't run. Ask the user to approve the implementation or request changes. If they request changes, make them, take them through QA again, show the preview again, and ask again.
 
 **4. Ask to commit.** Once the user approves the implementation, run \`cclinic tasks done <id>\` if it was a task, then ask whether to commit it. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and leave out review docs in \`${REVIEWS_FOLDER}/\` unless the user asks for them. Don't push unless asked. If they decline, leave the changes uncommitted.

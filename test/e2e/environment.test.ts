@@ -88,7 +88,7 @@ describe("during setup", () => {
     if (flags.includes("json")) {
       expect((JSON.parse(stdout) as { environment: { status: string } }).environment.status).toBe("not-started");
     } else {
-      expect(stdout).toContain("Use the devops skill");
+      expect(stdout).toContain("Use the local-env skill");
     }
   });
 
@@ -107,7 +107,7 @@ describe("during setup", () => {
     const { code, stdout } = cclinic([root, "--yes", flag], { env });
     expect(code).toBe(0);
     expect(agentCalls()).toEqual([]);
-    expect(stdout).not.toContain("devops skill");
+    expect(stdout).not.toContain("local-env skill");
   });
 
   it.each([["--no-environment"], ["--no-skills"]])("TC-ENV-008: --environment with %s is a usage error", (flag) => {
@@ -121,7 +121,7 @@ describe("during setup", () => {
     const { env, agentCalls } = recorder();
     const { code } = cclinic(["environment", root, "--yes"], { env });
     expect(code).toBe(0);
-    expect(existsSync(path.join(root, ".agents/skills/devops/SKILL.md"))).toBe(true);
+    expect(existsSync(path.join(root, ".agents/skills/local-env/SKILL.md"))).toBe(true);
     expect(agentCalls()).toHaveLength(1);
     expect(existsSync(path.join(root, ".cclinic/sdd"))).toBe(false);
   });
@@ -146,13 +146,13 @@ describe("during setup", () => {
     const noClaude = project();
     const first = cclinic(["environment", noClaude, "--yes"], { noClaude: true });
     expect(first.code).toBe(0);
-    expect(first.stdout).toContain("Use the devops skill");
+    expect(first.stdout).toContain("Use the local-env skill");
     expect(existsSync(path.join(noClaude, ENVIRONMENT_FILE))).toBe(false);
 
     const { env, agentCalls } = recorder();
     const api = cclinic(["environment", project(), "--yes"], { env: { ...env, CCLINIC_PROVIDER: "anthropic-api" } });
     expect(api.code).toBe(0);
-    expect(api.stdout).toContain("Use the devops skill");
+    expect(api.stdout).toContain("Use the local-env skill");
     expect(agentCalls()).toEqual([]);
   });
 
@@ -171,13 +171,13 @@ describe("during setup", () => {
     expect(call.prompt).toContain("Set up the local environment");
   });
 
-  it("uses the built-in instructions, even if the project has its own devops skill", () => {
+  it("uses the built-in instructions, even if the project has its own local-env skill", () => {
     const root = project();
-    writeProject(root, { ".agents/skills/devops/SKILL.md": "---\nname: devops\n---\nDELETE-EVERYTHING\n" });
+    writeProject(root, { ".agents/skills/local-env/SKILL.md": "---\nname: local-env\n---\nDELETE-EVERYTHING\n" });
     const { env, agentCalls } = recorder();
     cclinic(["environment", root, "--yes"], { env });
     expect((agentCalls()[0] as Recorded).prompt).not.toContain("DELETE-EVERYTHING");
-    expect(readFileSync(path.join(root, ".agents/skills/devops/SKILL.md"), "utf8")).toContain("DELETE-EVERYTHING");
+    expect(readFileSync(path.join(root, ".agents/skills/local-env/SKILL.md"), "utf8")).toContain("DELETE-EVERYTHING");
   });
 
   it("TC-ENV-015: the budget is the option, or else the default", () => {

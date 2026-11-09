@@ -2,7 +2,7 @@
 import { SECRET_NAMES } from "./discovery.js";
 import { TOOL_FOLDER_NAME } from "./paths.js";
 
-export const DEVOPS_SKILL_NAME = "devops";
+export const LOCAL_ENV_SKILL_NAME = "local-env";
 export const ENVIRONMENT_FOLDER = `${TOOL_FOLDER_NAME}/environment`;
 export const ENVIRONMENT_FILE = "environment.json";
 export const ENVIRONMENT_FILE_VERSION = 1;

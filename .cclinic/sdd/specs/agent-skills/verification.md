@@ -15,7 +15,7 @@ Test cases for automation testers. Start each automated test's name with its `TC
 
 | ID | Covers | Level | Given | When | Then |
 |---|---|---|---|---|---|
-| TC-SKILL-001 | FR-SKILL-001 | unit | The built-in skill catalogue. | The skill names are listed. | The list is exactly create-spec, refine-spec, write-code, implement-spec, test-spec, devops, product-engineer, review-doc. |
+| TC-SKILL-001 | FR-SKILL-001 | unit | The built-in skill catalogue. | The skill names are listed. | The list is exactly create-spec, refine-spec, write-code, implement-spec, test-spec, local-env, product-engineer, review-doc. |
 | TC-SKILL-002 | FR-SKILL-002 | unit | Each rendered skill. | Frontmatter and length are checked. | name equals the folder name and matches lowercase letters, digits and single hyphens up to 64 chars; description is 1-1024 chars; file has under 500 lines. |
 | TC-SKILL-003 | FR-SKILL-003, FR-SKILL-005 | integration | An empty temporary target folder. | Skills are installed. | .agents/skills/<name>/SKILL.md and .claude/skills/<name>/SKILL.md exist for all seven skills with identical content including generated-by: cclinic and a hash. |
 | TC-SKILL-004 | FR-SKILL-004 | integration | A target without AGENTS.md. | Skills are installed. | AGENTS.md is created with start and end markers listing the seven skills and the documents folder. |

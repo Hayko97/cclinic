@@ -3,7 +3,7 @@ name: implement-spec
 description: "Builds a spec requirement by requirement, with tests from its test cases, and reports proof that each one works. Use when the user asks to implement, build or complete a spec, feature or requirement that has a spec folder."
 metadata:
   generated-by: cclinic
-  content-hash: "2fc53176eecee9056ece45bad228d90da4780f6fea3bbfae9afbb7aaeb626c4d"
+  content-hash: "bb79caa46257f92966984e43fd3463ec2485a56ceec139c688824e2296a1e0be"
 ---
 
 # Implement a spec
@@ -26,7 +26,7 @@ Turn a spec into working, tested code, and report honestly on each requirement.
 8. **Verify everything.** Run the project's full checks. Then read each `VAL`, and judge whether the result would really meet it.
 9. **Hand it to QA.** Test the change with the `test-spec` skill, in a separate agent if your tool can run one. For each defect, decide whether the code, the test or the spec is wrong. Fix wrong code with `write-code`, or a wrong test so it checks what the spec says, then run QA again. If the spec is wrong, stop and use the `refine-spec` skill with the user's agreement. QA runs at most 3 times for a change, counting every run, and the count starts again only after the user replies. If the 3rd QA run still fails, stop: report the failures and show how to review it if the preview can start, instead of asking for approval.
 10. **Update the spec.** Set each finished requirement's status to `confirmed`, and update its evidence to point to the code. Only do this for requirements that work.
-11. **Show how to review it.** Run each `start` command in `.cclinic/environment/environment.json`, so the local environment includes this change, leave it running, and give the user a link, build or command to try. If the file doesn't exist, set it up with the `devops` skill.
+11. **Show how to review it.** Run each `start` command in `.cclinic/environment/environment.json`, so the local environment includes this change, leave it running, and give the user a link, build or command to try. If the file doesn't exist, set it up with the `local-env` skill.
 12. **Report and ask for review,** using the format below. Give the steps for each `manual` test case QA didn't run, so the user can test it by hand. Ask the user to approve the implementation or request changes. If they request changes, make them, run QA again, show how to review it again, and ask again.
 13. **Ask to commit.** Once they approve the implementation, ask whether to commit. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and don't include secrets. State any test that failed or wasn't run before asking. If they decline, leave the changes uncommitted.
 

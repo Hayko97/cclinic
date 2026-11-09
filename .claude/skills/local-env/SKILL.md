@@ -1,9 +1,9 @@
 ---
-name: devops
+name: local-env
 description: "Sets up a local environment suited to the project, and shows how to review each change, such as a link or a simulator build. Use when the user asks to set up, run or preview the project locally, or after implementing a change, so the user can try it before approving it."
 metadata:
   generated-by: cclinic
-  content-hash: "f5a4f3a7ed66163acb5c23527cf3bb27b4439610927f3cf6e36a58f63a4ce1db"
+  content-hash: "6417f7253140a3e5d0e9d764782590a26b4190a644d6e874e880a167184bee48"
 ---
 
 # Set up and use the local environment

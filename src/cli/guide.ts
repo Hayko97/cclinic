@@ -125,7 +125,7 @@ STEP 5: WORK WITH YOUR CODING AGENT
     write-code       "Use write-code to add a retry to the payment client."
     implement-spec   "Use implement-spec to build the user-login spec."
     test-spec        "Use test-spec to test the user-login spec."
-    devops           "Use devops to set up the local environment."
+    local-env        "Use local-env to set up the local environment."
     product-engineer "Help me plan what to build next."
     review-doc       "Use review-doc to show how the user-login change will look."
 

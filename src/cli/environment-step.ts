@@ -3,7 +3,7 @@ import { runEnvironmentAgent } from "../adapters/llm/environment-agent.js";
 import { readEnvironmentFile, snapshotFiles } from "../adapters/storage/environment-store.js";
 import { relativeDocsPath } from "../adapters/storage/skill-installer.js";
 import { AGENT_SKILLS } from "../core/agent-skills.js";
-import { DEVOPS_SKILL_NAME, ENVIRONMENT_MAX_BUDGET_USD } from "../core/constants/environment.js";
+import { LOCAL_ENV_SKILL_NAME, ENVIRONMENT_MAX_BUDGET_USD } from "../core/constants/environment.js";
 import { ERROR_DETAIL_MAX_CHARS } from "../core/constants/llm.js";
 import { USD_DECIMAL_PLACES } from "../core/constants/terminal.js";
 import {
@@ -41,8 +41,8 @@ export interface AgentSettings {
   readonly maxBudgetUsd?: number | undefined;
 }
 
-function devopsPrompt(docsPath: string): string {
-  const body = AGENT_SKILLS.find((skill) => skill.name === DEVOPS_SKILL_NAME)?.body ?? "";
+function localEnvPrompt(docsPath: string): string {
+  const body = AGENT_SKILLS.find((skill) => skill.name === LOCAL_ENV_SKILL_NAME)?.body ?? "";
   return buildEnvironmentPrompt(body.replaceAll("{{DOCS}}", docsPath));
 }
 
@@ -65,7 +65,7 @@ export async function runAgentStep(settings: AgentSettings, context: CommandCont
   try {
     ({ finalMessage, costUsd } = await runEnvironmentAgent({
       target,
-      prompt: devopsPrompt(relativeDocsPath(target, out)),
+      prompt: localEnvPrompt(relativeDocsPath(target, out)),
       model,
       effort,
       maxBudgetUsd: settings.maxBudgetUsd ?? ENVIRONMENT_MAX_BUDGET_USD,

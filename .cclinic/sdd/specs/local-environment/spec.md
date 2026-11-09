@@ -2,13 +2,13 @@
 
 ## Goal
 
-Let a person try every change for real, not just read test results. A `devops` skill sets up a local environment suited to the project. During `cclinic` setup, Claude follows that skill if the user agrees. After each implementation, the coding agent shows how to review the change, such as a link or a simulator build.
+Let a person try every change for real, not just read test results. A `local-env` skill sets up a local environment suited to the project. During `cclinic` setup, Claude follows that skill if the user agrees. After each implementation, the coding agent shows how to review the change, such as a link or a simulator build.
 
 ## Requirements
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-ENV-001 | The system must provide a `devops` skill, installed in `.agents/skills` and `.claude/skills` like the others, protected from overwriting like the others, and listed in the `AGENTS.md` skills table. | confirmed | `src/core/agent-skills.ts:284`, `user request` |
+| FR-ENV-001 | The system must provide a `local-env` skill, installed in `.agents/skills` and `.claude/skills` like the others, protected from overwriting like the others, and listed in the `AGENTS.md` skills table. | confirmed | `src/core/agent-skills.ts:295`, `src/core/constants/environment.ts:5`, `user request` |
 | FR-ENV-002 | The skill must work with any coding agent, and must prohibit committing and pushing. | confirmed | `src/core/agent-skills.ts:293`, `user request` |
 | FR-ENV-003 | After a run installs the skills in an interactive terminal with no valid environment file, cclinic must say that Claude will edit files and run commands that can build and run the project's code, then ask whether to continue, defaulting to yes. | confirmed | `src/cli/environment-step.ts:138`, `user request` |
 | FR-ENV-004 | With `--yes`, `--json`, `--quiet` or no interactive terminal, a run must not start Claude for the environment unless `--environment` is set. | confirmed | `src/cli/environment-step.ts:136`, `user request` |
@@ -34,7 +34,7 @@ Let a person try every change for real, not just read test results. A `devops` s
 | FR-ENV-024 | For `ios` and `android`, the skill must build and launch the app on a simulator or emulator without signing or a real device, checking commands against the tools' own help, and say what's needed if a tool or platform is missing. | docs-only | `src/core/agent-skills.ts:357`, `user request` |
 | FR-ENV-025 | For `desktop`, `cli` and `library`, the skill must not add Docker or a server, and must run the build and record a command to try with its expected result. | confirmed | `src/core/agent-skills.ts:361`, `user request` |
 | FR-ENV-026 | The skill must run each start command it records and report the real result, and must not describe a failed part as working. | confirmed | `src/core/agent-skills.ts:341`, `user request` |
-| FR-ENV-027 | After tests and before asking for approval, the agent must run each `start` command in the environment file, setting it up with the `devops` skill if the file doesn't exist. A server the agent starts itself doesn't count. | confirmed | `src/core/agent-skills.ts:448`, `user request` |
+| FR-ENV-027 | After tests and before asking for approval, the agent must run each `start` command in the environment file, setting it up with the `local-env` skill if the file doesn't exist. A server the agent starts itself doesn't count. | confirmed | `src/core/agent-skills.ts:448`, `user request` |
 | FR-ENV-028 | The preview must include the new change, so the agent must rebuild or restart before checking it. | confirmed | `src/core/agent-skills.ts:371`, `user request` |
 | FR-ENV-029 | The review message must state the link or command, any fallback, what to look at, how to stop the preview, and whether the agent checked it. | confirmed | `src/core/agent-skills.ts:375`, `user request` |
 | FR-ENV-030 | If the preview can't start, the agent must say why, report the test results, and still ask for review, unless the 3rd QA run failed, in which case it must report the failures without asking for approval (FR-INSTR-023). | docs-only | `src/core/agent-skills.ts:387`, `src/core/environment.test.ts:124`, `user request` |
@@ -49,7 +49,7 @@ Let a person try every change for real, not just read test results. A `devops` s
 |---|---|
 | Setup starts the Claude CLI with limited tools, after asking | The user asked for this during setup, and projects vary too much for fixed templates |
 | `--yes` doesn't agree to it | Analysis allows no tools. This step can run project code, so it needs its own agreement |
-| The built-in skill text is sent to Claude | A project's own `devops` file can't change what runs |
+| The built-in skill text is sent to Claude | A project's own `local-env` file can't change what runs |
 | New files go in `.cclinic/environment/` | The scan already skips it, so there's no re-analysis, and it can't overwrite project files |
 | `<alias>.localhost` with a `localhost` fallback | It needs no hosts file, proxy or certificates, but RFC 6761 only says resolvers "SHOULD" return loopback |
 | The workflow names the `start` command, not just the skill | In real trials with full shell access, agents skipped "use the `devops` skill" 3 times out of 3, and followed the concrete command 3 times out of 3 |
@@ -63,7 +63,7 @@ Let a person try every change for real, not just read test results. A `devops` s
 ## Edge cases
 
 - A dev server may reject unknown hosts. The alias check catches this, and the fallback link is used.
-- A project's own `devops` skill is left alone, and isn't what Claude follows during setup.
+- A project's own `local-env` skill is left alone, and isn't what Claude follows during setup.
 - An invalid environment file is reported, then set up again.
 - A project needing a database runs it as a local container with example values.
 

@@ -78,7 +78,7 @@ Run `cclinic guide` for the full walkthrough, or `cclinic --help` for every opti
 | `write-code`       | Write code that fits your stack and guidelines, as a maintainer would |
 | `implement-spec`   | Build a spec requirement by requirement, and prove that it works      |
 | `test-spec`        | Act as QA: automate the test cases, run them, and report defects      |
-| `devops`           | Set up a local environment, and show how to review each change        |
+| `local-env`        | Set up a local environment, and show how to review each change        |
 | `product-engineer` | Ask what you want to build, and plan it as a roadmap of tasks         |
 | `review-doc`       | Show, with diagrams and mockups, how a spec change will work and look |
 

@@ -102,8 +102,8 @@ describe("cclinic environment", () => {
     const test = harness();
     await runEnvironmentCommand(root, {}, test.context);
     expect(test.agentCalls()).toBe(0);
-    expect(test.stdout()).toContain("Use the devops skill");
-    expect(existsSync(path.join(root, ".agents/skills/devops/SKILL.md"))).toBe(true);
+    expect(test.stdout()).toContain("Use the local-env skill");
+    expect(existsSync(path.join(root, ".agents/skills/local-env/SKILL.md"))).toBe(true);
   });
 
   it("agreeing starts Claude, and shows how to review", async () => {
@@ -126,11 +126,11 @@ describe("cclinic environment", () => {
     for (const test of [harness({ CCLINIC_PROVIDER: "anthropic-api" }), harness({ FAKE_CLAUDE_LOGGED_OUT: "1" })]) {
       await runEnvironmentCommand(project(), { yes: true }, test.context);
       expect(test.agentCalls()).toBe(0);
-      expect(test.stdout()).toContain("Use the devops skill");
+      expect(test.stdout()).toContain("Use the local-env skill");
     }
     const noClaude = harness({}, false);
     await runEnvironmentCommand(project(), { yes: true }, noClaude.context);
-    expect(noClaude.stdout()).toContain("Use the devops skill");
+    expect(noClaude.stdout()).toContain("Use the local-env skill");
   });
 
   it("TC-ENV-021: an existing file is shown, and --json reports it", async () => {
@@ -147,7 +147,7 @@ describe("cclinic environment", () => {
     const root = project();
     const first = harness();
     await runEnvironmentCommand(root, { yes: true }, first.context);
-    const skill = path.join(root, ".agents/skills/devops/SKILL.md");
+    const skill = path.join(root, ".agents/skills/local-env/SKILL.md");
     const edited = `${readFileSync(skill, "utf8")}\nMy addition.\n`;
     writeFileSync(skill, edited);
     const second = harness();
@@ -156,12 +156,12 @@ describe("cclinic environment", () => {
     expect(readFileSync(skill, "utf8")).toBe(edited);
   });
 
-  it("TC-ENV-002: another person's skill named devops is left alone and reported", async () => {
-    const own = "---\nname: devops\ndescription: Mine\n---\nBody\n";
-    const root = project({ ".agents/skills/devops/SKILL.md": own });
+  it("TC-ENV-002: another person's skill named local-env is left alone and reported", async () => {
+    const own = "---\nname: local-env\ndescription: Mine\n---\nBody\n";
+    const root = project({ ".agents/skills/local-env/SKILL.md": own });
     const test = harness();
     await runEnvironmentCommand(root, { yes: true }, test.context);
-    expect(readFileSync(path.join(root, ".agents/skills/devops/SKILL.md"), "utf8")).toBe(own);
+    expect(readFileSync(path.join(root, ".agents/skills/local-env/SKILL.md"), "utf8")).toBe(own);
     expect(test.stderr()).toContain("1 skipped");
   });
 

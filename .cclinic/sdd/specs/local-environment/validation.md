@@ -4,7 +4,7 @@ Acceptance criteria from the user's point of view.
 
 | ID | Covers | User need | Accepted when |
 |---|---|---|---|
-| VAL-ENV-001 | FR-ENV-001, FR-ENV-002 | Any coding agent can set up my environment | After setup, the `devops` skill is available to my agent, and it never commits or pushes while using it |
+| VAL-ENV-001 | FR-ENV-001, FR-ENV-002 | Any coding agent can set up my environment | After setup, the `local-env` skill is available to my agent, and it never commits or pushes while using it |
 | VAL-ENV-002 | FR-ENV-003, FR-ENV-004, FR-ENV-005 | Nothing runs my code without my agreement | Setup tells me what will happen and asks first. Scripts and CI don't start it unless they ask for it, and I can turn it off |
 | VAL-ENV-003 | FR-ENV-006 | I can set this up later | Running one command sets up the environment on a project, even with no documents yet |
 | VAL-ENV-004 | FR-ENV-007 | I'm not stuck without the Claude CLI | I get one sentence to give my own coding agent, and setup still succeeds |
