@@ -14,7 +14,7 @@ export const ENVIRONMENT_MAX_BUDGET_USD = 2;
 
 export const ENVIRONMENT_AGENT_TOOLS: readonly string[] = ["Read", "Glob", "Grep", "Write", "Edit", "Bash"];
 
-const BUILD_COMMANDS = [
+export const BUILD_COMMANDS: readonly string[] = [
   "cd",
   "echo",
   "sleep",
@@ -59,7 +59,7 @@ export const ENVIRONMENT_AGENT_ALLOWED_TOOLS: readonly string[] = [
   ...BUILD_COMMANDS.map((command) => `Bash(${command} *)`),
 ];
 
-const SECRET_FILES = [
+export const SECRET_FILES: readonly string[] = [
   ".env",
   ".env.local",
   ".env.development",

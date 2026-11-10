@@ -1,9 +1,22 @@
 /** Shared test helpers: temp projects, sample documents and a fake LLM provider. */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { crc32 } from "node:zlib";
 import { afterEach } from "vitest";
+import type { CommandContext } from "../../src/cli/command-context.js";
+import { createReporter } from "../../src/cli/reporter.js";
 import type { LlmProvider, LlmRequest, LlmResult, Logger } from "../../src/core/ports.js";
 import { moduleSummarySchema, projectDataSchema, specContentSchema } from "../../src/core/schemas.js";
 
@@ -222,4 +235,69 @@ export class FakeLlm implements LlmProvider {
       this.active -= 1;
     }
   }
+}
+
+const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
+
+/** A rule for the fake `claude` (see FAKE_CLAUDE_SCRIPT in test/fixtures/fake-claude/claude). */
+export interface FakeClaudeRule {
+  readonly match?: string;
+  readonly times?: number;
+  readonly output?: unknown;
+  readonly message?: string;
+  readonly cost?: number;
+  readonly exitCode?: number;
+  readonly delayMs?: number;
+  readonly hang?: boolean;
+  readonly write?: Readonly<Record<string, string>>;
+}
+
+export interface FakeClaudeCall {
+  readonly args: readonly string[];
+  readonly cwd: string;
+  readonly prompt: string;
+}
+
+/** Runs commands in-process with a fake `claude` on PATH, scripted replies, and captured output. */
+export function agentHarness(
+  options: { rules?: readonly FakeClaudeRule[]; withClaude?: boolean; env?: NodeJS.ProcessEnv } = {},
+) {
+  const bin = makeTempFolder();
+  symlinkSync(process.execPath, path.join(bin, "node"));
+  if (options.withClaude !== false) {
+    copyFileSync(path.join(REPO_ROOT, "test/fixtures/fake-claude/claude"), path.join(bin, "claude"));
+    chmodSync(path.join(bin, "claude"), 0o755);
+  }
+  const work = makeTempFolder();
+  const record = path.join(work, "calls.jsonl");
+  const script = path.join(work, "script.json");
+  writeFileSync(script, JSON.stringify(options.rules ?? []));
+  const home = makeTempFolder();
+  const environment: NodeJS.ProcessEnv = {
+    PATH: `${bin}:/usr/bin:/bin`,
+    HOME: home,
+    XDG_CONFIG_HOME: path.join(home, "config"),
+    FAKE_CLAUDE_RECORD: record,
+    FAKE_CLAUDE_SCRIPT: script,
+    ...options.env,
+  };
+  const output = { out: "", err: "" };
+  const reporter = createReporter({
+    quiet: false,
+    debug: false,
+    color: "never",
+    environment,
+    stdout: { write: (text: string) => (output.out += text) },
+    stderr: { write: (text: string) => (output.err += text) },
+  });
+  const controller = new AbortController();
+  const context: CommandContext = { reporter, environment, signal: controller.signal, version: "0.1.0" };
+  const calls = (): FakeClaudeCall[] =>
+    existsSync(record)
+      ? readFileSync(record, "utf8")
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => JSON.parse(line) as FakeClaudeCall)
+      : [];
+  return { context, controller, environment, output, calls, bin };
 }

@@ -1,5 +1,5 @@
 /** Console menus. They write to stderr, so stdout stays clean for scripts (FR-CLI-006). */
-import { confirm, select } from "@inquirer/prompts";
+import { confirm, input, select } from "@inquirer/prompts";
 import { MENU_COLUMN_GAP } from "../core/constants/terminal.js";
 import { CancelledError, UsageError } from "../core/errors.js";
 import { EFFORT_OPTIONS, MODEL_OPTIONS, validOptionsText, type Effort, type ModelChoice } from "../core/models.js";
@@ -73,4 +73,14 @@ export function chooseEffort(current: Effort): Promise<Effort> {
 
 export function askToConfirm(message: string, defaultAnswer = false): Promise<boolean> {
   return prompting(() => confirm({ message, default: defaultAnswer }, { output: process.stderr }));
+}
+
+export function chooseFrom<T>(message: string, choices: readonly { value: T; name: string }[]): Promise<T> {
+  return prompting(() =>
+    select({ message, choices: [...choices], pageSize: choices.length }, { output: process.stderr }),
+  );
+}
+
+export function askText(message: string): Promise<string> {
+  return prompting(() => input({ message }, { output: process.stderr }));
 }

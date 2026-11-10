@@ -91,7 +91,7 @@ export function parseStreamLines(text: string): unknown[] {
   return events;
 }
 
-function findResult(events: readonly unknown[]): ResultEvent | undefined {
+export function findResult(events: readonly unknown[]): ResultEvent | undefined {
   for (const event of [...events].reverse()) {
     const parsed = resultEventSchema.safeParse(event);
     if (parsed.success) return parsed.data;

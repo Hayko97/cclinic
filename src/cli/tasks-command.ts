@@ -6,32 +6,42 @@ import { projectPaths } from "../adapters/storage/document-store.js";
 import { openTaskStore, type OpenMode, type TaskStore } from "../adapters/storage/task-store.js";
 import { UsageError } from "../core/errors.js";
 import {
+  buildOverview,
   buildRoadmap,
-  milestoneInputSchema,
   parseId,
   parseInput,
+  PLAN_HINT,
+  renderOverview,
   renderRoadmap,
+  renderRoadmapList,
   renderTask,
   renderTaskList,
+  summarizeRoadmap,
   taskInputSchema,
   type TaskStatus,
 } from "../core/tasks.js";
 import type { CommandContext } from "./command-context.js";
 import { commandHelp } from "./guide.js";
+import { collect } from "./options.js";
 
 interface TasksOptions {
   readonly dir?: string;
   readonly json?: boolean;
 }
 
-async function toolFolder(dir: string | undefined): Promise<string> {
+/** The project folder for `-C, --dir`, defaulting to the current folder (FR-TASK-014). */
+export async function projectFolder(dir: string | undefined): Promise<string> {
   const absolute = path.resolve(dir ?? process.cwd());
   const isFolder = await stat(absolute).then(
     (info) => info.isDirectory(),
     () => false,
   );
   if (!isFolder) throw new UsageError(`"${dir ?? absolute}" isn't a folder.`);
-  return projectPaths(absolute, undefined).tool;
+  return absolute;
+}
+
+async function toolFolder(dir: string | undefined): Promise<string> {
+  return projectPaths(await projectFolder(dir), undefined).tool;
 }
 
 /** Runs one command against the store, then prints text or JSON (FR-TASK-013). */
@@ -65,13 +75,26 @@ function withCommonOptions(command: Command, example: string): Command {
     .addHelpText("after", commandHelp(`cclinic tasks ${command.name()}`, example));
 }
 
+/** Creating roadmaps and milestones is left to the PM agent (FR-TASK-003, FR-TASK-023). */
+function addPlanOnlyCommand(parent: Command, name: string, what: string, context: CommandContext): void {
+  withCommonOptions(
+    parent.command(name).description(`${what} (use cclinic plan instead)`).allowUnknownOption().allowExcessArguments(),
+    "cclinic plan",
+  ).action(() => {
+    context.reporter.debug(`Refused tasks ${parent.name()} ${name}.`);
+    throw new UsageError(`${what} isn't available here. ${PLAN_HINT}`);
+  });
+}
+
+export function readOverview(store: TaskStore | undefined) {
+  return buildOverview(store?.listRoadmaps() ?? [], store?.listMilestones() ?? [], store?.listTasks(true) ?? []);
+}
+
 export function addTasksCommand(program: Command, context: CommandContext): void {
-  const tasks = program
-    .command("tasks")
-    .description("Plan the roadmap and track tasks, without using any Claude usage");
+  const tasks = program.command("tasks").description("See roadmaps and track tasks, without using any Claude usage");
 
   withCommonOptions(
-    tasks.command("list").description("List open and in-progress tasks in roadmap order"),
+    tasks.command("list").description("List open, in-progress and blocked tasks in roadmap order"),
     "cclinic tasks list --all --json",
   )
     .option("--all", "include done tasks")
@@ -83,14 +106,53 @@ export function addTasksCommand(program: Command, context: CommandContext): void
     });
 
   withCommonOptions(
-    tasks.command("roadmap").description("Show milestones in order, with their tasks"),
+    tasks.command("roadmaps").description("List every roadmap with its status and task counts"),
+    "cclinic tasks roadmaps --json",
+  ).action(async (options: TasksOptions) => {
+    await withStore(options, "read", context, (store) => {
+      const summaries = readOverview(store).roadmaps.map(summarizeRoadmap);
+      return { text: renderRoadmapList(summaries), json: { roadmaps: summaries } };
+    });
+  });
+
+  const roadmap = withCommonOptions(
+    tasks.command("roadmap").description("Show every roadmap in full, then tasks with no milestone"),
     "cclinic tasks roadmap --json",
   ).action(async (options: TasksOptions) => {
     await withStore(options, "read", context, (store) => {
-      const roadmap = buildRoadmap(store?.listMilestones() ?? [], store?.listTasks(true) ?? []);
-      return { text: renderRoadmap(roadmap), json: { ...roadmap } };
+      const overview = readOverview(store);
+      return { text: renderOverview(overview), json: { ...overview } };
     });
   });
+
+  withCommonOptions(
+    roadmap.command("show").description("Show one roadmap's milestones and tasks").argument("<id>", "roadmap ID"),
+    "cclinic tasks roadmap show 1 --json",
+  ).action(async (given: string, options: TasksOptions) => {
+    const id = parseId(given, "roadmap");
+    await withStore(options, "read", context, (store) => {
+      const record = store?.listRoadmaps().find((item) => item.id === id);
+      if (record === undefined) throw new UsageError(`Roadmap ${id} doesn't exist.`);
+      const found = buildRoadmap(record, store?.listMilestones() ?? [], store?.listTasks(true) ?? []);
+      return { text: renderRoadmap(found), json: { roadmap: found } };
+    });
+  });
+
+  withCommonOptions(
+    roadmap
+      .command("remove")
+      .description("Delete a roadmap and its milestones. Their tasks are kept, with no milestone")
+      .argument("<id>", "roadmap ID"),
+    "cclinic tasks roadmap remove 2",
+  ).action(async (given: string, options: TasksOptions) => {
+    const id = parseId(given, "roadmap");
+    await withStore(options, "update", context, (store) => {
+      requireStore(store, `Roadmap ${id}`).removeRoadmap(id);
+      return { text: `Removed roadmap ${id}. Its tasks have no milestone now.`, json: { removed: id } };
+    });
+  });
+
+  addPlanOnlyCommand(roadmap, "add", "Creating a roadmap", context);
 
   withCommonOptions(
     tasks.command("show").description("Show every detail of a task").argument("<id>", "task ID"),
@@ -108,19 +170,31 @@ export function addTasksCommand(program: Command, context: CommandContext): void
   withCommonOptions(
     tasks
       .command("add")
-      .description("Add a task")
+      .description("Add a task with no milestone. Use cclinic plan --task to add one to a roadmap")
       .requiredOption("--title <text>", "what the task delivers")
       .option("--description <text>", "details and acceptance notes")
-      .option("--milestone <id>", "milestone it belongs to")
-      .option("--spec <name>", "spec it belongs to, such as user-login"),
-    'cclinic tasks add --title "Lock accounts" --milestone 1 --spec auth --json',
+      .option("--spec <name>", "spec it belongs to, such as user-login")
+      .option("--depends-on <id>", "a task that must be done first. Repeatable", collect, [])
+      .option("--milestone <id>", "not available: use cclinic plan --task"),
+    'cclinic tasks add --title "Lock accounts" --spec auth --depends-on 2 --json',
   ).action(
-    async (options: TasksOptions & { title: string; description?: string; milestone?: string; spec?: string }) => {
+    async (
+      options: TasksOptions & {
+        title: string;
+        description?: string;
+        spec?: string;
+        dependsOn: readonly string[];
+        milestone?: string;
+      },
+    ) => {
+      if (options.milestone !== undefined) {
+        throw new UsageError(`A task joins a roadmap's milestone only through cclinic plan --task. ${PLAN_HINT}`);
+      }
       const input = parseInput(taskInputSchema, {
         title: options.title,
         description: options.description,
-        milestoneId: options.milestone === undefined ? undefined : parseId(options.milestone, "milestone"),
         spec: options.spec,
+        dependsOn: options.dependsOn.map((value) => parseId(value, "task")),
       });
       await withStore(options, "create", context, (store) => {
         const task = requireStore(store, "The task database").addTask(input);
@@ -128,6 +202,28 @@ export function addTasksCommand(program: Command, context: CommandContext): void
       });
     },
   );
+
+  const dependencyCommands = [
+    ["depend", "Make a task depend on another", "addDependency", "now depends on"],
+    ["undepend", "Remove a dependency between two tasks", "removeDependency", "no longer depends on"],
+  ] as const;
+  for (const [name, description, method, verb] of dependencyCommands) {
+    withCommonOptions(
+      tasks
+        .command(name)
+        .description(description)
+        .argument("<id>", "task ID")
+        .requiredOption("--on <id>", "the task it depends on"),
+      `cclinic tasks ${name} 3 --on 2`,
+    ).action(async (given: string, options: TasksOptions & { on: string }) => {
+      const id = parseId(given, "task");
+      const dependsOnId = parseId(options.on, "task");
+      await withStore(options, "update", context, (store) => {
+        const task = requireStore(store, `Task ${id}`)[method](id, dependsOnId);
+        return { text: `Task ${id} ${verb} task ${dependsOnId}.`, json: { task } };
+      });
+    });
+  }
 
   const statusCommands: readonly (readonly [string, TaskStatus, string])[] = [
     ["start", "in-progress", "Mark a task as in progress"],
@@ -157,22 +253,9 @@ export function addTasksCommand(program: Command, context: CommandContext): void
     });
   });
 
-  const milestone = tasks.command("milestone").description("Add or remove roadmap milestones");
+  const milestone = tasks.command("milestone").description("Remove roadmap milestones");
 
-  withCommonOptions(
-    milestone
-      .command("add")
-      .description("Add a milestone after the existing ones")
-      .requiredOption("--title <text>", "milestone name")
-      .option("--goal <text>", "what it achieves"),
-    'cclinic tasks milestone add --title MVP --goal "First release" --json',
-  ).action(async (options: TasksOptions & { title: string; goal?: string }) => {
-    const input = parseInput(milestoneInputSchema, { title: options.title, goal: options.goal });
-    await withStore(options, "create", context, (store) => {
-      const added = requireStore(store, "The task database").addMilestone(input);
-      return { text: `Added milestone ${added.id}: ${added.title}`, json: { milestone: added } };
-    });
-  });
+  addPlanOnlyCommand(milestone, "add", "Creating a milestone", context);
 
   withCommonOptions(
     milestone

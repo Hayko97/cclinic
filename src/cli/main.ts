@@ -1,6 +1,7 @@
 /** Entry point and composition root: parses arguments, wires everything, and maps errors to exit codes. */
 import { readFileSync } from "node:fs";
 import { Command, CommanderError, Option } from "commander";
+import { AUTO_LIMITS, PLAN_LIMITS } from "../core/constants/agents.js";
 import { LIMITS, SHUTDOWN_TIMEOUT_MS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ARGV_OFFSET } from "../core/constants/terminal.js";
@@ -16,9 +17,11 @@ import {
 import { runEnvironmentCommand, type EnvironmentCommandOptions } from "./environment-command.js";
 import { runGenerate, type CommandContext, type GenerateOptions } from "./generate-command.js";
 import { commandHelp, GUIDE_TEXT, HELP_HOW_IT_WORKS } from "./guide.js";
-import { collect, integerInRange, oneOf, positiveNumber } from "./options.js";
+import { collect, integerInRange, oneOf, positiveId, positiveNumber } from "./options.js";
 import { runClean, runDoctor, runModelCommand, runSkillsCommand, type SkillsCommandOptions } from "./other-commands.js";
 import { createReporter, type ColorMode, type Reporter } from "./reporter.js";
+import { runAutoCommand, type AutoOptions } from "./auto-command.js";
+import { runPlanCommand, type PlanOptions } from "./plan-command.js";
 import { addTasksCommand } from "./tasks-command.js";
 
 const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
@@ -181,6 +184,46 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     });
 
   addTasksCommand(program, context);
+
+  program
+    .command("plan")
+    .description("Plan a roadmap, or one task, with the PM agent. Only an approved plan is saved")
+    .option("-C, --dir <path>", "project folder (default: the current folder)")
+    .option("--roadmap <id>", "extend this roadmap, or with --task, add the task to it", positiveId)
+    .option("--task", "plan one concrete task instead of a roadmap")
+    .option("-m, --model [value]", "model to use. With no value, opens a menu")
+    .option("--effort [value]", "reasoning level. With no value, opens a menu")
+    .option(
+      "--max-budget-usd <n>",
+      `stop the session at this estimated spend (default: ${PLAN_LIMITS.maxBudgetUsd})`,
+      positiveNumber,
+      PLAN_LIMITS.maxBudgetUsd,
+    )
+    .option(...limitOption("--timeout-minutes <n>", "time limit for each PM turn", LIMITS.timeoutMinutes))
+    .addHelpText("after", commandHelp("cclinic plan", "cclinic plan --task --roadmap 1"))
+    .action(async (options: PlanOptions) => {
+      await runPlanCommand(options, context);
+    });
+
+  program
+    .command("auto")
+    .description("Run a whole roadmap with developer, PM and QA agents, with no human, on its own branches")
+    .option("-C, --dir <path>", "project folder (default: the current folder)")
+    .option("--roadmap <id>", "the roadmap to run. Without it, a menu lists them", positiveId)
+    .requiredOption("--max-budget-usd <n>", "the most the whole run may spend (required)", positiveNumber)
+    .option(...limitOption("--developers <n>", "developer agents working at once", AUTO_LIMITS.developers))
+    .option("-m, --model [value]", "model for every agent. With no value, opens a menu")
+    .option("--effort [value]", "reasoning level for every agent. With no value, opens a menu")
+    .option(...limitOption("--timeout-minutes <n>", "time limit for each agent call", LIMITS.timeoutMinutes))
+    .option("-y, --yes", "skip the confirmation prompt")
+    .option("--json", "print the result as JSON")
+    .addHelpText(
+      "after",
+      commandHelp("cclinic auto", "cclinic auto --roadmap 1 --max-budget-usd 20 --developers 3 --yes"),
+    )
+    .action(async (options: AutoOptions) => {
+      setExit(await runAutoCommand(options, context));
+    });
 
   program
     .command("environment")

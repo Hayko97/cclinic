@@ -21,6 +21,12 @@ export function positiveNumber(value: string): number {
   return parsed;
 }
 
+export function positiveId(value: string): number {
+  const id = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  if (!Number.isSafeInteger(id) || id < 1) throw new InvalidArgumentError("It must be a whole number above 0.");
+  return id;
+}
+
 export function oneOf<T extends string>(allowed: readonly T[]) {
   return (value: string): T => {
     const match = allowed.find((item) => item === value);

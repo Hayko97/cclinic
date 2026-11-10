@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 // A stand-in for the Claude CLI, for tests. It costs nothing and never touches the network.
 // FAKE_CLAUDE_MODE: ok (default), fail-after-1, hang, slow, invalid-model, auth-error, invalid-output, usage-limit
+// FAKE_CLAUDE_SCRIPT: a JSON file of rules for agent calls. Each call uses the first rule whose `match`
+// (a regex on the prompt) fits and that has uses left (`times`, default 1, 0 for unlimited). A rule can
+// set `output` (structured output), `message`, `cost`, `exitCode`, `delayMs`, `hang` and `write`
+// (files to write, relative to the working folder).
 const fs = require("node:fs");
 
 const args = process.argv.slice(2);
@@ -35,6 +39,60 @@ if (record) {
 }
 
 const emit = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
+
+const scriptFile = process.env.FAKE_CLAUDE_SCRIPT;
+if (scriptFile) {
+  const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  const lock = `${scriptFile}.lock`;
+  for (;;) {
+    try {
+      fs.mkdirSync(lock);
+      break;
+    } catch {
+      pause(5);
+    }
+  }
+  const stateFile = `${scriptFile}.state`;
+  const rules = JSON.parse(fs.readFileSync(scriptFile, "utf8"));
+  const used = fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, "utf8")) : {};
+  const index = rules.findIndex((rule, position) => {
+    const times = rule.times ?? 1;
+    const isLeft = times === 0 || (used[position] ?? 0) < times;
+    return isLeft && (rule.match === undefined || new RegExp(rule.match, "s").test(prompt));
+  });
+  if (index !== -1) used[index] = (used[index] ?? 0) + 1;
+  fs.writeFileSync(stateFile, JSON.stringify(used));
+  fs.rmdirSync(lock);
+  const rule = rules[index];
+  if (rule === undefined) {
+    emit({ type: "result", is_error: true, subtype: "success", result: "No script rule matched this prompt." });
+    process.exit(1);
+  }
+  if (process.env.FAKE_CLAUDE_PIDS) fs.appendFileSync(process.env.FAKE_CLAUDE_PIDS, `${process.pid}\n`);
+  if (rule.hang) {
+    setInterval(() => {}, 1000);
+    return;
+  }
+  const respond = () => {
+    for (const [file, content] of Object.entries(rule.write ?? {})) {
+      fs.mkdirSync(require("node:path").dirname(file), { recursive: true });
+      fs.writeFileSync(file, content);
+    }
+    const isError = (rule.exitCode ?? 0) !== 0;
+    emit({
+      type: "result",
+      is_error: isError,
+      subtype: "success",
+      result: rule.message ?? "Done.",
+      ...(rule.output === undefined ? {} : { structured_output: rule.output }),
+      total_cost_usd: rule.cost ?? 0.01,
+    });
+    process.exit(rule.exitCode ?? 0);
+  };
+  if (rule.delayMs) setTimeout(respond, rule.delayMs);
+  else respond();
+  return;
+}
 const fail = (fields, code = 1) => {
   emit({ type: "result", is_error: true, subtype: "success", structured_output: null, ...fields });
   process.exit(code);

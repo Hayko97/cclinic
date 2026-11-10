@@ -7,14 +7,19 @@ Analyse every prompt, and follow this lifecycle:
 
 **0. Check open tasks.** On every prompt, first run `cclinic tasks list --json`. If it lists tasks and the prompt isn't about one of them, list them (ID, title, status, spec), and wait for the user to choose: work on one of them, remove it with `cclinic tasks remove <id>` and continue with the prompt, or keep it and continue with the prompt. Once the user chooses to keep them, don't ask about the same tasks again in this conversation, only when a new task appears. If there are no tasks, don't mention them. If the command fails, say so in one line and continue.
 
-**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, use the `product-engineer` skill, and don't start spec or code work. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask. When work starts on a task, run `cclinic tasks start <id>`, and use the task's spec.
+**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, you may talk it through with the `product-engineer` skill, but don't create roadmaps, milestones or roadmap tasks yourself: tell the user to run `cclinic plan`, where the PM agent creates the roadmap, or `cclinic plan --task` for one concrete task. Don't start spec or code work. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask. When work starts on a task, run `cclinic tasks start <id>`, and use the task's spec.
 
 **2. Refine the spec, and get it approved.**
 - **New feature:** use the `refine-spec` skill if it belongs in an existing spec, or the `create-spec` skill if not.
 - **Bug or issue:** use `refine-spec`. Add a test case that reproduces it, and correct any requirement that's wrong or missing.
 - **No behaviour change**, such as a refactor, formatting, a typo or a dependency update: no spec update is needed. Go to stage 3.
 
-Show what changed in `spec.md`, `validation.md` and `verification.md`, and any open questions. Ask the user to approve or reject it, and stop. Don't change production code until they clearly approve. If they reject it or ask for changes, refine the spec and ask again.
+Show what changed in `spec.md`, `validation.md` and `verification.md`, and any open questions. Then offer the user three options, and stop until they choose one. Don't change production code until they clearly approve:
+- **`approve`:** go to stage 3.
+- **`refine`:** refine the spec with the changes they ask for, and offer the three options again. A rejection works the same way.
+- **`review-doc`:** use the `review-doc` skill to write a visual doc of how the project will work and look after the change, in `.cclinic/reviews/<spec-name>/review.md`. Give the user its path, ask them to review it, and offer `approve` or `refine`. A review doc isn't approval, and it changes no production code.
+
+Any other reply, such as a question, isn't approval: answer it, and offer the options again.
 
 **3. Implement, test, and get it approved.** Use the `implement-spec` skill, with the `write-code` skill for all code. If the spec turns out to be wrong, go back to stage 2. Then, in this order:
 1. **Test it as QA.** Use the `test-spec` skill to test the change against the spec's `verification.md` and `validation.md`, even if the spec didn't change. If no spec covers the change, QA runs the project's full checks and reports that. If your tool can run a separate agent, run QA there, so the code isn't checked by the agent that wrote it. If you're running QA for the agent that implemented the change, follow only the `test-spec` skill. Don't start this lifecycle, change the spec or stop at stage 2.
@@ -42,7 +47,8 @@ Skills are in `.agents/skills/<name>/SKILL.md`. If your tool doesn't load skills
 | `implement-spec` | Builds a spec requirement by requirement, with tests from its test cases, and reports proof that each one works |
 | `test-spec` | Acts as QA for a spec or feature: automates its test cases, runs them, explores edge cases, and reports results and defects |
 | `local-env` | Sets up a local environment suited to the project, and shows how to review each change, such as a link or a simulator build |
-| `product-engineer` | Helps the user decide what to build, by asking questions and proposing a roadmap of milestones and tasks, which it saves once approved |
+| `product-engineer` | Plans what to build as the PM: asks the user questions and proposes a roadmap of milestones and tasks with their dependencies, or one concrete task |
+| `review-doc` | Writes a simple, visual review doc for a spec change, with diagrams, screenshots and mockups of how the project will work and look after it |
 | `review-code` | Reviews a change against the project's coding rules and developer guidelines, and reports findings by severity with a verdict, without changing code |
 
 This section is managed by cclinic, so keep your own notes outside the markers.

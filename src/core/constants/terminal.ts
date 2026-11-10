@@ -1,6 +1,17 @@
 /** Values for command-line output. */
 
-export const COMMANDS = ["model", "doctor", "skills", "tasks", "environment", "clean", "guide", "help"] as const;
+export const COMMANDS = [
+  "model",
+  "doctor",
+  "skills",
+  "tasks",
+  "plan",
+  "auto",
+  "environment",
+  "clean",
+  "guide",
+  "help",
+] as const;
 export const MAX_TYPO_DISTANCE = 2;
 
 /** Skips the Node.js executable and script path in process.argv. */

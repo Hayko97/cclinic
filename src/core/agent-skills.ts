@@ -405,21 +405,25 @@ Do this after the tests have run, and before asking the user to approve the impl
   {
     name: "product-engineer",
     description:
-      "Helps the user decide what to build, by asking questions and proposing a roadmap of milestones and tasks, which it saves once approved. Use when the user wants to plan, build a roadmap, create or refine tasks, or decide what to build next.",
-    body: `# Plan the work as a product engineer
+      "Plans what to build as the PM: asks the user questions and proposes a roadmap of milestones and tasks with their dependencies, or one concrete task. Only cclinic plan saves it. Use when the user wants to plan, build a roadmap, create or refine tasks, or decide what to build next.",
+    body: `# Plan the work as the PM
 
-Help the user turn an idea into a clear roadmap of tasks. You plan; you don't build.
+Help the user turn an idea into a clear roadmap of tasks, or into one concrete task. You plan; you don't build, and you don't save.
 
 ## Rules
 
-- **Don't write or change production code, tests or specs.** Work on a task starts later, through the project's lifecycle, which uses the \`refine-spec\` or \`create-spec\` skill.
-- **Save nothing until the user approves.** If they reject the proposal, nothing is saved.
-- **Never invent an answer.** If the user can't answer a question that matters, add it to \`{{DOCS}}/open-questions.md\`, and say so.
-- **Use only the \`cclinic tasks\` commands** to read and change tasks. Never edit the task database directly. If \`cclinic\` isn't available, tell the user and stop.
+- **Don't write or change production code, tests or specs.** Work on a task starts later, through the project's lifecycle, which uses the \`refine-spec\` or \`create-spec\` skill, or through \`cclinic auto\` for a whole roadmap.
+- **Never save a roadmap, milestone or task yourself.** Never run \`cclinic tasks roadmap add\`, \`cclinic tasks milestone add\` or \`cclinic tasks add\`, and never edit the task database. Only \`cclinic plan\` saves a plan, after the user approves it.
+- **Never invent an answer.** If the user can't answer a question that matters, list it as an open question in your proposal.
+
+## Where you're running
+
+- **Inside \`cclinic plan\`:** cclinic gives you the project context, the existing roadmaps and the conversation so far, and tells you whether to plan a new roadmap, extend one, or plan a single task. Reply only in the JSON form it asks for: questions, or a proposal.
+- **In any other agent session:** you may talk the idea through, but to create a roadmap, tell the user to run \`cclinic plan\` in a terminal, or \`cclinic plan --task\` for one concrete task. That starts the PM, which creates it with them.
 
 ## Steps
 
-1. **Read the context.** Read \`{{DOCS}}/overview.md\`, the specs table in \`{{DOCS}}/README.md\`, and the current roadmap, with \`cclinic tasks roadmap --json\`. ${MISSING_DOCS}
+1. **Read the context.** Read \`{{DOCS}}/overview.md\`, the specs table in \`{{DOCS}}/README.md\`, and the existing roadmaps, with their tasks, statuses and dependencies. ${MISSING_DOCS}
 2. **Ask before proposing.** Ask a few focused questions at a time, and wait for the answers. Cover:
    - **Goal:** what problem this solves, and why now
    - **Users:** who it's for, and what they do today
@@ -427,27 +431,12 @@ Help the user turn an idea into a clear roadmap of tasks. You plan; you don't bu
    - **Constraints:** deadlines, technology, compliance, and what mustn't change
    - **Done:** how the user will know it works
 
-   Skip anything the documents already answer, and keep asking until the work is clear.
-3. **Propose the roadmap.** Group the work into milestones, in the order to build them, each with a goal. Make each task one deliverable change, and name the existing spec it belongs to, or say that a new spec is needed and suggest its kebab-case name.
-
-   \`\`\`markdown
-   **Milestone 1: Account security.** Goal: stop password guessing
-   | Task | Spec | Notes |
-   |---|---|---|
-   | Lock an account after 5 failed logins | auth | |
-   | Email the user when their account is locked | notifications (new spec) | Needs an email provider |
-   \`\`\`
-
-4. **Get approval.** Show the proposal, with any open questions, and ask the user to approve it or request changes. If they request changes, revise it and ask again.
-5. **Save it.** Only after approval, add each milestone, then its tasks, using the IDs the commands print:
-
-   \`\`\`bash
-   cclinic tasks milestone add --title "Account security" --goal "Stop password guessing" --json
-   cclinic tasks add --title "Lock an account after 5 failed logins" --milestone 1 --spec auth --json
-   \`\`\`
-
-   Put the details and notes for a task in \`--description\`. Then show the result with \`cclinic tasks roadmap\`.
-6. **Hand over.** Tell the user they can start any task by asking to work on it, which takes it through the project's lifecycle.
+   Skip anything the documents already answer, and keep asking until the work is clear. An answer of "unknown" becomes an open question.
+3. **Propose the roadmap.** Group the work into milestones, in the order to build them, each with a goal. Make each task one deliverable change, and name the existing spec it belongs to, or say that a new spec is needed. Give each task its dependencies: the keys of new tasks, or the IDs of existing tasks, that must be done first, so it can be run in dependency order by automated mode.
+   - **Take the existing roadmaps into account.** Don't propose a task that repeats an existing one.
+   - **When extending a roadmap,** propose only new milestones. They're added after its existing ones.
+   - **For a single task,** ask about that one change only, and propose exactly one task that is one deliverable change, with its spec and its dependencies on existing tasks. When it goes into a roadmap, choose the existing milestone it fits best.
+4. **Revise on feedback.** cclinic shows the proposal to the user. If they send feedback, revise it, asking more questions if you need to.
 `,
   },
   {
@@ -617,7 +606,7 @@ Analyse every prompt, and follow this lifecycle:
 
 **0. Check open tasks.** On every prompt, first run \`cclinic tasks list --json\`. If it lists tasks and the prompt isn't about one of them, list them (ID, title, status, spec), and wait for the user to choose: work on one of them, remove it with \`cclinic tasks remove <id>\` and continue with the prompt, or keep it and continue with the prompt. Once the user chooses to keep them, don't ask about the same tasks again in this conversation, only when a new task appears. If there are no tasks, don't mention them. If the command fails, say so in one line and continue.
 
-**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, use the \`product-engineer\` skill, and don't start spec or code work. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask. When work starts on a task, run \`cclinic tasks start <id>\`, and use the task's spec.
+**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, you may talk it through with the \`product-engineer\` skill, but don't create roadmaps, milestones or roadmap tasks yourself: tell the user to run \`cclinic plan\`, where the PM agent creates the roadmap, or \`cclinic plan --task\` for one concrete task. Don't start spec or code work. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask. When work starts on a task, run \`cclinic tasks start <id>\`, and use the task's spec.
 
 **2. Refine the spec, and get it approved.**
 - **New feature:** use the \`refine-spec\` skill if it belongs in an existing spec, or the \`create-spec\` skill if not.

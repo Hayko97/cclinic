@@ -3,7 +3,7 @@ name: refine-spec
 description: "Improves an existing spec: fixes vague or untestable requirements, fills coverage gaps, updates it to match the code, and resolves open questions. Use when the user asks to review, refine, update or tighten a spec, or when code and spec have drifted apart."
 metadata:
   generated-by: cclinic
-  content-hash: "a19d5192c02a9f7380e191e42adce76369cafdda61d09ec3f88959a3abb80453"
+  content-hash: "03c0b3a8d792e8ab2cd201155853186bc6b476d1332bbb38515c3d25732879bf"
 ---
 
 # Refine a spec
@@ -24,7 +24,12 @@ Make an existing spec more accurate and testable, without changing what the proj
 4. **Separate what you can fix from what the user must decide.** Fix wording, coverage, evidence and status yourself. Anything that changes intended behaviour is the user's decision, so ask. If they can't answer now, record an open question.
 5. **Make the changes,** keeping IDs stable. When a requirement is removed, delete it and don't reuse its ID. When one is split, keep the ID for the closest match, and give the rest new numbers.
 6. **Remove resolved items** from `open-questions.md`, and reflect the answers in the spec.
-7. **Ask for review, and stop.** Report what changed and why, what you asked, and what's still open, and ask the user to approve or reject it. Don't implement it in this skill. If they reject it or ask for changes, refine it and ask again.
+7. **Ask for review, and stop.** Report what changed and why, what you asked, and what's still open. Then offer the user three options, and stop until they choose one:
+   - **`approve`:** the spec is ready to implement.
+   - **`refine`:** refine the spec with the changes they ask for, and ask again.
+   - **`review-doc`:** use the `review-doc` skill to write a visual doc of how the project will work and look after the change.
+
+   Don't implement it in this skill.
 
 ## Spec format
 

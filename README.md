@@ -79,11 +79,15 @@ Run `cclinic guide` for the full walkthrough, or `cclinic --help` for every opti
 | `implement-spec`   | Build a spec requirement by requirement, and prove that it works           |
 | `test-spec`        | Act as QA: automate the test cases, run them, and report defects           |
 | `local-env`        | Set up a local environment, and show how to review each change             |
-| `product-engineer` | Ask what you want to build, and plan it as a roadmap of tasks              |
+| `product-engineer` | The PM's instructions: ask what to build, and propose a roadmap            |
 | `review-doc`       | Show, with diagrams and mockups, how a spec change will work and look      |
 | `review-code`      | Review a change against your coding rules and guidelines before you see it |
 
-Planned milestones and tasks are kept in `.cclinic/tasks.db`, and read and changed with `cclinic tasks` (`list`, `roadmap`, `add`, `show`, `start`, `done`, `remove`, `milestone add|remove`, each with `--json` and `-C <folder>`). On every prompt, your agent checks for open tasks, and asks whether to work on one, remove it, or keep it and carry on.
+Roadmaps are created only by the PM agent: run `cclinic plan` in a terminal, answer its questions, and approve its proposal of milestones and tasks with their dependencies. `cclinic plan --task` plans one concrete task instead, standalone or in a roadmap. Nothing is saved until you approve.
+
+Roadmaps and tasks are kept in `.cclinic/tasks.db`, and read and changed with `cclinic tasks` (`roadmaps`, `roadmap [show|remove]`, `list`, `add`, `depend`, `undepend`, `show`, `start`, `done`, `remove`, `milestone remove`, each with `--json` and `-C <folder>`). On every prompt, your agent checks for open tasks, and asks whether to work on one, remove it, or keep it and carry on.
+
+`cclinic auto --roadmap <id> --max-budget-usd <amount>` runs a whole roadmap with no human. Developer agents take tasks in dependency order, several at once (`--developers`). For each task, the PM agent approves the spec, a QA agent tests the change end to end, and the PM reviews it before cclinic commits it to the task's branch and merges it into the run branch `cclinic/auto/<run-id>/run`. Your own branch is never touched and nothing is pushed. When the run ends, you get a desktop notification and a report in `.cclinic/auto/<run-id>/report.md`. Agents work from the last commit, so commit the skills and documents first.
 
 When your agent asks you to review a spec change, you can choose `approve`, `refine` or `review-doc`. `review-doc` writes `.cclinic/reviews/<spec>/review.md`, with diagrams, screenshots of today and mockups of after, and then asks you to approve or refine the spec.
 
@@ -134,7 +138,9 @@ Run `cclinic guide` for the full walkthrough, `cclinic --help` for an overview a
 | `cclinic doctor`       | Check your setup, without using any Claude usage          |
 | `cclinic skills`       | Install the coding agent skills, with no Claude usage     |
 | `cclinic environment`  | Set up a local environment for previewing changes         |
-| `cclinic tasks`        | Plan the roadmap and track tasks, with no Claude usage    |
+| `cclinic tasks`        | See roadmaps and track tasks, with no Claude usage        |
+| `cclinic plan`         | Plan a roadmap, or one task, with the PM agent            |
+| `cclinic auto`         | Run a whole roadmap with developer, PM and QA agents      |
 | `cclinic clean`        | Delete the cache and failed drafts                        |
 
 The default is Sonnet at medium reasoning. Re-running only reprocesses what changed, and continues from where a failed run stopped.

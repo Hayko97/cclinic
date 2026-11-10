@@ -3,7 +3,7 @@ name: create-spec
 description: "Writes a new spec for a feature or capability, with requirements, acceptance criteria and test cases. Use when the user asks to spec, plan or document something new before building it, or describes a feature that has no spec yet."
 metadata:
   generated-by: cclinic
-  content-hash: "ff50db64c9b1b3d81cc4db41b089c88e001034a0ca85759c2d02f27df4773a14"
+  content-hash: "d4141238d5b9262f6d31dfb41616180fd80ccaf4e1f210a8a3c6968ad5999e8b"
 ---
 
 # Create a spec
@@ -19,7 +19,12 @@ Write a spec that a developer and an automation tester could each work from with
 5. **Write the three files,** using the format below. Scope one capability per spec, and split it if it's growing into several.
 6. **Add it to the specs table** in `.cclinic/sdd/README.md`.
 7. **Check your work** using the checklist below.
-8. **Ask for review, and stop.** Summarise the spec and any open questions, and ask the user to approve or reject it. Don't implement it in this skill. If they reject it or ask for changes, refine it and ask again.
+8. **Ask for review, and stop.** Summarise the spec and any open questions. Then offer the user three options, and stop until they choose one:
+   - **`approve`:** the spec is ready to implement.
+   - **`refine`:** refine the spec with the changes they ask for, and ask again.
+   - **`review-doc`:** use the `review-doc` skill to write a visual doc of how the project will work and look after the change.
+
+   Don't implement it in this skill.
 
 ## Spec format
 

@@ -24,7 +24,7 @@ export interface GitOptions {
   readonly timeoutMs?: number;
 }
 
-interface GitOutcome {
+export interface GitOutcome {
   readonly isOk: boolean;
   readonly isMissing: boolean;
   readonly hasTimedOut: boolean;
@@ -37,7 +37,7 @@ function gitEnvironment(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return { ...Object.fromEntries(kept), GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" };
 }
 
-function runGit(args: readonly string[], cwd: string, options: GitOptions): Promise<GitOutcome> {
+export function runGit(args: readonly string[], cwd: string, options: GitOptions): Promise<GitOutcome> {
   return new Promise((resolve) => {
     execFile(
       GIT_COMMAND,

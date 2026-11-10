@@ -1,0 +1,86 @@
+/** Runs one PM, developer or QA agent as a `claude -p` process with limited tools (FR-PLAN-005, FR-AUTO-016). */
+import { BUDGET_DECIMAL_PLACES } from "../../core/constants/llm.js";
+import { LIMITS } from "../../core/constants/limits.js";
+import { AgentCallError, LlmError } from "../../core/errors.js";
+import type { Effort, ModelChoice } from "../../core/models.js";
+import { claudeEnvironment, findResult, requireSuccessfulResult, resultMessage, runProcess } from "./claude-cli.js";
+
+export interface AgentToolSettings {
+  readonly tools: readonly string[];
+  readonly allowedTools: readonly string[];
+  readonly deniedTools: readonly string[];
+}
+
+export interface AgentRequest extends AgentToolSettings {
+  readonly cwd: string;
+  readonly prompt: string;
+  readonly model: ModelChoice;
+  readonly effort: Effort;
+  readonly maxBudgetUsd: number;
+  /** When given, the agent must end with JSON in this shape. */
+  readonly jsonSchema?: Record<string, unknown>;
+  readonly environment: NodeJS.ProcessEnv;
+  readonly signal: AbortSignal;
+  readonly timeoutMs: number;
+}
+
+export interface AgentResult {
+  readonly costUsd: number | null;
+  readonly finalMessage: string;
+  readonly structuredOutput: unknown;
+}
+
+export function buildAgentArgs(
+  input: AgentToolSettings & {
+    model: string;
+    effort: string;
+    maxBudgetUsd: number;
+    jsonSchema?: Record<string, unknown>;
+  },
+): string[] {
+  return [
+    "-p",
+    "--model",
+    input.model,
+    "--effort",
+    input.effort,
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    ...(input.jsonSchema === undefined ? [] : ["--json-schema", JSON.stringify(input.jsonSchema)]),
+    "--tools",
+    ...input.tools,
+    "--allowedTools",
+    ...input.allowedTools,
+    "--disallowedTools",
+    ...input.deniedTools,
+    "--permission-mode",
+    "dontAsk",
+    "--no-session-persistence",
+    // Keeps the login, and stops the project's own hooks and settings from running.
+    "--safe-mode",
+    "--max-budget-usd",
+    input.maxBudgetUsd.toFixed(BUDGET_DECIMAL_PLACES),
+  ];
+}
+
+export async function runAgent(request: AgentRequest): Promise<AgentResult> {
+  const { events, exitCode } = await runProcess(buildAgentArgs(request), request.prompt, {
+    cwd: request.cwd,
+    environment: claudeEnvironment(request.environment, LIMITS.maxRetries.default),
+    timeoutMs: request.timeoutMs,
+    signal: request.signal,
+    onEvent: () => undefined,
+  });
+  try {
+    const result = requireSuccessfulResult(events, exitCode, request.model);
+    return {
+      costUsd: result.total_cost_usd ?? null,
+      finalMessage: resultMessage(result),
+      structuredOutput: result.structured_output ?? null,
+    };
+  } catch (error) {
+    if (!(error instanceof LlmError)) throw error;
+    throw new AgentCallError(error.message, findResult(events)?.total_cost_usd ?? null, { cause: error });
+  }
+}

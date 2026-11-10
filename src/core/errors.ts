@@ -20,6 +20,8 @@ export class ValidationFailedError extends CclinicError {
 export class CancelledError extends CclinicError {}
 /** Exits like a Claude failure, but re-running starts this step again rather than continuing it. */
 export class EnvironmentStepError extends CclinicError {}
+/** A PM, developer or QA session stopped at a limit or on unusable replies. Re-running starts it again. */
+export class AgentSessionError extends CclinicError {}
 
 export class LlmError extends CclinicError {}
 export class AuthError extends LlmError {}
@@ -35,6 +37,16 @@ export class TruncatedError extends LlmError {}
 export class SchemaError extends LlmError {}
 export class BudgetError extends LlmError {}
 export class ProviderError extends LlmError {}
+/** An agent's `claude` process failed. It keeps what the process cost before it stopped. */
+export class AgentCallError extends LlmError {
+  constructor(
+    message: string,
+    readonly costUsd: number | null,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+  }
+}
 
 /** The task database can't be used. It's expected, so it's reported without "unexpected" (FR-TASK-016). */
 export class TaskDatabaseError extends CclinicError {}
@@ -54,7 +66,8 @@ export function exitCodeFor(error: unknown): number {
   if (error instanceof CancelledError) return EXIT_CODES.sigint;
   if (error instanceof UsageError) return EXIT_CODES.usage;
   if (error instanceof NoProviderError) return EXIT_CODES.noProvider;
-  if (error instanceof LlmError || error instanceof EnvironmentStepError) return EXIT_CODES.llm;
+  if (error instanceof LlmError || error instanceof EnvironmentStepError || error instanceof AgentSessionError)
+    return EXIT_CODES.llm;
   if (error instanceof ValidationFailedError) return EXIT_CODES.validation;
   return EXIT_CODES.internal;
 }

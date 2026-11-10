@@ -127,12 +127,16 @@ STEP 5: WORK WITH YOUR CODING AGENT
     implement-spec   "Use implement-spec to build the user-login spec."
     test-spec        "Use test-spec to test the user-login spec."
     local-env        "Use local-env to set up the local environment."
-    product-engineer "Help me plan what to build next."
+    product-engineer "Help me plan what to build next." (then: cclinic plan)
     review-doc       "Use review-doc to show how the user-login change will look."
     review-code      "Use review-code to review my uncommitted changes."
 
-  Planned tasks are kept in .cclinic/tasks.db. On each prompt, your agent checks
-  for open tasks, and asks whether to work on one, remove it, or keep it.
+  Roadmaps are created only by the PM agent, with "cclinic plan". Tasks are kept
+  in .cclinic/tasks.db. On each prompt, your agent checks for open tasks, and
+  asks whether to work on one, remove it, or keep it.
+
+  "cclinic auto --roadmap <id> --max-budget-usd <n>" runs a whole roadmap with
+  developer, PM and QA agents, on its own branches, and notifies you at the end.
 
   Skills you wrote are never replaced. Skills you edited are kept unless you use
   "cclinic skills --force".
@@ -155,8 +159,10 @@ COMMANDS
   cclinic model --reset   go back to ${DEFAULT_CLAUDE_MODEL.label} at ${DEFAULT_CLAUDE_EFFORT.label.toLowerCase()}
   cclinic skills [path]   install the skills only, with no Claude usage
   cclinic environment [path]  set up a local environment for previews
-  cclinic tasks roadmap   show the roadmap and its tasks, with no Claude usage
-  cclinic tasks list      list open tasks. Also: add, show, start, done, remove, milestone
+  cclinic plan            plan a roadmap with the PM agent. --task for one task
+  cclinic auto            run a whole roadmap with agents, with no human
+  cclinic tasks roadmaps  list roadmaps with their status, with no Claude usage
+  cclinic tasks list      list open tasks. Also: roadmap, add, depend, show, start, done, remove
   cclinic doctor [path]   check your setup, with no Claude usage
   cclinic clean [path]    delete the cache and failed drafts
   cclinic guide           show this guide

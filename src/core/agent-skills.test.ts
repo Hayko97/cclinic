@@ -366,26 +366,46 @@ describe("product engineer and tasks", () => {
   };
 
   it("TC-SKILL-036: reads the context and asks before proposing", () => {
-    for (const text of [".cclinic/sdd/overview.md", ".cclinic/sdd/README.md", "`cclinic tasks roadmap --json`"]) {
+    for (const text of [".cclinic/sdd/overview.md", ".cclinic/sdd/README.md", "the existing roadmaps"]) {
       expect(position(text)).toBeLessThan(position("**Ask before proposing.**"));
     }
     for (const text of ["**Goal:**", "**Users:**", "**Scope:**", "**Constraints:**", "**Done:**"]) {
       expect(position(text)).toBeLessThan(position("**Propose the roadmap.**"));
     }
-    expect(planner).toContain("add it to `.cclinic/sdd/open-questions.md`");
+    expect(planner).toContain("list it as an open question in your proposal");
   });
 
-  it("TC-SKILL-037: each task names its spec, and saving waits for approval", () => {
+  it("TC-SKILL-037: each task names its spec, the skill never saves, and it points to cclinic plan", () => {
     expect(planner).toContain("name the existing spec it belongs to, or say that a new spec is needed");
-    expect(planner).toContain("Save nothing until the user approves");
-    expect(position("**Get approval.**")).toBeLessThan(position("**Save it.** Only after approval"));
-    expect(position("**Save it.**")).toBeLessThan(position("cclinic tasks milestone add"));
-    expect(planner).toContain("cclinic tasks add --title");
+    expect(planner).toContain(
+      "Never run `cclinic tasks roadmap add`, `cclinic tasks milestone add` or `cclinic tasks add`",
+    );
+    expect(planner).toContain("Only `cclinic plan` saves a plan, after the user approves it.");
+    expect(planner).toContain("Reply only in the JSON form it asks for");
+    expect(planner).toContain("tell the user to run `cclinic plan` in a terminal, or `cclinic plan --task`");
   });
 
   it("TC-SKILL-038: plans without changing code, tests or specs", () => {
     expect(planner).toContain("Don't write or change production code, tests or specs");
     expect(planner).toContain("`refine-spec` or `create-spec`");
+  });
+
+  it("TC-SKILL-049: each task gets its dependencies, by key or existing ID", () => {
+    expect(planner).toContain(
+      "Give each task its dependencies: the keys of new tasks, or the IDs of existing tasks, that must be done first",
+    );
+  });
+
+  it("TC-SKILL-050: existing roadmaps are respected, and extensions only add milestones", () => {
+    expect(planner).toContain("Don't propose a task that repeats an existing one.");
+    expect(planner).toContain("propose only new milestones. They're added after its existing ones.");
+  });
+
+  it("TC-SKILL-051: a single task is one change with its spec, dependencies and best milestone", () => {
+    expect(planner).toContain(
+      "ask about that one change only, and propose exactly one task that is one deliverable change, with its spec and its dependencies on existing tasks",
+    );
+    expect(planner).toContain("choose the existing milestone it fits best");
   });
 
   it("TC-INSTR-043: every prompt checks open tasks first, and offers work, remove or keep", () => {
@@ -410,11 +430,14 @@ describe("product engineer and tasks", () => {
     expect(AGENT_WORKFLOW).toContain("If the command fails, say so in one line and continue");
   });
 
-  it("TC-INSTR-045: planning prompts go to product-engineer", () => {
+  it("TC-INSTR-045: planning prompts go to product-engineer and cclinic plan, never to hand-made roadmaps", () => {
     const stage = AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf("**1."), AGENT_WORKFLOW.indexOf("**2."));
     expect(stage).toContain(
-      "If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, use the `product-engineer` skill",
+      "If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, you may talk it through with the `product-engineer` skill",
     );
+    expect(stage).toContain("don't create roadmaps, milestones or roadmap tasks yourself");
+    expect(stage).toContain("tell the user to run `cclinic plan`");
+    expect(stage).toContain("or `cclinic plan --task` for one concrete task");
   });
 
   it("TC-INSTR-046: tasks are started with the work, and done after approval", () => {
