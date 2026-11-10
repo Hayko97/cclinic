@@ -13,7 +13,7 @@ How it works:
   1. Scans your project, skipping dependencies, build output, binaries and secrets
   2. Shows a summary, and asks before sending anything to Anthropic
   3. Uses Claude to write specs and project documents to .cclinic/sdd/
-  4. Installs eight skills, so your coding agent can work from those documents
+  4. Installs nine skills, so your coding agent can work from those documents
   5. Offers to set up a local environment, so you can try each change yourself
 
 Get started:
@@ -115,7 +115,8 @@ STEP 5: WORK WITH YOUR CODING AGENT
 
     1. Prompt      it analyses your request, and finds the spec
     2. Spec        it refines the spec, and you approve or reject it
-    3. Implement   after approval, it builds and tests, shows you a preview, and you review it
+    3. Implement   after approval, it builds, tests and reviews the code, shows you a preview,
+                   and you review it
     4. Commit      after you approve, it asks to commit. It never pushes on its own
 
   You can just describe what you want. You can also ask for a skill by name:
@@ -128,6 +129,7 @@ STEP 5: WORK WITH YOUR CODING AGENT
     local-env        "Use local-env to set up the local environment."
     product-engineer "Help me plan what to build next."
     review-doc       "Use review-doc to show how the user-login change will look."
+    review-code      "Use review-code to review my uncommitted changes."
 
   Planned tasks are kept in .cclinic/tasks.db. On each prompt, your agent checks
   for open tasks, and asks whether to work on one, remove it, or keep it.

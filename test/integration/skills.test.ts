@@ -54,8 +54,8 @@ describe("installing", () => {
 
   it("TC-SKILL-010: the summary counts each outcome", async () => {
     const root = makeTempFolder();
-    expect(summarizeInstall(await install(root))).toContain("18 installed");
-    expect(summarizeInstall(await install(root))).toContain("18 unchanged");
+    expect(summarizeInstall(await install(root))).toContain("20 installed");
+    expect(summarizeInstall(await install(root))).toContain("20 unchanged");
     writeFileSync(path.join(root, AGENTS_COPY), "mine");
     expect(summarizeInstall(await install(root))).toContain("1 skipped");
   });
@@ -271,5 +271,37 @@ describe("agent instructions", () => {
     });
     expect(result.included.map((item) => item.path)).toEqual(["src/a.ts"]);
     expect(result.skipped.map((item) => item.path)).not.toContain(CLAUDE);
+  });
+});
+
+describe("review-code skill", () => {
+  const SHARED_REVIEWER = ".agents/skills/review-code/SKILL.md";
+  const CLAUDE_REVIEWER = ".claude/skills/review-code/SKILL.md";
+
+  it("TC-CREV-001: review-code is installed in both folders and listed in AGENTS.md", async () => {
+    const root = makeTempFolder();
+    await install(root);
+    const shared = readFileSync(path.join(root, SHARED_REVIEWER), "utf8");
+    expect(readFileSync(path.join(root, CLAUDE_REVIEWER), "utf8")).toBe(shared);
+    expect(readFileSync(path.join(root, "AGENTS.md"), "utf8")).toContain("| `review-code` |");
+  });
+
+  it("TC-CREV-003: an edited or someone else's review-code skill is protected", async () => {
+    const edited = makeTempFolder();
+    await install(edited);
+    const file = path.join(edited, SHARED_REVIEWER);
+    writeFileSync(file, `${readFileSync(file, "utf8")}\nOur extra rule.\n`);
+    expect(statusOf(await install(edited), SHARED_REVIEWER)).toBe("skipped: edited, use --force to replace");
+    expect(readFileSync(file, "utf8")).toContain("Our extra rule.");
+    expect(statusOf(await install(edited, true), SHARED_REVIEWER)).toBe("updated");
+    expect(readFileSync(file, "utf8")).not.toContain("Our extra rule.");
+
+    const foreign = makeTempFolder();
+    const mine = "---\nname: review-code\ndescription: Our own reviewer\n---\nMine\n";
+    writeProject(foreign, { [SHARED_REVIEWER]: mine });
+    expect(statusOf(await install(foreign), SHARED_REVIEWER)).toBe("skipped: not created by cclinic");
+    expect(readFileSync(path.join(foreign, SHARED_REVIEWER), "utf8")).toBe(mine);
+    expect(statusOf(await install(foreign, true), SHARED_REVIEWER)).toBe("skipped: not created by cclinic");
+    expect(readFileSync(path.join(foreign, SHARED_REVIEWER), "utf8")).toBe(mine);
   });
 });

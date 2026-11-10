@@ -5,7 +5,14 @@
  */
 
 import { LOCAL_ENV_SKILL_NAME, ENVIRONMENT_FILE, ENVIRONMENT_FOLDER } from "./constants/environment.js";
-import { AGENTS_FILE, REVIEW_DOC_SKILL_NAME, REVIEWS_FOLDER } from "./constants/paths.js";
+import {
+  AGENTS_FILE,
+  BUILT_IN_REVIEW_LEVEL,
+  BUILT_IN_REVIEW_SKILL_NAME,
+  REVIEW_CODE_SKILL_NAME,
+  REVIEW_DOC_SKILL_NAME,
+  REVIEWS_FOLDER,
+} from "./constants/paths.js";
 export interface AgentSkill {
   readonly name: string;
   readonly description: string;
@@ -202,10 +209,11 @@ Turn a spec into working, tested code, and report honestly on each requirement.
 7. **Stay in scope.** Build only what the spec says. If the spec is wrong or incomplete, stop and tell the user, or use the \`refine-spec\` skill with their agreement. Don't quietly build something different.
 8. **Verify everything.** Run the project's full checks. Then read each \`VAL\`, and judge whether the result would really meet it.
 9. **Hand it to QA.** Test the change with the \`test-spec\` skill, in a separate agent if your tool can run one. For each defect, decide whether the code, the test or the spec is wrong. Fix wrong code with \`write-code\`, or a wrong test so it checks what the spec says, then run QA again. If the spec is wrong, stop and use the \`refine-spec\` skill with the user's agreement. QA runs at most 3 times for a change, counting every run, and the count starts again only after the user replies. If the 3rd QA run still fails, stop: report the failures and show how to review it if the preview can start, instead of asking for approval.
-10. **Update the spec.** Set each finished requirement's status to \`confirmed\`, and update its evidence to point to the code. Only do this for requirements that work.
-11. **Show how to review it.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and give the user a link, build or command to try. If the file doesn't exist, set it up with the \`local-env\` skill.
-12. **Report and ask for review,** using the format below. Give the steps for each \`manual\` test case QA didn't run, so the user can test it by hand. Ask the user to approve the implementation or request changes. If they request changes, make them, run QA again, show how to review it again, and ask again.
-13. **Ask to commit.** Once they approve the implementation, ask whether to commit. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and don't include secrets. State any test that failed or wasn't run before asking. If they decline, leave the changes uncommitted.
+10. **Review the code.** Once QA passes, review the change with the \`${REVIEW_CODE_SKILL_NAME}\` skill, naming the files the change touched, in a separate agent if your tool can run one. Fix each \`blocking\` and \`should-fix\` finding with \`write-code\`, without changing behaviour the spec doesn't ask to change, or say in the report why you think it's wrong. If a finding shows the spec is wrong, stop and use the \`refine-spec\` skill with the user's agreement. Fix \`nit\` findings only if the user asks. After fixing, run QA again, then the review again. If the fixes need QA and the 3 QA runs are used up, stop: report the findings and the untested fixes, and show how to review it if the preview can start, instead of asking for approval. The review runs at most 3 times for a change, counting every run, and the count starts again only after the user replies. If the 3rd review still has \`blocking\` or \`should-fix\` findings, stop: report them and show how to review it if the preview can start, instead of asking for approval.
+11. **Update the spec.** Set each finished requirement's status to \`confirmed\`, and update its evidence to point to the code. Only do this for requirements that work.
+12. **Show how to review it.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and give the user a link, build or command to try. If the file doesn't exist, set it up with the \`local-env\` skill.
+13. **Report and ask for review,** using the format below, with the review findings fixed, disputed and left, and whether the agent's built-in code review ran. Give the steps for each \`manual\` test case QA didn't run, so the user can test it by hand. Ask the user to approve the implementation or request changes. If they request changes, make them, run QA and the review again, show how to review it again, and ask again.
+14. **Ask to commit.** Once they approve the implementation, ask whether to commit. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and don't include secrets. State any test that failed or wasn't run, and any \`blocking\` or \`should-fix\` finding still open, before asking. If they decline, leave the changes uncommitted.
 
 ## Report format
 
@@ -480,6 +488,82 @@ Help the user decide whether to approve a spec change, by showing in one simple 
    A review doc isn't approval, so don't implement anything until the user chooses \`approve\`.
 `,
   },
+  {
+    name: REVIEW_CODE_SKILL_NAME,
+    description:
+      "Reviews a change against the project's coding rules and developer guidelines, and reports findings by severity with a verdict, without changing code. Use when QA has passed and before the preview, or when the user asks to review code before it's committed.",
+    body: `# Review code
+
+Review a change the way a careful senior maintainer of this project would, before the user sees it. You find and explain problems; the implementing agent fixes them.
+
+## Rules
+
+- **Don't change code, tests or specs.** Report findings only.
+- **Review only the change.** Review the files the change touched, as the implementing agent names them, or every uncommitted file if none are named: their diff, including new files, spec files and tests. Read enough of the surrounding code to judge each changed line. List problems in other files, or in code the change doesn't touch, as follow-ups. They don't affect the verdict.
+- **Cite the rule for every finding,** with its source. A preference no rule covers is at most a \`nit\`.
+- **Approve code that improves the project, even if it isn't perfect.**
+- If you're reviewing for the agent that implemented the change, follow only this skill. Don't start the project's lifecycle, change the spec or stop at stage 2.
+
+## Rules to review against
+
+When two conflict, the earlier one wins:
+
+1. **The project's own rules:** such as \`CONTRIBUTING.md\`, the user's own part of \`AGENTS.md\` or \`CLAUDE.md\`, and the linter and formatter configuration.
+2. **\`{{DOCS}}/developer-guidelines.md\`.** If it's missing, say so in the report.
+3. **The checklist below.**
+
+## Steps
+
+1. **Read the change.** Read the diff of the changed files, such as with \`git diff\`, and read new files in full. If a spec covers the change, read its \`spec.md\` in \`{{DOCS}}/specs/<name>/\`, so you can judge whether the code does what it says. If no spec covers it, such as a refactor, check that behaviour didn't change.
+2. **Run the checks first.** Run the project's formatter, linter, type checker and tests, using the commands in \`{{DOCS}}/stack.md\` or the project's own scripts, and record the real results. Each failure in the changed files, or caused by them, is a \`blocking\` finding. A failure only in other files is a follow-up. Don't review by hand what these tools already check.
+3. **Review against the rules.** Go through each changed file with the rules above and the checklist.
+4. **Run Claude Code's review, if you can.** If you're running in Claude Code and its built-in \`${BUILT_IN_REVIEW_SKILL_NAME}\` skill or command is available, run it on the current change at the level \`${BUILT_IN_REVIEW_LEVEL}\`, passing it explicitly, because with no level, it reuses the last level the user typed. Don't pass \`--fix\`, \`--comment\`, \`max\` or \`ultra\` unless the user asks. Add the findings you confirm, marked \`(claude-code)\`, and say in the report whether it ran. If it isn't available, say so in the report.
+5. **Confirm every finding.** Confirm each finding in the code, and drop any you can't confirm, rather than report a guess.
+6. **Report, and stop,** in the format below.
+
+## Checklist
+
+| Area | Look for |
+|---|---|
+| Correctness | It does what each changed requirement says, including errors and edge cases. Wrong conditions, off-by-one, missing null or empty cases, races |
+| Design | It fits the architecture and its dependency rules, with logic in the right layer |
+| SOLID | One reason to change per module, small interfaces, dependencies on abstractions where the project uses them. No abstraction with one implementation and no need |
+| KISS and YAGNI | The simplest design that meets the spec. No options, flags, layers or fallbacks nobody asked for |
+| DRY | Logic that already exists is reused, not copied. Search for existing helpers. Code that only looks alike can stay separate |
+| No hardcoded values | Magic numbers, strings, URLs, timeouts, limits and paths go in the project's constants, configuration or an existing named value, with units in the name |
+| Naming | Names from the domain, following the project's conventions. No vague names such as \`data\`, \`info\`, \`handler\`, \`Manager\` or \`Util\`. Booleans read as questions |
+| Errors | Handled at boundaries, where something can be done. No swallowed errors, and no catching only to log and rethrow |
+| Security | No secrets in code, tests or logs. Input validated at boundaries. No injection into shell commands, queries, paths or HTML |
+| Tests | Each changed behaviour is tested, and the tests check what the spec says. No skipped, deleted or weakened tests |
+| Comments and dead code | No comments restating the code. No unused code, imports or parameters, and no TODOs or stubs presented as finished |
+| Docs | Docs, help text and examples that the change makes wrong are updated |
+
+## Severity
+
+- **\`blocking\`:** a bug, a security problem, a failed check, or a change that doesn't meet the spec.
+- **\`should-fix\`:** a broken rule from the project's rules, the developer guidelines or the checklist.
+- **\`nit\`:** a matter of taste that no rule covers. Optional.
+
+## Report format
+
+\`\`\`markdown
+## Code review
+
+Checks: format passed, lint failed (1 error), types passed, tests passed (214)
+
+| Severity | Where | Rule (source) | Problem | Fix |
+|---|---|---|---|---|
+| blocking | \`src/session.ts:41\` | no-unused-vars (\`eslint.config.js\`) | \`oldToken\` is never used | Remove it |
+| should-fix | \`src/session.ts:18\` | No hardcoded values (\`developer-guidelines.md\`) | \`30000\` is an unnamed timeout | Use a named constant such as \`SESSION_TIMEOUT_MS\` |
+
+Follow-ups, not in this change: \`src/cache.ts:12\` uses the vague name \`info\`.
+
+Verdict: changes
+\`\`\`
+
+The verdict is \`approve\` when no \`blocking\` or \`should-fix\` findings remain, otherwise \`changes\`.
+`,
+  },
 ];
 
 const GENERATED_MARK = "generated-by: cclinic";
@@ -550,11 +634,12 @@ Any other reply, such as a question, isn't approval: answer it, and offer the op
 **3. Implement, test, and get it approved.** Use the \`implement-spec\` skill, with the \`write-code\` skill for all code. If the spec turns out to be wrong, go back to stage 2. Then, in this order:
 1. **Test it as QA.** Use the \`test-spec\` skill to test the change against the spec's \`verification.md\` and \`validation.md\`, even if the spec didn't change. If no spec covers the change, QA runs the project's full checks and reports that. If your tool can run a separate agent, run QA there, so the code isn't checked by the agent that wrote it. If you're running QA for the agent that implemented the change, follow only the \`test-spec\` skill. Don't start this lifecycle, change the spec or stop at stage 2.
 2. **Fix what fails.** For each failed test case or unmet acceptance criterion, decide whether the code, the test or the spec is wrong. Fix wrong code with the \`write-code\` skill and send it back to QA. Fix a wrong test the same way, so it checks what the spec says. If the spec is wrong, go back to stage 2. Never weaken a test to get a pass. QA runs at most 3 times for a change, counting every run, whatever was fixed. If the 3rd QA run still fails, stop: report what fails, show the preview if it can start, and don't ask for approval. The count starts again only after the user replies, such as approving a spec change or requesting a change.
-3. Report each requirement, the tests you ran and their real results, including the QA rounds.
-4. **Show a preview. Don't ask for approval until you've done this.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and check it. A server you start yourself doesn't count. If the file doesn't exist, set it up with the \`local-env\` skill. Give the user the link, simulator build or command to try. If there's nothing to run, or it can't start, say why.
-5. Ask the user to test it by hand, with steps for each \`manual\` test case QA didn't run. Ask the user to approve the implementation or request changes. If they request changes, make them, take them through QA again, show the preview again, and ask again.
+3. **Review the code.** Once QA passes, review the change with the \`${REVIEW_CODE_SKILL_NAME}\` skill, even if the spec didn't change, and name the files the change touched. If your tool can run a separate agent, run the review there. If you're reviewing for the agent that implemented the change, follow only the \`${REVIEW_CODE_SKILL_NAME}\` skill. Don't start this lifecycle, change the spec or stop at stage 2. Fix each \`blocking\` and \`should-fix\` finding with the \`write-code\` skill, without changing behaviour the spec doesn't ask to change, or say in the report why you think it's wrong. If a finding shows the spec is wrong, go back to stage 2. Report \`nit\` findings, and fix them only if the user asks. After fixing, run QA again, which counts toward its limit, then the review again. If the fixes need QA and the 3 QA runs are used up, stop: report the findings and the untested fixes, show the preview if it can start, and don't ask for approval. The review runs at most 3 times for a change, counting every run, and the count starts again only after the user replies. If the 3rd review still has \`blocking\` or \`should-fix\` findings, stop: report them, show the preview if it can start, and don't ask for approval.
+4. Report each requirement, the tests you ran and their real results, including the QA rounds, and the review: findings fixed, findings you disagreed with and why, \`nit\` findings and follow-ups left, and whether Claude Code's review ran.
+5. **Show a preview. Don't ask for approval until you've done this.** Run each \`start\` command in \`${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}\`, so the local environment includes this change, leave it running, and check it. A server you start yourself doesn't count. If the file doesn't exist, set it up with the \`local-env\` skill. Give the user the link, simulator build or command to try. If there's nothing to run, or it can't start, say why.
+6. Ask the user to test it by hand, with steps for each \`manual\` test case QA didn't run. Ask the user to approve the implementation or request changes. If they request changes, make them, take them through QA and the review again, show the preview again, and ask again.
 
-**4. Ask to commit.** Once the user approves the implementation, run \`cclinic tasks done <id>\` if it was a task, then ask whether to commit it. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and leave out review docs in \`${REVIEWS_FOLDER}/\` unless the user asks for them. Don't push unless asked. If they decline, leave the changes uncommitted.
+**4. Ask to commit.** Once the user approves the implementation, run \`cclinic tasks done <id>\` if it was a task, state any \`blocking\` or \`should-fix\` review finding that's still open, then ask whether to commit it. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and leave out review docs in \`${REVIEWS_FOLDER}/\` unless the user asks for them. Don't push unless asked. If they decline, leave the changes uncommitted.
 
 If the user tells you to skip a stage, do as they ask, and say which stage was skipped. If \`{{DOCS}}\` doesn't exist, ask the user to run \`cclinic\` first. If nobody can answer, as in an unattended run, stop at stage 2 and report the spec, because silence isn't approval.`;
 

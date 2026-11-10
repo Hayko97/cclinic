@@ -20,9 +20,10 @@ const skill = (name: string): AgentSkill => {
   return found;
 };
 const render = (name: string): string => renderSkill(skill(name), ".cclinic/sdd", hash);
+const CLAUDE_CODE_STEP = /4\. \*\*Run Claude Code's review[^\n]*\n/;
 
 describe("skill format", () => {
-  it("TC-SKILL-040: provides the eight skills", () => {
+  it("TC-SKILL-040: provides the nine skills", () => {
     expect(AGENT_SKILLS.map((item) => item.name)).toEqual([
       "create-spec",
       "refine-spec",
@@ -32,6 +33,7 @@ describe("skill format", () => {
       "local-env",
       "product-engineer",
       "review-doc",
+      "review-code",
     ]);
   });
 
@@ -106,7 +108,7 @@ describe("protecting existing work", () => {
 
 describe("skill content", () => {
   it.each(AGENT_SKILLS.map((item) => item.name))("TC-SKILL-024: %s names no specific agent or stack", (name) => {
-    const body = skill(name).body;
+    const body = skill(name).body.replace(CLAUDE_CODE_STEP, "");
     for (const word of [
       "Claude",
       "Codex",
@@ -250,7 +252,9 @@ describe("agent workflow", () => {
     expect(order.every((position) => position >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((left, right) => left - right));
     expect(body).toContain("Never push unless the user asks");
-    expect(body).toContain("State any test that failed or wasn't run before asking");
+    expect(body).toContain(
+      "State any test that failed or wasn't run, and any `blocking` or `should-fix` finding still open, before asking",
+    );
     expect(body).not.toContain("Don't commit or push unless");
   });
 
@@ -274,7 +278,7 @@ describe("agent workflow", () => {
       "separate agent",
       "Never weaken a test",
       "`manual` test case",
-      "through QA again, show the preview again, and ask again",
+      "through QA and the review again, show the preview again, and ask again",
     ]) {
       expect(stage3).toContain(text);
     }
@@ -287,10 +291,7 @@ describe("agent workflow", () => {
   });
 
   it("TC-INSTR-038, TC-INSTR-039: wrong tests get fixed, and every QA run counts toward the limit", () => {
-    const step = workflow.slice(
-      workflow.indexOf("**Fix what fails.**"),
-      workflow.indexOf("3. Report each requirement"),
-    );
+    const step = workflow.slice(workflow.indexOf("**Fix what fails.**"), workflow.indexOf("3. **Review the code.**"));
     for (const text of [
       "Fix a wrong test the same way, so it checks what the spec says",
       "Never weaken a test",
@@ -524,5 +525,233 @@ describe("review doc", () => {
     for (const text of ["- **`approve`:**", "- **`refine`:**", "- **`review-doc`:** use the `review-doc` skill"]) {
       expect(step).toContain(text);
     }
+  });
+});
+
+describe("code review", () => {
+  const reviewer = render("review-code");
+  const stage3 = AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf("**3. Implement"), AGENT_WORKFLOW.indexOf("**4. Ask"));
+  const reviewStep = stage3.slice(stage3.indexOf("**Review the code.**"), stage3.indexOf("4. Report each requirement"));
+  const at = (text: string, within = reviewer): number => {
+    const found = within.indexOf(text);
+    expect(found, text).toBeGreaterThan(-1);
+    return found;
+  };
+
+  it("TC-CREV-002: the skill is review-code, so Claude Code's own code-review isn't hidden", () => {
+    const names = AGENT_SKILLS.map((item) => item.name);
+    expect(names).toContain("review-code");
+    expect(names).not.toContain("code-review");
+  });
+
+  it("TC-CREV-004: only the optional Claude Code step names Claude Code", () => {
+    expect(reviewer).toMatch(CLAUDE_CODE_STEP);
+    const outside = reviewer.replace(CLAUDE_CODE_STEP, "");
+    expect(outside).not.toContain("Claude Code");
+    expect(outside).not.toMatch(/\b(Codex|Cursor|Copilot|Gemini)\b/);
+  });
+
+  it("TC-CREV-005: rule sources are the project's, then the guidelines, then the checklist", () => {
+    const order = [
+      "**The project's own rules:**",
+      "`.cclinic/sdd/developer-guidelines.md`",
+      "**The checklist below.**",
+    ].map((text) => at(text));
+    expect(order).toEqual([...order].sort((left, right) => left - right));
+    at("When two conflict, the earlier one wins");
+    at("Cite the rule for every finding");
+    expect(renderSkill(skill("review-code"), "docs/specs-home", hash)).toContain(
+      "`docs/specs-home/developer-guidelines.md`",
+    );
+  });
+
+  it("TC-CREV-006: the checklist covers the agreed areas", () => {
+    const checklist = reviewer.slice(at("## Checklist"), at("## Severity"));
+    for (const area of [
+      "Correctness",
+      "Design",
+      "SOLID",
+      "KISS and YAGNI",
+      "DRY",
+      "No hardcoded values",
+      "constants",
+      "Naming",
+      "Errors",
+      "Security",
+      "Tests",
+      "Comments and dead code",
+      "Docs",
+    ]) {
+      expect(checklist).toContain(area);
+    }
+  });
+
+  it("TC-CREV-007: reviews only the changed files, and lists the rest as follow-ups", () => {
+    at(
+      "Review the files the change touched, as the implementing agent names them, or every uncommitted file if none are named: their diff, including new files, spec files and tests",
+    );
+    at("Read enough of the surrounding code to judge each changed line");
+    at(
+      "List problems in other files, or in code the change doesn't touch, as follow-ups. They don't affect the verdict",
+    );
+  });
+
+  it("TC-CREV-008: runs the project's checks first, and a failure is blocking", () => {
+    const step = reviewer.slice(at("2. **Run the checks first.**"), at("3. **Review against the rules.**"));
+    for (const text of [
+      "formatter, linter, type checker and tests",
+      "Each failure in the changed files, or caused by them, is a `blocking` finding",
+      "A failure only in other files is a follow-up",
+    ]) {
+      expect(step).toContain(text);
+    }
+  });
+
+  it("TC-CREV-009: defines the severities and what each finding contains", () => {
+    const severity = reviewer.slice(at("## Severity"), at("## Report format"));
+    expect(severity.match(/^- \*\*`[a-z-]+`:\*\*/gm)).toEqual([
+      "- **`blocking`:**",
+      "- **`should-fix`:**",
+      "- **`nit`:**",
+    ]);
+    at("| Severity | Where | Rule (source) | Problem | Fix |");
+  });
+
+  it("TC-CREV-010: runs Claude Code's code-review at an explicit medium level, without fixing or posting", () => {
+    const step = reviewer.slice(at("**Run Claude Code's review"), at("5. **Confirm every finding.**"));
+    for (const text of [
+      "built-in `code-review`",
+      "at the level `medium`, passing it explicitly",
+      "with no level, it reuses the last level the user typed",
+      "Don't pass `--fix`, `--comment`, `max` or `ultra` unless the user asks",
+      "If it isn't available, say so in the report",
+    ]) {
+      expect(step).toContain(text);
+    }
+  });
+
+  it("TC-CREV-011: confirms each finding, and drops what it can't confirm", () => {
+    at("Confirm each finding in the code, and drop any you can't confirm, rather than report a guess");
+  });
+
+  it("TC-CREV-012: changes nothing, and ends with a report and a verdict", () => {
+    at("**Don't change code, tests or specs.**");
+    at("The verdict is `approve` when no `blocking` or `should-fix` findings remain, otherwise `changes`");
+  });
+
+  it("TC-CREV-013: stage 3 reviews after QA and before the preview", () => {
+    const order = ["**Test it as QA.**", "**Fix what fails.**", "**Review the code.**", "**Show a preview."].map(
+      (text) => at(text, stage3),
+    );
+    expect(order).toEqual([...order].sort((left, right) => left - right));
+    for (const text of ["`review-code` skill", "even if the spec didn't change", "separate agent"]) {
+      expect(reviewStep).toContain(text);
+    }
+  });
+
+  it("TC-CREV-014: findings are fixed with write-code, disputed with a reason, or sent back to the spec", () => {
+    for (const text of [
+      "Fix each `blocking` and `should-fix` finding with the `write-code` skill, without changing behaviour the spec doesn't ask to change",
+      "or say in the report why you think it's wrong",
+      "If a finding shows the spec is wrong, go back to stage 2",
+      "Report `nit` findings, and fix them only if the user asks",
+    ]) {
+      expect(reviewStep).toContain(text);
+    }
+  });
+
+  it("TC-CREV-015: fixes go back through QA and review, at most 3 reviews", () => {
+    for (const text of [
+      "run QA again, which counts toward its limit, then the review again",
+      "If the fixes need QA and the 3 QA runs are used up, stop: report the findings and the untested fixes, show the preview if it can start, and don't ask for approval",
+      "The review runs at most 3 times for a change, counting every run",
+      "the count starts again only after the user replies",
+    ]) {
+      expect(reviewStep).toContain(text);
+    }
+  });
+
+  it("TC-CREV-016: after the 3rd failing review, it stops without asking for approval", () => {
+    expect(reviewStep).toContain(
+      "If the 3rd review still has `blocking` or `should-fix` findings, stop: report them, show the preview if it can start, and don't ask for approval",
+    );
+  });
+
+  it("TC-CREV-017: the report includes the review", () => {
+    const report = stage3.slice(at("4. Report each requirement", stage3), at("**Show a preview.", stage3));
+    for (const text of [
+      "findings fixed",
+      "findings you disagreed with and why",
+      "`nit` findings and follow-ups left",
+      "whether Claude Code's review ran",
+    ]) {
+      expect(report).toContain(text);
+    }
+  });
+
+  it("TC-CREV-018: open findings are stated before the commit question", () => {
+    const stage4 = AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf("**4. Ask"));
+    expect(stage4.indexOf("state any `blocking` or `should-fix` review finding that's still open")).toBeGreaterThan(-1);
+    expect(stage4.indexOf("state any `blocking` or `should-fix` review finding that's still open")).toBeLessThan(
+      stage4.indexOf("ask whether to commit it"),
+    );
+  });
+
+  it("TC-CREV-019: a review run for the implementing agent only follows review-code", () => {
+    expect(reviewStep).toContain(
+      "If you're reviewing for the agent that implemented the change, follow only the `review-code` skill. Don't start this lifecycle, change the spec or stop at stage 2.",
+    );
+    at("If you're reviewing for the agent that implemented the change, follow only this skill");
+  });
+
+  it("TC-CREV-020: implement-spec has the same review step, after QA", () => {
+    const body = skill("implement-spec").body;
+    const order = ["Hand it to QA", "Review the code", "Update the spec", "Show how to review it"].map((text) =>
+      at(text, body),
+    );
+    expect(order).toEqual([...order].sort((left, right) => left - right));
+    const step = body.slice(at("Review the code", body), at("Update the spec", body));
+    for (const text of [
+      "`review-code` skill",
+      "with `write-code`",
+      "run QA again, then the review again",
+      "If the fixes need QA and the 3 QA runs are used up, stop: report the findings and the untested fixes",
+      "instead of asking for approval",
+      "at most 3 times for a change",
+      "If the 3rd review still has `blocking` or `should-fix` findings, stop",
+      "without changing behaviour the spec doesn't ask to change",
+      "say in the report why you think it's wrong",
+      "If a finding shows the spec is wrong, stop and use the `refine-spec` skill",
+      "Fix `nit` findings only if the user asks",
+      "the count starts again only after the user replies",
+    ]) {
+      expect(step).toContain(text);
+    }
+    const report = body.slice(at("Report and ask for review", body), at("Ask to commit", body));
+    expect(report).toContain("the review findings fixed, disputed and left");
+    expect(report, "FR-CREV-016: whether the built-in review ran").toMatch(/review ran/);
+  });
+
+  it("TC-CREV-021: the section with the review step stays under 200 lines", () => {
+    const block = renderAgentsBlock(".cclinic/sdd");
+    expect(block.split("\n").length).toBeLessThan(200);
+    expect(block).toContain("| `review-code` |");
+  });
+
+  it("TC-CREV-030: changes the user requests go through QA and the review again", () => {
+    expect(stage3).toContain(
+      "If they request changes, make them, take them through QA and the review again, show the preview again, and ask again",
+    );
+    expect(skill("implement-spec").body).toContain(
+      "If they request changes, make them, run QA and the review again, show how to review it again, and ask again",
+    );
+  });
+
+  it("TC-CREV-031: the reviewer is told which files the change touched", () => {
+    expect(reviewStep).toContain("and name the files the change touched");
+    const body = skill("implement-spec").body;
+    expect(body.slice(at("Review the code", body), at("Update the spec", body))).toContain(
+      "naming the files the change touched",
+    );
   });
 });

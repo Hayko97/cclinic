@@ -4,7 +4,7 @@
 
 Install marked AGENTS.md and CLAUDE.md sections into a target project so coding agents follow a spec-first lifecycle (open-task check, prompt, spec approval with an optional visual review doc, implementation approval, optional commit), without disturbing the user's own instructions or triggering reprocessing by cclinic.
 
-Stage 3 also requires a QA pass against the spec's test cases and acceptance criteria, fixing and re-testing until it passes, then a preview for the user to test by hand before asking for approval. For the preview, see FR-ENV-027 in [local-environment](../local-environment/spec.md).
+Stage 3 also requires a QA pass against the spec's test cases and acceptance criteria, fixing and re-testing until it passes, then a code review against the project's coding guidelines (see [code-review](../code-review/spec.md)), then a preview for the user to test by hand before asking for approval. For the preview, see FR-ENV-027 in [local-environment](../local-environment/spec.md).
 
 ## Requirements
 

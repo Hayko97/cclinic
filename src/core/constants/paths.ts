@@ -9,6 +9,11 @@ export const TASKS_DB_FILE = "tasks.db";
 /** Visual review docs written by the review-doc skill, outside the documents folder (FR-SKILL-033). */
 export const REVIEWS_FOLDER = `${TOOL_FOLDER_NAME}/reviews`;
 export const REVIEW_DOC_SKILL_NAME = "review-doc";
+/** Not "code-review", so a project skill doesn't hide Claude Code's built-in one (FR-CREV-001). */
+export const REVIEW_CODE_SKILL_NAME = "review-code";
+export const BUILT_IN_REVIEW_SKILL_NAME = "code-review";
+/** Passed explicitly: with no level, the built-in review reuses the last one the user typed, such as max (FR-CREV-008). */
+export const BUILT_IN_REVIEW_LEVEL = "medium";
 export const TEMP_FOLDER_SUFFIX = ".cclinic-tmp-";
 export const BACKUP_FOLDER_SUFFIX = ".cclinic-old-";
 

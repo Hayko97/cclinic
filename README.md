@@ -69,18 +69,19 @@ Run `cclinic guide` for the full walkthrough, or `cclinic --help` for every opti
 
 ## Skills for your coding agent
 
-`cclinic` also installs eight skills, so your coding agent can work from these documents:
+`cclinic` also installs nine skills, so your coding agent can work from these documents:
 
-| Skill              | Use it to                                                             |
-| ------------------ | --------------------------------------------------------------------- |
-| `create-spec`      | Write a new spec for a new capability                                 |
-| `refine-spec`      | Improve an existing spec, and resolve its open questions              |
-| `write-code`       | Write code that fits your stack and guidelines, as a maintainer would |
-| `implement-spec`   | Build a spec requirement by requirement, and prove that it works      |
-| `test-spec`        | Act as QA: automate the test cases, run them, and report defects      |
-| `local-env`        | Set up a local environment, and show how to review each change        |
-| `product-engineer` | Ask what you want to build, and plan it as a roadmap of tasks         |
-| `review-doc`       | Show, with diagrams and mockups, how a spec change will work and look |
+| Skill              | Use it to                                                                  |
+| ------------------ | -------------------------------------------------------------------------- |
+| `create-spec`      | Write a new spec for a new capability                                      |
+| `refine-spec`      | Improve an existing spec, and resolve its open questions                   |
+| `write-code`       | Write code that fits your stack and guidelines, as a maintainer would      |
+| `implement-spec`   | Build a spec requirement by requirement, and prove that it works           |
+| `test-spec`        | Act as QA: automate the test cases, run them, and report defects           |
+| `local-env`        | Set up a local environment, and show how to review each change             |
+| `product-engineer` | Ask what you want to build, and plan it as a roadmap of tasks              |
+| `review-doc`       | Show, with diagrams and mockups, how a spec change will work and look      |
+| `review-code`      | Review a change against your coding rules and guidelines before you see it |
 
 Planned milestones and tasks are kept in `.cclinic/tasks.db`, and read and changed with `cclinic tasks` (`list`, `roadmap`, `add`, `show`, `start`, `done`, `remove`, `milestone add|remove`, each with `--json` and `-C <folder>`). On every prompt, your agent checks for open tasks, and asks whether to work on one, remove it, or keep it and carry on.
 
@@ -94,7 +95,7 @@ They're installed in `.agents/skills/` (Codex, Cursor, GitHub Copilot, Gemini CL
 
 1. **Prompt:** it analyses your request, and finds the spec. A question just gets an answer.
 2. **Spec:** it refines or creates the spec, and asks you to approve or reject it. No production code changes before you approve.
-3. **Implement:** it builds and tests, shows you a way to try the change, such as a link or a simulator build, and asks you to approve it or request changes.
+3. **Implement:** it builds and tests, reviews the code against your rules and `developer-guidelines.md` (and with Claude Code's `/code-review` in Claude Code), fixes what the review finds, shows you a way to try the change, such as a link or a simulator build, and asks you to approve it or request changes.
 4. **Commit:** once you approve, it asks whether to commit. It never pushes on its own.
 
 These files are guidance, so an agent can still fail to follow them.
