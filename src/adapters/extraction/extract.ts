@@ -4,7 +4,9 @@ import { readFile } from "node:fs/promises";
 import { stripManagedSection } from "../../core/agent-skills.js";
 import { MIN_PDF_CHARS_PER_PAGE } from "../../core/constants/limits.js";
 import { MANAGED_INSTRUCTION_FILES } from "../../core/constants/paths.js";
+import { MCP_CONFIG_FILE } from "../../core/constants/workflow.js";
 import { extensionOf } from "../../core/exclusion-rules.js";
+import { stripCclinicServer } from "../../core/mcp-config.js";
 import type { ContentExtractor, ExtractedFile, ScannedFile, TextUnit } from "../../core/ports.js";
 
 const START_HEADING = "(start)";
@@ -144,7 +146,9 @@ export function createExtractor(): ContentExtractor {
       // cclinic adds a section to these files, which must not count as a project change.
       const bytes = MANAGED_INSTRUCTION_FILES.includes(file.path)
         ? Buffer.from(stripManagedSection(original.toString("utf8")))
-        : original;
+        : file.path === MCP_CONFIG_FILE
+          ? Buffer.from(stripCclinicServer(original.toString("utf8")))
+          : original;
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       try {
         switch (extensionOf(file.path)) {

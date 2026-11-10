@@ -50,7 +50,8 @@ export function projectPaths(target: string, out: string | undefined): ProjectPa
   };
 }
 
-async function ensureIgnoredFolder(folder: string): Promise<void> {
+/** Creates the folder with a `.gitignore` that keeps everything in it out of Git. */
+export async function ensureIgnoredFolder(folder: string): Promise<void> {
   await mkdir(folder, { recursive: true });
   const gitignore = path.join(folder, GITIGNORE_FILE);
   if (!(await exists(gitignore))) await writeFile(gitignore, "*\n");

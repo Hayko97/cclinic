@@ -37,6 +37,13 @@ module.exports = {
       from: { pathNot: "^src/adapters/llm/anthropic-api" },
       to: { path: "node_modules/@anthropic-ai/sdk" },
     },
+    {
+      name: "mcp-sdk-only-in-mcp-adapter",
+      severity: "error",
+      from: { pathNot: "^src/adapters/mcp/" },
+      // The SDK's subpath imports go through its exports map, which depcruise leaves unresolved, so match the name too.
+      to: { path: "(^|node_modules/)@modelcontextprotocol/sdk" },
+    },
     { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
   ],
   options: {

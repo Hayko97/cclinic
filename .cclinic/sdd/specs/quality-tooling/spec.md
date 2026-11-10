@@ -28,6 +28,7 @@ Enforce architecture, lint, types, coverage, mutation testing and test infrastru
 | FR-QUAL-018 | Parser contract tests must use recorded real claude output fixtures for success, budget exhaustion and invalid model. | confirmed | `test/fixtures/recorded-cli-output/success.jsonl:1-2`, `test/fixtures/recorded-cli-output/budget.jsonl:1`, `test/fixtures/recorded-cli-output/invalid-model.jsonl:1`, `sdd/developer-guidelines.md:297` |
 | FR-QUAL-019 | The fake claude must support failure modes (fail-after-1, hang, slow, invalid-model, auth-error, invalid-output, usage-limit, retry-events) selected by FAKE_CLAUDE_MODE and record each call. | code-only | `test/fixtures/fake-claude/claude:1-117`, `test/fixtures/fake-claude/claude:27-35` |
 | FR-QUAL-020 | The build must bundle src/cli/main.ts into a single ESM dist/main.js with sourcemaps, launched by bin/cclinic.js. | code-only | `tsup.config.ts:3-11`, `package.json:10-12`, `package.json:21` |
+| FR-QUAL-021 | The architecture check must fail when `@modelcontextprotocol/sdk` is imported from anywhere other than `src/adapters/mcp/`. | confirmed | `.dependency-cruiser.cjs`, `test/integration/mcp-server.test.ts`, `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-006, `user request` |
 
 ## Edge cases
 

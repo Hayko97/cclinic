@@ -17,3 +17,4 @@ Acceptance criteria from the user's point of view.
 | VAL-CLI-011 | FR-CLI-023, FR-CLI-024 | Be protected from running on the wrong or huge folder. | Home, root or oversized projects stop before sending, with an explanation of how to proceed deliberately. |
 | VAL-CLI-012 | FR-CLI-019 | Learn the workflow from the terminal. | cclinic guide works offline and covers steps, commands, skills, limits and exit codes. |
 | VAL-CLI-013 | FR-CLI-026, FR-CLI-027 | Set a default model and install agent skills from the CLI. | model lists, sets and resets the default, and skills installs the skills without Claude usage. |
+| VAL-CLI-014 | FR-CLI-028, FR-CLI-029 | I can run the MCP server and answer approvals from a terminal | `cclinic mcp` starts the server, and `cclinic approve` shows what's waiting and records my answer, but only when I run it myself in a terminal |

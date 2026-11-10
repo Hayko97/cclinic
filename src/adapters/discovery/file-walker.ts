@@ -6,6 +6,7 @@ import { stripManagedSection } from "../../core/agent-skills.js";
 import { BINARY_DOCUMENT_EXTENSIONS, REASONS } from "../../core/constants/discovery.js";
 import { BINARY_SNIFF_BYTES, BYTES_PER_MIB, MAX_DOCUMENT_BYTES } from "../../core/constants/limits.js";
 import { CCLINIC_IGNORE_FILE, GITIGNORE_FILE, MANAGED_INSTRUCTION_FILES } from "../../core/constants/paths.js";
+import { MCP_CONFIG_FILE } from "../../core/constants/workflow.js";
 import {
   classifyFile,
   evaluatePath,
@@ -15,6 +16,7 @@ import {
   looksBundled,
   type RuleContext,
 } from "../../core/exclusion-rules.js";
+import { holdsOnlyCclinicServer } from "../../core/mcp-config.js";
 import type { ScanResult, ScannedFile, SkippedEntry } from "../../core/ports.js";
 
 export interface ScanOptions {
@@ -84,6 +86,11 @@ async function holdsOnlyCclinicSection(file: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** FR-MCP-042: a `.mcp.json` cclinic created, with only its own server in it. */
+async function holdsOnlyCclinicMcpServer(file: string): Promise<boolean> {
+  return holdsOnlyCclinicServer(await readFile(file, "utf8").catch(() => ""));
 }
 
 /** The scan's rules for a path that may not exist any more, such as one named in Git history (FR-GIT-015). */
@@ -197,6 +204,7 @@ export async function scanFolder(options: ScanOptions): Promise<ScanResult> {
       }
       if (!entry.isFile()) continue;
       if (MANAGED_INSTRUCTION_FILES.includes(relative) && (await holdsOnlyCclinicSection(absolute))) continue;
+      if (relative === MCP_CONFIG_FILE && (await holdsOnlyCclinicMcpServer(absolute))) continue;
       const decision = evaluatePath(relative, false, context);
       if (decision.keep) await inspectFile(relative, absolute, decision.forced);
       else skipped.push({ path: relative, reason: decision.reason });

@@ -1,5 +1,6 @@
 /** Values for Git setup and history (FR-GIT-024). */
 import { MANAGED_INSTRUCTION_FILES, SKILL_FOLDERS, TOOL_FOLDER_NAME } from "./paths.js";
+import { MCP_CONFIG_FILE } from "./workflow.js";
 
 export const GIT_COMMAND = "git";
 export const GIT_FOLDER = ".git";
@@ -18,6 +19,7 @@ export const HISTORY_EXCLUDED_PATHS: readonly string[] = [
   TOOL_FOLDER_NAME,
   ...SKILL_FOLDERS.map((folder) => folder.slice(0, folder.indexOf("/"))),
   ...MANAGED_INSTRUCTION_FILES,
+  MCP_CONFIG_FILE,
 ];
 
 /** Stops a scanned repository's settings from running programs (FR-GIT-023). */
@@ -47,3 +49,6 @@ export const REMOTE_PROVIDER_LINKS: readonly string[] = [
 ];
 
 export const GIT_INSTALL_LINK = "https://git-scm.com/downloads";
+
+/** `git status --porcelain` puts two status letters and a space before each path. */
+export const PORCELAIN_PATH_START = 3;

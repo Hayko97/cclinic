@@ -778,3 +778,38 @@ describe("code review", () => {
     );
   });
 });
+
+describe("the cclinic MCP tools in the workflow", () => {
+  const block = renderAgentsBlock(".cclinic/sdd");
+
+  it("TC-INSTR-056: tells agents to call workflow_status first and use the tools, or the written steps without them", () => {
+    expect(block).toContain("call `workflow_status` at the start of each prompt");
+    for (const tool of [
+      "tasks_list",
+      "workflow_begin",
+      "task_start",
+      "workflow_advance",
+      "qa_report",
+      "review_report",
+      "preview_start",
+    ])
+      expect(block).toContain(`\`${tool}\``);
+    expect(block).toContain("Without the tools, follow the steps below.");
+  });
+
+  it("TC-INSTR-057: tells agents never to approve for the user, and to report a refused step", () => {
+    expect(block).toContain("Never answer an approval question yourself, and never run `cclinic approve`");
+    expect(block).toContain("When a tool refuses a step, tell the user why");
+  });
+
+  it("TC-INSTR-058: stays under 200 lines with the MCP lines", () => {
+    expect(block.split("\n").length).toBeLessThan(200);
+  });
+
+  it("TC-CREV-034: tells agents to report each review with review_report, in AGENTS.md and implement-spec", () => {
+    expect(block).toContain("`review_report` after each review, with its verdict and findings by severity");
+    expect(skill("implement-spec").body).toContain(
+      "report each review with `review_report`, with its verdict and findings by severity",
+    );
+  });
+});

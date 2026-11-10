@@ -5,6 +5,7 @@ import { AUTO_LIMITS, PLAN_LIMITS } from "../core/constants/agents.js";
 import { LIMITS, SHUTDOWN_TIMEOUT_MS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ARGV_OFFSET } from "../core/constants/terminal.js";
+import { APPROVERS } from "../core/workflow.js";
 import {
   EXIT_CODES,
   exitCodeFor,
@@ -22,6 +23,7 @@ import { runClean, runDoctor, runModelCommand, runSkillsCommand, type SkillsComm
 import { createReporter, type ColorMode, type Reporter } from "./reporter.js";
 import { runAutoCommand, type AutoOptions } from "./auto-command.js";
 import { runPlanCommand, type PlanOptions } from "./plan-command.js";
+import { runApproveCommand, runMcpCommand, type McpOptions } from "./mcp-command.js";
 import { addTasksCommand } from "./tasks-command.js";
 
 const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
@@ -223,6 +225,30 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     )
     .action(async (options: AutoOptions) => {
       setExit(await runAutoCommand(options, context));
+    });
+
+  program
+    .command("mcp")
+    .description("Run the MCP server that coding agents use for each change. Your agent starts it")
+    .option("-C, --dir <path>", "project folder (default: the current folder)")
+    .addOption(
+      new Option("--approver <who>", "who answers the approval gates").argParser(oneOf(APPROVERS)).default("user"),
+    )
+    .option("--run <id>", "with --approver pm-agent: the automated run")
+    .option("--task <id>", "with --approver pm-agent: the task", positiveId)
+    .option("--max-budget-usd <n>", "with --approver pm-agent: the most this task may spend", positiveNumber)
+    .addHelpText("after", commandHelp("cclinic mcp", "cclinic mcp -C ./my-project"))
+    .action(async (options: McpOptions) => {
+      await runMcpCommand(options, context);
+    });
+
+  program
+    .command("approve")
+    .description("Answer an approval question the MCP server is waiting on, in your own terminal")
+    .argument("[path]", "project folder (default: the current folder)")
+    .addHelpText("after", commandHelp("cclinic approve", "cclinic approve ./my-project"))
+    .action(async (given: string | undefined) => {
+      await runApproveCommand(given, context);
     });
 
   program

@@ -17,7 +17,14 @@ import {
   PREFERRED_REMOTE,
 } from "../../core/constants/git.js";
 import { GITIGNORE_FILE } from "../../core/constants/paths.js";
-import { GIT_LOG_FORMAT, parseGitLog, remoteHost, type GitCommit, type GitStatus } from "../../core/git-history.js";
+import {
+  GIT_LOG_FORMAT,
+  parseGitLog,
+  parsePorcelainPaths,
+  remoteHost,
+  type GitCommit,
+  type GitStatus,
+} from "../../core/git-history.js";
 
 export interface GitOptions {
   readonly environment: NodeJS.ProcessEnv;
@@ -174,4 +181,17 @@ export async function readRawHistory(target: string, options: HistoryOptions): P
 
 export async function hasGitignore(folder: string): Promise<boolean> {
   return pathExists(path.join(folder, GITIGNORE_FILE));
+}
+
+/** The checked-out branch, or undefined outside a repository or on a detached HEAD (FR-MCP-038). */
+export async function readCurrentBranch(target: string, options: GitOptions): Promise<string | undefined> {
+  const outcome = await runGit(["symbolic-ref", "--quiet", "--short", "HEAD"], target, options);
+  const branch = outcome.stdout.trim();
+  return outcome.isOk && branch !== "" ? branch : undefined;
+}
+
+/** Uncommitted files, new ones included, relative to the repository (FR-MCP-014). */
+export async function listChangedFiles(target: string, options: GitOptions): Promise<readonly string[]> {
+  const outcome = await runGit(["status", "--porcelain", "--untracked-files=all", "-z"], target, options);
+  return outcome.isOk ? parsePorcelainPaths(outcome.stdout) : [];
 }

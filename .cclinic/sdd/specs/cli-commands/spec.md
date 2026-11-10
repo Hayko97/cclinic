@@ -37,6 +37,8 @@ Provide the cclinic command-line interface with commands, options, limits, confi
 | FR-CLI-025 | The CLI must not send telemetry and must connect only to the chosen Anthropic provider and, for doctor, to npm. | confirmed | `sdd/specs/cli/spec.md:112`, `sdd/specs/cli/validation.md:20`, `sdd/specs/cli/verification.md:57-58` |
 | FR-CLI-026 | `cclinic model` must list, choose or reset the saved default model and reasoning level. | confirmed | `sdd/specs/cli/spec.md:11`, `src/cli/main.ts:132-141`, `src/cli/other-commands.ts:32-74` |
 | FR-CLI-027 | `cclinic skills [path]` must install the agent skills without using any LLM, supporting --out, --force and --json. | confirmed | `sdd/specs/cli/spec.md:13`, `src/cli/main.ts:153-163` |
+| FR-CLI-028 | The CLI must provide `cclinic mcp`, which starts the MCP server as the [mcp-server](../mcp-server/spec.md) spec describes, accepting `-C, --dir`, `--approver`, `--run`, `--task` and `--max-budget-usd`. | confirmed | `src/cli/mcp-command.ts`, `src/cli/main.ts`, `test/e2e/mcp.test.ts`, `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-001, FR-MCP-002, `user request` |
+| FR-CLI-029 | The CLI must provide `cclinic approve [path]`, which lists the gate questions waiting in the project's workflow state, lets the user choose an answer for one, and records it with approver `user`. With no question waiting it must say so and exit 0. Without a TTY it must exit 2 and record nothing. | confirmed | `src/cli/mcp-command.ts`, `test/e2e/mcp.test.ts`, `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-029, `user request` |
 
 ## Edge cases
 

@@ -34,7 +34,7 @@ describe("installing", () => {
       expect(readFileSync(path.join(root, ".claude/skills", name, "SKILL.md"), "utf8")).toBe(shared);
       expect(shared).toContain(`name: ${name}\n`);
     }
-    expect(entries).toHaveLength(AGENT_SKILLS.length * 2 + 2);
+    expect(entries).toHaveLength(AGENT_SKILLS.length * 2 + 3);
     expect(entries.every((entry) => entry.status === "installed")).toBe(true);
     await expect(hasInstalledSkills(root)).resolves.toBe(true);
     await expect(hasInstalledSkills(makeTempFolder())).resolves.toBe(false);
@@ -54,8 +54,8 @@ describe("installing", () => {
 
   it("TC-SKILL-010: the summary counts each outcome", async () => {
     const root = makeTempFolder();
-    expect(summarizeInstall(await install(root))).toContain("20 installed");
-    expect(summarizeInstall(await install(root))).toContain("20 unchanged");
+    expect(summarizeInstall(await install(root))).toContain("21 installed");
+    expect(summarizeInstall(await install(root))).toContain("21 unchanged");
     writeFileSync(path.join(root, AGENTS_COPY), "mine");
     expect(summarizeInstall(await install(root))).toContain("1 skipped");
   });

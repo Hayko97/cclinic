@@ -1,5 +1,11 @@
 /** Pure logic for Git status and history (spec: git-setup). The Git commands themselves are in adapters/git. */
-import { HISTORY_WINDOW_DAYS, MAX_HISTORY_CHARS, MAX_HISTORY_COMMITS, REMOTE_PROVIDER_LINKS } from "./constants/git.js";
+import {
+  HISTORY_WINDOW_DAYS,
+  MAX_HISTORY_CHARS,
+  MAX_HISTORY_COMMITS,
+  PORCELAIN_PATH_START,
+  REMOTE_PROVIDER_LINKS,
+} from "./constants/git.js";
 import { redact } from "./redaction.js";
 
 export interface GitRemote {
@@ -32,6 +38,19 @@ const FIELD_SEPARATOR = "\u001f";
 
 /** The `git log` format that parseGitLog reads. */
 export const GIT_LOG_FORMAT = "--format=%x1e%h%x1f%ad%x1f%B%x1f";
+
+/** The changed paths in `git status --porcelain -z` output (FR-MCP-014). */
+export function parsePorcelainPaths(output: string): readonly string[] {
+  const entries = output.split("\0").filter((entry) => entry !== "");
+  const paths: string[] = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index] ?? "";
+    paths.push(entry.slice(PORCELAIN_PATH_START));
+    // A rename or copy, in the index or the worktree, is followed by its old path, which isn't a change of its own.
+    if (/^(R|C|.R|.C)/.test(entry)) index += 1;
+  }
+  return paths;
+}
 
 export function parseGitLog(output: string): GitCommit[] {
   return output

@@ -40,6 +40,8 @@ The review runs before the preview, not after the user approves, so the code the
 | FR-CREV-019 | The `implement-spec` skill must include the review step in the same place and with the same rules as the workflow (FR-CREV-012 to FR-CREV-016). Since it names no agent, it must report whether "the agent's built-in code review" ran. | confirmed | `src/core/agent-skills.ts:212`, `src/core/agent-skills.test.ts:730`, `user request` |
 | FR-CREV-020 | The `AGENTS.md` section, with the new step, must stay under 200 lines (FR-INSTR-010). | confirmed | `src/core/agent-skills.test.ts:758`, `user request` |
 | FR-CREV-021 | When the user requests changes after the preview, the workflow and the `implement-spec` skill must tell agents to make them, take them through QA and the review again, and show the preview again before asking again. | confirmed | `src/core/agent-skills.ts:629`, `src/core/agent-skills.ts:215`, `src/core/agent-skills.test.ts:764`, review-code run 1 finding, `user request` |
+| FR-CREV-022 | When the cclinic MCP server is present, the workflow must tell agents to report each review with `review_report`, giving its verdict and the findings by severity, so the server counts the reviews and requires QA after each fix (FR-MCP-021, FR-MCP-022). | confirmed | `src/core/agent-skills.ts`, `src/core/agent-skills.test.ts`, `.cclinic/sdd/specs/mcp-server/spec.md`, `user request` |
+| FR-CREV-023 | In auto mode, the review must be run by a reviewer agent the task server starts with this skill, not by the developer agent, and its JSON verdict must be `approve` or `changes` with the findings (FR-MCP-033). | docs-only | `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-033, `user request` |
 
 ## Changes to other specs
 
@@ -64,11 +66,11 @@ Adding a ninth skill changes these requirements, which must be updated with this
 - QA passes on its 3rd run, then the review finds a `should-fix`: the agent can fix it but can't run QA again, so it stops and reports, without asking for approval.
 - The user typed `/code-review max` earlier in the session: the review still runs Claude Code's review at `medium`.
 - A user who asked to skip the review: it's skipped, and the agent says the review stage was skipped.
-- Automated mode (`cclinic auto`): the developer agent follows `AGENTS.md`, so it runs the review too, and no human is asked.
+- Automated mode (`cclinic auto`): the task server starts a reviewer agent with this skill (FR-CREV-023), and no human is asked.
 
 ## Non-goals
 
-- cclinic running a reviewer itself, or enforcing the review with hooks or CI. It's guidance, like the rest of the workflow.
+- cclinic running a reviewer itself in manual mode, or enforcing the review with hooks or CI. In manual mode the review is guidance, checked by the MCP server when it's present. In auto mode the task server runs it (FR-CREV-023).
 - Posting review comments to a pull request or another remote service.
 - A new rules file or configuration for the review. The user sets rules in their own project files or in `developer-guidelines.md`.
 - Fixing problems in code the change doesn't touch.

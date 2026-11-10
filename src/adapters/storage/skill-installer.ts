@@ -11,6 +11,8 @@ import {
   renderSkill,
 } from "../../core/agent-skills.js";
 import { AGENTS_FILE, CLAUDE_FILE, SKILL_FILE, SKILL_FOLDERS } from "../../core/constants/paths.js";
+import { CODEX_MCP_CONFIG, MCP_CONFIG_FILE } from "../../core/constants/workflow.js";
+import { mergeMcpConfig } from "../../core/mcp-config.js";
 import { sha256 } from "./document-store.js";
 
 export type SkillStatus =
@@ -19,7 +21,8 @@ export type SkillStatus =
   | "unchanged"
   | "skipped: not created by cclinic"
   | "skipped: edited, use --force to replace"
-  | "skipped: damaged markers";
+  | "skipped: damaged markers"
+  | "skipped: not valid JSON";
 
 export interface SkillInstallEntry {
   readonly path: string;
@@ -65,6 +68,21 @@ async function installInstructionFile(file: string, section: string): Promise<Sk
   return existing === undefined ? "installed" : "updated";
 }
 
+/** FR-MCP-004: cclinic's server, next to every other one, and never over a cclinic entry the user changed. */
+async function installMcpConfig(file: string): Promise<SkillStatus> {
+  const merged = mergeMcpConfig(await readIfExists(file));
+  if ("content" in merged) {
+    await writeAtomically(file, merged.content);
+    return merged.status;
+  }
+  const statuses = {
+    kept: "skipped: not created by cclinic",
+    unreadable: "skipped: not valid JSON",
+    unchanged: "unchanged",
+  } as const;
+  return statuses[merged.status];
+}
+
 export interface InstallOptions {
   readonly target: string;
   readonly out: string;
@@ -99,6 +117,7 @@ export async function installSkills(options: InstallOptions): Promise<readonly S
     path: CLAUDE_FILE,
     status: await installInstructionFile(path.join(target, CLAUDE_FILE), renderClaudeBlock()),
   });
+  entries.push({ path: MCP_CONFIG_FILE, status: await installMcpConfig(path.join(target, MCP_CONFIG_FILE)) });
   return entries;
 }
 
@@ -112,7 +131,9 @@ export function summarizeInstall(entries: readonly SkillInstallEntry[]): string 
     .filter((label) => counts.has(label))
     .map((label) => `${counts.get(label) ?? 0} ${label}`)
     .join(", ");
-  return `Agent skills: ${summary}. Locations: ${SKILL_FOLDERS.join(", ")}, ${AGENTS_FILE}, ${CLAUDE_FILE}`;
+  return `Agent skills: ${summary}. Locations: ${SKILL_FOLDERS.join(", ")}, ${AGENTS_FILE}, ${CLAUDE_FILE}, ${MCP_CONFIG_FILE}
+For Codex, add the cclinic MCP server to ~/.codex/config.toml:
+${CODEX_MCP_CONFIG}`;
 }
 
 export async function hasInstalledSkills(target: string): Promise<boolean> {

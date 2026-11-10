@@ -1,6 +1,6 @@
 /** The files of an automated run in `.cclinic/auto/<run-id>`, and the lock that allows one run at a time. */
 import { existsSync } from "node:fs";
-import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RunState } from "../../core/automation.js";
 import {
@@ -72,6 +72,43 @@ export async function acquireRunLock(target: string, runId: string): Promise<() 
     }
   }
   throw new UsageError(`Couldn't create the lock file ${lockFile}.`);
+}
+
+function parseRunState(text: string, runId: string): RunState {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = undefined;
+  }
+  const isRunState =
+    typeof parsed === "object" &&
+    parsed !== null &&
+    "runId" in parsed &&
+    "tasks" in parsed &&
+    Array.isArray(parsed.tasks);
+  if (!isRunState) throw new UsageError(`The state of automated run ${runId} isn't readable.`);
+  return parsed as RunState;
+}
+
+/** A run's saved state, or the latest run's when no ID is given (FR-MCP-015). Undefined when there's none. */
+export async function readRunState(target: string, runId?: string): Promise<RunState | undefined> {
+  const ids = runId === undefined ? (await readdir(autoFolder(target)).catch(() => [])).sort().reverse() : [runId];
+  for (const id of ids) {
+    const text = await readFile(path.join(runFolder(target, id), RUN_STATE_FILE), "utf8").catch(() => undefined);
+    if (text !== undefined) return parseRunState(text, id);
+  }
+  return undefined;
+}
+
+/** The ID of the live run working on this task, if any (FR-MCP-012). */
+export async function findRunHoldingTask(target: string, taskId: number): Promise<string | undefined> {
+  const holder = await readLiveLock(path.join(autoFolder(target), AUTO_LOCK_FILE));
+  if (holder?.runId === undefined) return undefined;
+  const state = await readRunState(target, holder.runId);
+  return state?.tasks.some((task) => task.taskId === taskId && task.status === "running") === true
+    ? holder.runId
+    : undefined;
 }
 
 /** Secrets are redacted from everything a run saves (FR-AUTO-027). */

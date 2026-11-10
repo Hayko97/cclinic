@@ -18,6 +18,7 @@
 | Library | pdfjs-dist | ^6.5.438 | `package.json:38` |
 | Library | mammoth | ^1.13.0 | `package.json:37` |
 | Library | ignore | ^7.0.14 | `package.json:36` |
+| Library | @modelcontextprotocol/sdk (MIT) | ^1.32.2 | `package.json:35`. Needed for the `cclinic mcp` server (FR-MCP-006): the official MCP implementation, maintained by the protocol's authors. Used only in `src/adapters/mcp/` |
 | External tool | Claude Code CLI | tested 2.1.319 | `src/core/constants/llm.ts:9-11`, `sdd/stack.md:48` |
 | External tool | Git | unknown | `sdd/stack.md:49`, `src/core/constants/git.ts:4` |
 | Package manager | npm | unknown | `README.md:12-14`, `sdd/stack.md:13` |

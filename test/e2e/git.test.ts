@@ -1,6 +1,15 @@
 /** Git behaviour through the built binary, with a fake `claude` and real Git repositories. */
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -338,5 +347,33 @@ describe("Git problems never stop a run", () => {
     expect(stderr).toContain("unsafe");
     expect(existsSync(path.join(root, ".git"))).toBe(false);
     expect(readFileSync(log, "utf8")).not.toContain("safe.directory");
+  });
+});
+
+describe("the MCP server's config, QA", () => {
+  it("TC-MCP-064: committing cclinic's own .mcp.json alone causes no Claude call and no document change", () => {
+    const box = sandbox();
+    const root = repositoryWithCommits(box);
+    expect(cclinic([root, "--yes"], box).code).toBe(0);
+    expect(JSON.parse(readFileSync(path.join(root, ".mcp.json"), "utf8"))).toEqual({
+      mcpServers: { cclinic: { command: "npx", args: ["cclinic", "mcp"] } },
+    });
+    git(root, box, "add", "-A", "--", ".", ":!.mcp.json");
+    git(root, box, "commit", "-q", "-m", "Add cclinic output");
+    git(root, box, "add", ".mcp.json");
+    git(root, box, "commit", "-q", "-m", "Add the MCP server");
+    const out = path.join(root, ".cclinic/sdd");
+    const snapshot = () =>
+      Object.fromEntries(
+        readdirSync(out)
+          .filter((name) => name.endsWith(".md"))
+          .map((name) => [name, readFileSync(path.join(out, name), "utf8")]),
+      );
+    const before = snapshot();
+    const record = path.join(makeTempFolder(), "calls.jsonl");
+    const run = cclinic([root, "--yes"], box, { FAKE_CLAUDE_RECORD: record });
+    expect(run.code, run.stderr).toBe(0);
+    expect(existsSync(record)).toBe(false);
+    expect(snapshot()).toEqual(before);
   });
 });

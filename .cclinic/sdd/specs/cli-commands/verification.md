@@ -52,3 +52,7 @@ Test cases for automation testers. Start each automated test's name with its `TC
 | TC-CLI-035 | FR-CLI-027 | e2e | Temp project | Run `cclinic skills <path> --json` | Skills are installed in .agents/skills and .claude/skills, no LLM call, and stdout is one JSON object. |
 | TC-CLI-036 | FR-CLI-001 | e2e | A folder named model inside the working directory | Run `cclinic ./model --dry-run` | It is treated as the target path, not the model command. |
 | TC-CLI-037 | FR-CLI-003 | e2e | Built CLI | Run with -q, -d, --debug-file, --json, --color never on a dry run | All options are accepted and no unknown-option error occurs. |
+| TC-CLI-056 | FR-CLI-028 | e2e | Built CLI | Run `cclinic help mcp` and `cclinic mcp --approver robot` | Help lists the options; the bad value exits 2 |
+| TC-CLI-057 | FR-CLI-029 | e2e | A project with one waiting G1 question | Run `cclinic approve` in a pseudo-TTY and choose `approve` | The answer is recorded with approver `user`, exit 0 |
+| TC-CLI-058 | FR-CLI-029 | e2e | A project with no waiting question | Run `cclinic approve` in a pseudo-TTY | It says nothing is waiting, exit 0 |
+| TC-CLI-059 | FR-CLI-029 | e2e | A project with one waiting question | Run `cclinic approve` with stdin not a TTY | Exit 2, and the question is still waiting |

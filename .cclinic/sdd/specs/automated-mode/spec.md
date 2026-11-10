@@ -2,7 +2,7 @@
 
 ## Goal
 
-Let a user hand a whole saved roadmap created beforehand by the PM agent with `cclinic plan` ([roadmap-planning](../roadmap-planning/spec.md)), to a team of Claude CLI agents that works with no human in the loop. Developer agents take tasks in dependency order, several at once. A product manager (PM) agent approves each spec change and reviews each finished task, and a QA agent tests it end to end. Each run works on its own branches and never touches the user's checked-out branch. The user gets a notification and a report when it finishes.
+Let a user hand a whole saved roadmap created beforehand by the PM agent with `cclinic plan` ([roadmap-planning](../roadmap-planning/spec.md)), to a team of Claude CLI agents that works with no human in the loop. Developer agents take tasks in dependency order, several at once. Each task's steps are run by its own `cclinic mcp` server in `pm-agent` mode ([mcp-server](../mcp-server/spec.md)): a product manager (PM) agent approves each spec change and reviews each finished task, a QA agent tests it end to end, and a reviewer agent reviews the code. Each run works on its own branches and never touches the user's checked-out branch. The user gets a notification and a report when it finishes.
 
 Roadmaps, milestones, tasks, dependencies and the `blocked` status are stored as described in [task-tracking](../task-tracking/spec.md). The skills the agents follow (`create-spec`, `refine-spec`, `write-code`, `implement-spec`, `test-spec`) are in [agent-skills](../agent-skills/spec.md). Running Claude is covered by [llm-providers](../llm-providers/spec.md).
 
@@ -10,19 +10,22 @@ Roadmaps, milestones, tasks, dependencies and the `blocked` status are stored as
 
 | Role | Runs as | Does |
 |---|---|---|
-| Orchestrator | cclinic itself, no LLM | Picks tasks, creates branches and worktrees, starts agents, makes every Git commit and merge, updates `tasks.db`, enforces limits, writes the report, notifies the user |
-| Developer | A `claude -p` process in the task's worktree | Creates or refines the spec, then implements it and fixes what QA or the PM reports |
-| PM | A separate `claude -p` process, read-only | Approves or sends back the spec change, then approves or sends back the finished work |
-| QA | A separate `claude -p` process in the task's worktree | Tests the change against the spec with the `test-spec` skill, including end-to-end tests |
+| Orchestrator | cclinic itself, no LLM | Picks tasks, creates branches and worktrees, starts each task's developer agent with its own `cclinic mcp --approver pm-agent` server, makes every Git commit and merge, updates `tasks.db`, adds up costs, writes the report, notifies the user |
+| Task server | `cclinic mcp --approver pm-agent`, one per task, started for the developer agent | Runs the task's steps and gates, starts the PM, QA and reviewer agents, enforces the per-task limits ([mcp-server](../mcp-server/spec.md)) |
+| Developer | A `claude -p` process in the task's worktree, with the task server as its only MCP server | Drives the task through the server's tools: creates or refines the spec, implements it, and fixes what the PM, QA or reviewer reports |
+| PM | A separate `claude -p` process, read-only, started by the task server | Approves or sends back the spec change, then approves or sends back the finished work |
+| QA | A separate `claude -p` process in the task's worktree, started by the task server | Tests the change against the spec with the `test-spec` skill, including end-to-end tests |
+| Reviewer | A separate `claude -p` process in the task's worktree, started by the task server | Reviews the change with the `review-code` skill, without changing files |
 
 ## Per-task flow
 
-1. Developer: spec, using `refine-spec` (when the task names a spec) or `create-spec`.
-2. PM: spec review, `approve` or `refine` with feedback. On `refine`, back to step 1.
+1. Developer: spec, using `refine-spec` (when the task names a spec) or `create-spec`, then asks the server to move on.
+2. PM (started by the server): spec review, `approve` or `refine` with feedback. On `refine`, back to step 1.
 3. Developer: implement, using `implement-spec` and `write-code`.
-4. QA: test. On `fail`, the developer fixes, and QA runs again.
-5. PM: implementation review, `approve` or `changes` with feedback. On `changes`, the developer fixes, then back to step 4.
-6. Orchestrator: commits on the task branch, merges it into the run branch, and marks the task `done`.
+4. QA (started by the server): test. On `fail`, the developer fixes, and QA runs again.
+5. Reviewer (started by the server): code review. On `changes`, the developer fixes, then back to step 4.
+6. PM (started by the server): implementation review, `approve` or `changes` with feedback. On `changes`, the developer fixes, then back to step 4.
+7. Orchestrator: when the server reports the change `done`, commits on the task branch, merges it into the run branch, and marks the task `done`.
 
 ## Requirements
 
@@ -63,18 +66,27 @@ Roadmaps, milestones, tasks, dependencies and the `blocked` status are stored as
 |---|---|---|---|
 | FR-AUTO-016 | Every agent must run as a separate `claude -p` process with `--permission-mode dontAsk`, `--safe-mode`, `--no-session-persistence`, the run's model and effort, and a per-call `--max-budget-usd` no higher than the budget left in the run. | confirmed | `src/adapters/llm/agent-process.ts`, `src/core/constants/agents.ts`, `src/core/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request`, `src/adapters/llm/environment-agent.ts:29-53` |
 | FR-AUTO-017 | No agent may run `git`, `sudo`, or read `.env` files or other secret files. Developer and QA agents may write only inside their task's worktree. The PM agent may only read files (Read, Glob, Grep) and run no commands. | confirmed | `src/adapters/llm/agent-process.ts`, `src/core/constants/agents.ts`, `src/core/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request`, `src/core/constants/environment.ts` |
-| FR-AUTO-018 | The developer's prompt must say it works in automated mode: it must follow the project's `AGENTS.md` lifecycle and skills, but it must not wait for a human, the PM gives approvals, and it must not commit, push or change `tasks.db`. | confirmed | `src/adapters/llm/agent-process.ts`, `src/core/constants/agents.ts`, `src/core/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request`, `AGENTS.md` |
-| FR-AUTO-019 | The PM's spec review must check the spec change against the task's title and description and its milestone's goal, and return a JSON verdict of `approve`, or `refine` with feedback. On `refine`, the developer must get the feedback and revise the spec. | confirmed | `src/application/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request` |
+| FR-AUTO-018 | The developer's prompt must say it works in automated mode: it must follow the project's `AGENTS.md` lifecycle and skills, drive the task through the task server's tools, not wait for a human, since the PM agent the server starts gives approvals, and not commit, push or change `tasks.db`. | docs-only | `src/adapters/llm/agent-process.ts`, `src/core/constants/agents.ts`, `src/core/automation.ts`, `AGENTS.md`, `.cclinic/sdd/specs/mcp-server/spec.md`, `user request` |
+| FR-AUTO-019 | The PM's spec review, started by the task server, must check the spec change against the task's title and description and its milestone's goal, and return a JSON verdict of `approve`, or `refine` with feedback. On `refine`, the developer must get the feedback and revise the spec. | docs-only | `src/application/automation.ts`, `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-031, `user request` |
 | FR-AUTO-020 | Implementation must not start until the PM has approved the spec. | confirmed | `src/application/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request`, `AGENTS.md` |
-| FR-AUTO-021 | The QA agent must be a different process from the developer, follow the `test-spec` skill, run the spec's test cases including end-to-end tests where the spec has them, and return a JSON result of `pass`, or `fail` with each failing test case and its output. On `fail`, the developer must get the failures and fix them. | confirmed | `src/application/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request`, `AGENTS.md` |
-| FR-AUTO-022 | The PM's implementation review must check the diff and the latest QA result against the spec and the task, and return a JSON verdict of `approve` with the requirement IDs covered, or `changes` with feedback. A `changes` verdict must send the work back to the developer, then to QA again. | confirmed | `src/application/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request` |
+| FR-AUTO-021 | The QA agent, started by the task server, must be a different process from the developer, follow the `test-spec` skill, run the spec's test cases including end-to-end tests where the spec has them, and return a JSON result of `pass`, or `fail` with each failing test case and its output. On `fail`, the developer must get the failures and fix them. | docs-only | `src/application/automation.ts`, `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-032, `AGENTS.md`, `user request` |
+| FR-AUTO-022 | The PM's implementation review, started by the task server, must check the diff, the latest QA result and the latest code review against the spec and the task, and return a JSON verdict of `approve` with the requirement IDs covered, or `changes` with feedback. A `changes` verdict must send the work back to the developer, then to QA and the code review again. | docs-only | `src/application/automation.ts`, `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-031, `user request` |
 | FR-AUTO-023 | A PM or QA reply that isn't a valid verdict, and an agent that fails, times out or hits its budget, must count as a rejected round, with the reason saved. | confirmed | `src/application/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request` |
+
+### Task server
+
+| ID | Requirement | Status | Evidence |
+|---|---|---|---|
+| FR-AUTO-035 | For each task, cclinic must start the developer agent with `cclinic mcp --approver pm-agent --run <run-id> --task <id> --max-budget-usd <amount>` as its only MCP server, in the task's worktree, and must not run the PM, QA or reviewer agents itself. | docs-only | `src/application/automation.ts`, `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-002, FR-MCP-031 to FR-MCP-037, `user request` |
+| FR-AUTO-036 | When the developer agent ends, cclinic must read the task's workflow state: when the change is `done`, it must commit and merge as FR-AUTO-013 says; when it's `blocked`, it must block the task with the recorded reason; otherwise it must block the task with the step the change stopped at as the reason. | docs-only | `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-035, FR-MCP-038, `user request` |
+| FR-AUTO-037 | The `--max-budget-usd` given to a task server must be no higher than the budget left in the run when the task starts, and the cost the server records must be added to the run's total cost, the task's cost in `run.json`, and the report. | docs-only | `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-036, `user request` |
+| FR-AUTO-038 | Each task must go through a code review by a reviewer agent the task server starts with the `review-code` skill, after QA passes and before the PM's implementation review. | docs-only | `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-033, `.cclinic/sdd/specs/code-review/spec.md`, `user request` |
 
 ### Limits
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-AUTO-024 | Each task must have at most 3 PM spec reviews, 3 QA runs and 3 PM implementation reviews. When any limit is reached without approval or a pass, the task must become `blocked`, with the last feedback or failures as the reason. | confirmed | `src/application/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request`, `AGENTS.md` |
+| FR-AUTO-024 | Each task must have at most 3 PM spec reviews, 3 QA runs, 3 code reviews and 3 PM implementation reviews, counted by the task server. When any limit is reached without approval or a pass, the task must become `blocked`, with the last feedback or failures as the reason. | docs-only | `src/application/automation.ts`, `src/core/constants/agents.ts:32`, `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-035, `AGENTS.md`, `user request` |
 | FR-AUTO-025 | The total cost of all agents must not go over `--max-budget-usd`. When the budget left can't cover another agent call, cclinic must start no new agent, let running agents finish, set unfinished tasks back to `open`, and end the run as `budget-reached`. | confirmed | `src/application/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request`, `src/adapters/llm/environment-agent.ts:54` |
 | FR-AUTO-026 | Each agent call must stop at `--timeout-minutes` (default 30). | confirmed | `src/application/automation.ts`, `test/integration/automation.test.ts`, `test/integration/automation-flow.test.ts`, `test/e2e/auto.test.ts`, `user request`, `src/core/constants/limits.ts:14` |
 
@@ -104,6 +116,8 @@ Roadmaps, milestones, tasks, dependencies and the `blocked` status are stored as
 - The budget runs out mid-task: that task goes back to `open`, and its task branch keeps any work as a `WIP` commit.
 - `tasks.db` is changed by the user during a run: cclinic reads each task again before starting it, and skips any that was removed or is no longer `open`.
 - The user's `HEAD` moves during the run: the run branch is unaffected.
+- The developer agent crashes or times out before the change is `done`: the task is blocked with the step it stopped at (FR-AUTO-036).
+- The task server can't start, such as a broken install: the developer agent has no cclinic tools, ends without a `done` change, and the task is blocked with that reason.
 - `.cclinic/tasks.db` is committed: each run updates task statuses in it, so it shows as modified afterwards. That doesn't stop the next run.
 
 ## Non-goals

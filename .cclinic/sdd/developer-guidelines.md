@@ -111,6 +111,7 @@ Follow the established style guide and formatter for each language, and enforce 
 ### For this project
 
 - **Observed:** Use spawn/execFile with argument arrays, never a shell; wrap scanned content in <project_content> tags as untrusted; give the model no tools; never read secret files; strip ANTHROPIC_API_KEY/AUTH_TOKEN from claude child env. (`src/core/prompts.ts:9-29`, `src/adapters/llm/claude-cli.ts:35-46`, `src/core/exclusion-rules.ts:28-37`, `sdd/specs/git-setup/spec.md:61`)
+- **Exception:** `preview_start` runs each `start` command from `.cclinic/environment/environment.json` in a shell, because a start line is a shell command written for one, which the agent would otherwise run in its own shell. It runs only commands from that file, after its schema is checked. (`src/adapters/preview/preview-runner.ts`, `sdd/specs/mcp-server/spec.md` FR-MCP-023)
 - **Recommended:** Run npm audit in CI and enable 2FA on the publishing npm account. (`sdd/developer-guidelines.md:226-228`)
 
 ## Logging and performance

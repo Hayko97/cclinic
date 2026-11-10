@@ -8,6 +8,7 @@ import {
   describeGitStatus,
   formatRemoteAlert,
   parseGitLog,
+  parsePorcelainPaths,
   remoteHost,
   type GitCommit,
 } from "./git-history.js";
@@ -159,5 +160,17 @@ describe("constants", () => {
       ),
     );
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("changed paths", () => {
+  it("TC-MCP-019: lists changed and new files, skipping the old path of a rename in the index or the worktree", () => {
+    expect(parsePorcelainPaths(" M a.ts\0?? new.ts\0R  b.ts\0old-b.ts\0 R c.ts\0old-c.ts\0")).toEqual([
+      "a.ts",
+      "new.ts",
+      "b.ts",
+      "c.ts",
+    ]);
+    expect(parsePorcelainPaths("")).toEqual([]);
   });
 });

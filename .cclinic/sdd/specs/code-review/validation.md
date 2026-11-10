@@ -18,3 +18,4 @@ Acceptance criteria from the user's point of view.
 | VAL-CREV-012 | FR-CREV-019 | The skills agree with the workflow | Following `implement-spec` alone gives the same review step as following `AGENTS.md` |
 | VAL-CREV-013 | FR-CREV-020 | The instructions stay short enough to follow | The `AGENTS.md` section is still under 200 lines |
 | VAL-CREV-014 | FR-CREV-014, FR-CREV-021 | Code I see and commit is always tested and reviewed | Changes I ask for after the preview are tested and reviewed again, and the agent never asks for approval of review fixes that QA couldn't test |
+| VAL-CREV-015 | FR-CREV-022, FR-CREV-023 | Reviews are counted and independent | With the cclinic tools, every review is recorded and fixes are tested again before I see them; in auto runs, a separate reviewer reviews the developer's work |
