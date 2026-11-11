@@ -23,7 +23,10 @@ export const GUI_LOCK_FILE = "gui.lock";
 export const GUI_CONTENT_SECURITY_POLICY =
   "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 /** FR-GUI-010: the only static files the GUI serves. */
-export const GUI_ASSETS = { page: "index.html", files: ["app.js", "styles.css"] } as const;
+export const GUI_ASSETS = {
+  page: "index.html",
+  files: ["app.js", "api.js", "canvas.js", "panel.js", "list.js", "jobs.js", "icons.js", "styles.css"],
+} as const;
 export const GUI_MAX_BODY_BYTES = 1_048_576;
 /** The longest include or exclude pattern, and the most of each, the GUI passes on. */
 export const GUI_MAX_PATTERN_LENGTH = 500;

@@ -10,18 +10,74 @@
   <body>
     <header class="top-bar">
       <span class="logo" aria-hidden="true">c</span>
-      <div>
+      <div class="project">
         <strong id="project-name">cclinic</strong>
         <div id="project-folder" class="muted"></div>
       </div>
+      <div class="top-status">
+        <span id="job-count" class="muted"></span>
+        <span id="budget" class="muted"></span>
+        <button id="theme" type="button">Theme: Auto</button>
+      </div>
     </header>
+    <nav class="rail" aria-label="Places">
+      <button type="button" data-view="canvas" aria-current="true">Canvas</button>
+      <button type="button" data-view="setup">Setup</button>
+      <button type="button" data-view="jobs">Jobs</button>
+    </nav>
     <main class="content">
-      <section aria-labelledby="jobs-title">
-        <div class="section-head">
-          <h1 id="jobs-title">Jobs</h1>
-          <button id="run-doctor" type="button" class="primary">Run doctor</button>
+      <p id="notice" class="notice" role="status" aria-live="polite"></p>
+
+      <section id="view-canvas" class="view-canvas" aria-label="Canvas">
+        <div class="toolbar">
+          <div class="segmented" role="group" aria-label="View">
+            <button type="button" data-layout="canvas" aria-pressed="true">Canvas</button>
+            <button type="button" data-layout="list" aria-pressed="false">List</button>
+          </div>
+          <button id="add-task-open" type="button" class="primary">Add task</button>
+          <div id="canvas-tools" class="zoom" role="group" aria-label="Zoom">
+            <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+            <span id="zoom-level" aria-live="polite">100 %</span>
+            <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+            <button id="zoom-fit" type="button">Fit</button>
+          </div>
         </div>
-        <p id="notice" class="muted" role="status" aria-live="polite"></p>
+        <ul id="canvas-problems" class="problems" hidden></ul>
+        <div id="canvas-area" class="canvas-area">
+          <div id="board" class="board">
+            <svg id="arrows" class="arrows" aria-hidden="true">
+              <defs>
+                <marker
+                  id="arrow-head"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="10"
+                  markerHeight="10"
+                  markerUnits="userSpaceOnUse"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0,0 L10,5 L0,10 z" class="arrow-head" />
+                </marker>
+              </defs>
+            </svg>
+            <div id="frames" class="frames"></div>
+          </div>
+          <p id="canvas-empty" class="canvas-empty muted" hidden>
+            There are no roadmaps or tasks yet. Add a task, or plan a roadmap with <code>cclinic plan</code>.
+          </p>
+        </div>
+        <div id="list" class="list" hidden></div>
+      </section>
+
+      <section id="view-setup" aria-labelledby="setup-title" hidden>
+        <h1 id="setup-title">Setup</h1>
+        <p class="muted">Check that cclinic can run in this project.</p>
+        <button id="run-doctor" type="button" class="primary">Run doctor</button>
+      </section>
+
+      <section id="view-jobs" aria-labelledby="jobs-title" hidden>
+        <h1 id="jobs-title">Jobs</h1>
         <div class="jobs">
           <ul id="job-list" class="job-list" aria-label="Jobs"></ul>
           <article class="job-output" aria-labelledby="output-title">
@@ -34,5 +90,38 @@
         </div>
       </section>
     </main>
+
+    <aside id="panel" class="side-panel" aria-labelledby="panel-title" hidden>
+      <div class="panel-head">
+        <h1 id="panel-title"></h1>
+        <button id="panel-close" type="button" aria-label="Close panel">×</button>
+      </div>
+      <div id="panel-body" class="panel-body"></div>
+    </aside>
+
+    <dialog id="confirm" aria-labelledby="confirm-message">
+      <form method="dialog">
+        <p id="confirm-message"></p>
+        <div class="actions">
+          <button type="submit" value="cancel">Cancel</button>
+          <button id="confirm-ok" type="submit" value="confirm" class="danger"></button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="add-task" aria-labelledby="add-task-title">
+      <form id="add-task-form">
+        <h2 id="add-task-title">Add a task</h2>
+        <label>Title <input name="title" required maxlength="200" /></label>
+        <label>Description <textarea name="description" rows="3"></textarea></label>
+        <label>Spec <input name="spec" placeholder="Optional, such as auth" /></label>
+        <label>Depends on <input name="dependsOn" placeholder="Task IDs, such as 2, 5" /></label>
+        <p id="add-task-error" class="error" role="alert"></p>
+        <div class="actions">
+          <button id="add-task-cancel" type="button">Cancel</button>
+          <button type="submit" class="primary">Add task</button>
+        </div>
+      </form>
+    </dialog>
   </body>
 </html>

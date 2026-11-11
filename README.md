@@ -170,6 +170,7 @@ Large or expensive runs stop before anything is sent. Each limit can be changed.
 The specifications live in [`.cclinic/sdd/`](.cclinic/sdd/README.md). Start there, and follow [`.cclinic/sdd/developer-guidelines.md`](.cclinic/sdd/developer-guidelines.md).
 
 ```
+npm run setup:browsers  # once: the headless Chromium the GUI's page tests use
 npm run verify          # lint, types, architecture, tests and coverage
 npm test                # unit and integration tests
 npm run test:e2e        # the built binary, against a fake claude command

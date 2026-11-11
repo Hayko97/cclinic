@@ -6,6 +6,7 @@
 | Runtime | Node.js | >=22.18 (.nvmrc: 26) | `package.json:17-19`, `.nvmrc:1`, `bin/cclinic.js:5` |
 | Build | tsup | ^9.0.0 | `package.json:51`, `tsup.config.ts:1` |
 | Test | Vitest with coverage-v8 | ^5.1.0 | `package.json:47`, `vitest.config.ts:1` |
+| Test | Playwright (`@playwright/test`, Apache-2.0), dev only | ^1.65.0 | `package.json`. Drives the GUI's pages in headless Chromium for the gui spec's UI test cases (`test/integration/gui-page.test.ts`). Not shipped. Run `npm run setup:browsers` once after `npm ci`, locally and in CI, before the tests |
 | Test | Stryker Mutator | ^10.1.1 | `package.json:44-45`, `stryker.config.json:2` |
 | Lint | ESLint + typescript-eslint | ^10.14.0 / ^8.72.1 | `package.json:49`, `package.json:53`, `eslint.config.js:5` |
 | Formatting | Prettier | ^3.9.10 | `package.json:50`, `.prettierrc.json:2` |

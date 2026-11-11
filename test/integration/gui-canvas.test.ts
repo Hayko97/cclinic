@@ -319,6 +319,35 @@ describe("canvas data", () => {
     });
   });
 
+  it("TC-GUI-031: while the task database can't be read, the saved positions are kept, and a move keeps them", async () => {
+    const root = project();
+    const gui = await start(root);
+    const saved = { version: 1, frames: {}, cards: { "task-1": { x: 40, y: 200 }, "task-3": { x: 40, y: 300 } } };
+    await sendTo(gui, "PUT", "/api/layout", saved);
+    writeFileSync(path.join(root, ".cclinic/tasks.db"), "not a database");
+    const { canvas } = JSON.parse((await sendTo(gui, "GET", "/api/canvas")).body) as { canvas: CanvasView };
+    expect(canvas.problems).not.toEqual([]);
+    expect((JSON.parse(readFileSync(path.join(root, ".cclinic/gui/layout.json"), "utf8")) as Layout).cards).toEqual(
+      saved.cards,
+    );
+    // A page sends only what it moved; what it couldn't see stays saved.
+    await sendTo(gui, "PUT", "/api/layout", { version: 1, frames: { changes: { x: 9, y: 9 } }, cards: {} });
+    expect((JSON.parse(readFileSync(path.join(root, ".cclinic/gui/layout.json"), "utf8")) as Layout).cards).toEqual(
+      saved.cards,
+    );
+  });
+
+  it("TC-GUI-099: a move saved from one tab doesn't undo a move saved from another", async () => {
+    const root = project();
+    const gui = await start(root);
+    await sendTo(gui, "PUT", "/api/layout", { version: 1, frames: {}, cards: { "task-1": { x: 40, y: 200 } } });
+    await sendTo(gui, "PUT", "/api/layout", { version: 1, frames: {}, cards: { "task-3": { x: 40, y: 300 } } });
+    expect((JSON.parse(readFileSync(path.join(root, ".cclinic/gui/layout.json"), "utf8")) as Layout).cards).toEqual({
+      "task-1": { x: 40, y: 200 },
+      "task-3": { x: 40, y: 300 },
+    });
+  });
+
   it("TC-GUI-101: Tidy up with nothing saved pins no other frame", async () => {
     const root = project();
     const gui = await start(root);

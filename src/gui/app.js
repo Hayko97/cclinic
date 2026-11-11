@@ -1,115 +1,104 @@
-// The GUI's page. It talks only to its own server, which checks the token cookie set on first load.
+// The GUI's page: a top bar, a rail with Canvas, Setup and Jobs, and a side panel (FR-GUI-049).
+import { api, money, notify } from "./api.js";
+import { addIcons } from "./icons.js";
+import { onCanvasChange, onOpenTask, refresh, selectTask, showCanvas, startCanvas } from "./canvas.js";
+import { refreshJobs, startJobs } from "./jobs.js";
+import { drawList } from "./list.js";
+import { openPanel, refreshPanel, startAddTask, startPanel } from "./panel.js";
 
 // The token was only needed to load the page; keep it out of the address bar and history.
 if (location.search !== "") history.replaceState(null, "", location.pathname);
 
-const elements = {
-  name: document.getElementById("project-name"),
-  folder: document.getElementById("project-folder"),
-  list: document.getElementById("job-list"),
-  title: document.getElementById("output-title"),
-  output: document.getElementById("output"),
-  cancel: document.getElementById("cancel-job"),
-  notice: document.getElementById("notice"),
-  runDoctor: document.getElementById("run-doctor"),
-};
-
-let selected;
-
-function showError(error) {
-  elements.notice.textContent = error.message;
-}
-let events;
-
-async function api(path, options = {}) {
-  const response = await fetch(path, {
-    ...options,
-    headers: options.body === undefined ? {} : { "content-type": "application/json" },
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? `Request failed (${response.status}).`);
-  return data;
-}
-
-function status(job) {
-  return job.isRunning ? "Running" : `${job.exitMeaning} (exit ${job.exitCode})`;
-}
-
-async function refreshJobs() {
-  const { jobs } = await api("/api/jobs");
-  elements.list.replaceChildren(
-    ...jobs.map((job) => {
-      const item = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = `${job.command} · ${status(job)}`;
-      button.setAttribute("aria-current", String(job.id === selected));
-      button.addEventListener("click", () => show(job.id));
-      item.append(button);
-      return item;
-    }),
-  );
-}
-
-function addLines(lines) {
-  for (const line of lines) {
-    const span = document.createElement("span");
-    span.className = line.stream;
-    span.textContent = `${line.text}\n`;
-    elements.output.append(span);
-  }
-}
-
-function show(id) {
-  selected = id;
-  events?.close();
-  elements.output.replaceChildren();
-  events = new EventSource(`/api/jobs/${id}/events`);
-  events.addEventListener("job", (message) => {
-    const { job } = JSON.parse(message.data);
-    // Sent again after a reconnect, so it replaces what's shown instead of adding to it.
-    elements.output.replaceChildren();
-    elements.title.textContent = `${job.command} · ${status(job)}`;
-    elements.cancel.hidden = !job.isRunning;
-    if (job.output.dropped > 0) addLines([{ stream: "stderr", text: `(${job.output.dropped} older lines dropped)` }]);
-    addLines(job.output.lines);
-    if (!job.isRunning) events.close();
-  });
-  events.addEventListener("output", (message) => addLines(JSON.parse(message.data).lines));
-  events.addEventListener("end", (message) => {
-    const { job } = JSON.parse(message.data);
-    elements.title.textContent = `${job.command} · ${status(job)}`;
-    elements.cancel.hidden = true;
-    elements.notice.textContent = `${job.command}: ${status(job)}`;
-    events.close();
-    refreshJobs().catch(showError);
-  });
-  refreshJobs().catch(showError);
-}
-
-elements.runDoctor.addEventListener("click", async () => {
+/** What the browser remembers between visits (FR-GUI-054); the page works without it. */
+function remembered(key, fallback) {
   try {
-    const { job } = await api("/api/jobs", { method: "POST", body: JSON.stringify({ command: "doctor" }) });
-    show(job.id);
-  } catch (error) {
-    showError(error);
+    return localStorage.getItem(`cclinic.${key}`) ?? fallback;
+  } catch {
+    return fallback;
   }
+}
+
+function remember(key, value) {
+  try {
+    localStorage.setItem(`cclinic.${key}`, value);
+  } catch {
+    // Private windows may refuse; the choice then lasts only for this visit.
+  }
+}
+
+function showView(name) {
+  for (const view of ["canvas", "setup", "jobs"]) {
+    document.getElementById(`view-${view}`).hidden = view !== name;
+    document.querySelector(`[data-view="${view}"]`).setAttribute("aria-current", String(view === name));
+  }
+  if (name === "canvas") showCanvas();
+  if (name === "jobs") refreshJobs().catch((error) => notify(error.message, true));
+}
+
+/** FR-GUI-054: Canvas or List, remembered in the browser. */
+function showLayout(name) {
+  const isList = name === "list";
+  document.getElementById("canvas-area").hidden = isList;
+  document.getElementById("list").hidden = !isList;
+  document.getElementById("canvas-tools").hidden = isList;
+  for (const button of document.querySelectorAll("[data-layout]"))
+    button.setAttribute("aria-pressed", String(button.dataset.layout === name));
+  remember("layout", name);
+  if (!isList) showCanvas();
+}
+
+function openTask(id) {
+  selectTask(id);
+  openPanel({ kind: "task", id });
+}
+
+function applyTheme(chosen) {
+  if (chosen === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = chosen;
+  const label = chosen === "dark" ? "Dark" : chosen === "light" ? "Light" : "Auto";
+  document.getElementById("theme").textContent = `Theme: ${label}`;
+}
+
+for (const button of document.querySelectorAll("[data-view]"))
+  button.addEventListener("click", () => showView(button.dataset.view));
+for (const button of document.querySelectorAll("[data-layout]"))
+  button.addEventListener("click", () => showLayout(button.dataset.layout));
+// Kept here, so the toggle works for this visit even when the browser won't store it.
+const THEMES = ["system", "light", "dark"];
+let theme = THEMES.includes(remembered("theme", "system")) ? remembered("theme", "system") : "system";
+document.getElementById("theme").addEventListener("click", () => {
+  theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+  remember("theme", theme);
+  applyTheme(theme);
 });
 
-elements.cancel.addEventListener("click", async () => {
-  if (selected === undefined) return;
-  try {
-    await api(`/api/jobs/${selected}/cancel`, { method: "POST" });
-  } catch (error) {
-    showError(error);
-  }
+applyTheme(theme);
+addIcons();
+onOpenTask((target) => openPanel(target));
+onCanvasChange((canvas) => {
+  drawList(canvas, openTask);
+  refreshPanel();
+  const spent = canvas.roadmaps.filter((roadmap) => roadmap.spentUsd !== null);
+  document.getElementById("budget").textContent =
+    spent.length === 0
+      ? ""
+      : spent.map((roadmap) => `${money(roadmap.spentUsd)} of ${money(roadmap.budgetUsd)}`).join(" · ");
 });
+startPanel();
+startAddTask();
+startJobs();
+startCanvas();
+// An unknown remembered layout falls back to the Canvas, as an unknown theme falls back to Auto.
+const LAYOUTS = ["canvas", "list"];
+showLayout(LAYOUTS.includes(remembered("layout", "canvas")) ? remembered("layout", "canvas") : "canvas");
 
 try {
   const project = await api("/api/project");
-  elements.name.textContent = project.name;
-  elements.folder.textContent = project.folder;
+  document.getElementById("project-name").textContent = project.name;
+  document.getElementById("project-folder").textContent = project.folder;
+  document.title = `cclinic · ${project.name}`;
+  await refresh();
   await refreshJobs();
 } catch (error) {
-  showError(error);
+  notify(error.message, true);
 }

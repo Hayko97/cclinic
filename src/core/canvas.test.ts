@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { AgentSession, RunState } from "./automation.js";
-import { buildCanvas, parseTranscriptLine, resolveLayout, tidyFrame, type CanvasSources } from "./canvas.js";
+import {
+  buildCanvas,
+  frameWidths,
+  parseTranscriptLine,
+  resolveLayout,
+  tidyFrame,
+  type CanvasSources,
+} from "./canvas.js";
 import { LAYOUT } from "./constants/gui.js";
 import type { Roadmap, Task } from "./tasks.js";
 import { beginChange, linkSession, stateKey, type WorkflowState } from "./workflow.js";
@@ -299,6 +306,14 @@ describe("layout", () => {
     for (const [index, [start, end]] of spans.entries())
       for (const [otherStart, otherEnd] of spans.slice(index + 1))
         expect(end <= otherStart || otherEnd <= start).toBe(true);
+  });
+
+  it("TC-GUI-100: each frame's width is its columns' width, the same the layout spaces frames by", () => {
+    const widths = frameWidths(view);
+    expect(widths["roadmap-1"]).toBe(2 * LAYOUT.framePadding + 2 * LAYOUT.cardWidth + LAYOUT.columnGap);
+    expect(widths["unassigned"]).toBe(2 * LAYOUT.framePadding + LAYOUT.cardWidth);
+    const layout = resolveLayout(view, undefined);
+    expect(layout.frames["roadmap-2"]?.x).toBe((widths["roadmap-1"] ?? 0) + LAYOUT.frameGap);
   });
 
   it("TC-GUI-031: a saved position wins, a new task gets an automatic one, and a removed task's saved one is dropped", () => {

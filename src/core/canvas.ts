@@ -425,6 +425,17 @@ function framePlans(view: CanvasView): FramePlan[] {
   ];
 }
 
+/** FR-GUI-074: a frame is as wide as its columns; the page draws it and clamps drops to this same width. */
+export function frameWidth(columnCount: number): number {
+  const columns = Math.max(1, columnCount);
+  return LAYOUT.framePadding + LAYOUT.framePadding + columns * LAYOUT.cardWidth + (columns - 1) * LAYOUT.columnGap;
+}
+
+/** Each frame's width, by frame key, so the page never works it out again. */
+export function frameWidths(view: CanvasView): Record<string, number> {
+  return Object.fromEntries(framePlans(view).map((plan) => [plan.key, frameWidth(plan.columns.length)]));
+}
+
 /**
  * FR-GUI-074: frames side by side, each milestone a column, each task after the ones it depends on. A saved
  * position wins; keys of frames and cards that no longer exist are dropped (FR-GUI-075).
@@ -433,12 +444,7 @@ export function resolveLayout(view: CanvasView, saved: Layout | undefined): Layo
   const frames: Record<string, Point> = {};
   const cards: Record<string, Point> = {};
   const plans = framePlans(view);
-  const widthOf = (plan: FramePlan) => {
-    const columnCount = Math.max(1, plan.columns.length);
-    return (
-      LAYOUT.framePadding + LAYOUT.framePadding + columnCount * LAYOUT.cardWidth + (columnCount - 1) * LAYOUT.columnGap
-    );
-  };
+  const widthOf = (plan: FramePlan) => frameWidth(plan.columns.length);
   // A new frame goes to the right of every frame already placed, by hand or automatically, so none overlap.
   let nextX = 0;
   for (const plan of plans) {

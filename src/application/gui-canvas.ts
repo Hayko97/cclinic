@@ -8,6 +8,7 @@ import {
   resolveLayout,
   tidyFrame,
   tidyRequestSchema,
+  frameWidths,
   type CanvasSources,
   type CanvasView,
   type Layout,
@@ -17,7 +18,13 @@ import {
   type TranscriptLocation,
   type TranscriptPosition,
 } from "../core/canvas.js";
-import { CANVAS_POLL_MS, LAYOUT_VERSION, TRANSCRIPT_MAX_ENTRIES, TRANSCRIPT_POLL_MS } from "../core/constants/gui.js";
+import {
+  CANVAS_POLL_MS,
+  LAYOUT,
+  LAYOUT_VERSION,
+  TRANSCRIPT_MAX_ENTRIES,
+  TRANSCRIPT_POLL_MS,
+} from "../core/constants/gui.js";
 import type { SendEvent } from "../core/gui.js";
 import { redact } from "../core/redaction.js";
 
@@ -44,12 +51,23 @@ const EMPTY_LAYOUT: Layout = { version: LAYOUT_VERSION, frames: {}, cards: {} };
 
 export interface CanvasPayload {
   readonly canvas: CanvasView;
+  /** Every frame and card's position: saved where it was moved by hand, else placed automatically. */
   readonly layout: Layout;
+  /** Each frame's width, by frame key: the one rule the server lays frames out by (FR-GUI-074). */
+  readonly frameWidths: Readonly<Record<string, number>>;
+  /** The automatic layout's sizes, so the page draws frames and columns on the same grid (FR-GUI-074). */
+  readonly sizes: typeof LAYOUT;
 }
 
 export async function readCanvas(ports: CanvasPorts): Promise<CanvasPayload> {
   const canvas = buildCanvas(await ports.readSources(), ports.now());
-  return { canvas, layout: resolveLayout(canvas, await ports.readLayout()) };
+  const saved = await ports.readLayout();
+  return {
+    canvas,
+    layout: resolveLayout(canvas, saved),
+    frameWidths: frameWidths(canvas),
+    sizes: LAYOUT,
+  };
 }
 
 /** FR-GUI-022, FR-GUI-075: the canvas now, then each time it changes. */
@@ -89,13 +107,25 @@ function prunedIfComplete(canvas: CanvasView, layout: Layout): Layout {
   return canvas.problems.length === 0 ? pruneLayout(canvas, layout) : layout;
 }
 
-/** FR-GUI-073: a layout the browser sends, refused unless it has the saved shape. */
+/**
+ * FR-GUI-073: positions the browser moved, refused unless they have the saved shape. They're added to what's
+ * saved, so a tab that sends only its own move never undoes another tab's.
+ */
 export async function saveCanvasLayout(ports: CanvasPorts, body: unknown): Promise<Layout | undefined> {
   const parsed = layoutSchema.safeParse(body);
   if (!parsed.success) return undefined;
+  const moved = parsed.data;
   const canvas = buildCanvas(await ports.readSources(), ports.now());
-  const layout = prunedIfComplete(canvas, parsed.data);
-  await ports.updateLayout(() => layout);
+  let layout: Layout = EMPTY_LAYOUT;
+  await ports.updateLayout((saved) => {
+    const base = saved ?? EMPTY_LAYOUT;
+    layout = prunedIfComplete(canvas, {
+      version: LAYOUT_VERSION,
+      frames: { ...base.frames, ...moved.frames },
+      cards: { ...base.cards, ...moved.cards },
+    });
+    return layout;
+  });
   return layout;
 }
 
