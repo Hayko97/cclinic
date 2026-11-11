@@ -18,6 +18,27 @@ export const MCP_SERVER_NAME = "cclinic";
 export const MCP_CONFIG_FILE = ".mcp.json";
 /** FR-MCP-004: the entry Claude Code reads from `.mcp.json`. */
 export const MCP_SERVER_ENTRY = { command: "npx", args: ["cclinic", "mcp"] } as const;
+/** FR-MCP-044: Claude Code's project settings, where the hook that links sessions to changes goes. */
+export const CLAUDE_SETTINGS_FILE = ".claude/settings.json";
+export const SESSION_LINK_COMMAND = "session-link";
+export const SESSION_LINK_HOOK = {
+  matcher: `mcp__${MCP_SERVER_NAME}__.*`,
+  hooks: [{ type: "command", command: `npx cclinic ${SESSION_LINK_COMMAND}` }],
+} as const;
+/** FR-MCP-045: the hook gives up after this, so it never holds up the user's session. */
+export const SESSION_LINK_TIMEOUT_MS = 5_000;
+/** One writer of the workflow state at a time (FR-MCP-045): how often to try for the lock, and for how long. */
+export const STATE_LOCK_FILE = ".state.lock";
+/** Held for a moment by the one process removing a lock whose process has ended. */
+export const STATE_LOCK_BREAKER_SUFFIX = ".break";
+export const STATE_LOCK_RETRY_MS = 20;
+export const STATE_LOCK_WAIT_MS = 10_000;
+/** A save takes milliseconds, so a lock held this long was left by a process that hung or whose ID is reused. */
+export const STATE_LOCK_STALE_MS = 60_000;
+/** Where a lock can't be created with its content in one step, an empty one is given this long to be written. */
+export const STATE_LOCK_WRITE_GRACE_MS = 1_000;
+/** The hook stops waiting for the lock this long before its own timeout, so it can let go before it exits. */
+export const SESSION_LINK_LOCK_WAIT_MS = 4_000;
 /** FR-MCP-005: Codex reads servers from each developer's own config, so cclinic prints this instead. */
 export const CODEX_MCP_CONFIG = `[mcp_servers.${MCP_SERVER_NAME}]
 command = "${MCP_SERVER_ENTRY.command}"

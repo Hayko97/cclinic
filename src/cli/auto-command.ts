@@ -1,6 +1,7 @@
 /** The `cclinic auto` command: runs a whole roadmap with developer, PM and QA agents (spec: automated-mode). */
+import { randomUUID } from "node:crypto";
 import { openRunRepository, readRepositoryState, branchExists, missingFromHead } from "../adapters/git/run-branches.js";
-import { runAgent } from "../adapters/llm/agent-process.js";
+import { claudeTranscriptPath, runAgent } from "../adapters/llm/agent-process.js";
 import { toJsonSchemaObject } from "../adapters/llm/retry.js";
 import { notifyUser } from "../adapters/notify/desktop-notifier.js";
 import { projectPaths } from "../adapters/storage/document-store.js";
@@ -24,6 +25,7 @@ import {
   runBranchName,
   runOrder,
   selectRoadmapTasks,
+  type AgentSession,
   type RunState,
   type TaskContext,
   type TaskRun,
@@ -37,7 +39,7 @@ import {
 } from "../core/constants/agents.js";
 import { MS_PER_MINUTE } from "../core/constants/limits.js";
 import { SKILL_FILE, SKILL_FOLDERS } from "../core/constants/paths.js";
-import { CancelledError, UsageError } from "../core/errors.js";
+import { AgentCallError, CancelledError, UsageError } from "../core/errors.js";
 import type { Effort, ModelChoice } from "../core/models.js";
 import type { Roadmap, RoadmapOverview, Task, TaskStatus } from "../core/tasks.js";
 import { requireClaudeCli } from "./agent-checks.js";
@@ -134,23 +136,50 @@ function agentRunner(settings: {
   effort: Effort;
   timeoutMinutes: number;
   context: CommandContext;
+  saveSession: (session: AgentSession) => Promise<void>;
 }) {
   return async (call: AgentCall) => {
     const isPm = call.role === "pm";
-    const result = await runAgent({
+    // FR-AUTO-039: recorded before the agent starts, so a viewer can follow it while it works.
+    const sessionId = randomUUID();
+    const session: AgentSession = {
+      sessionId,
+      taskId: call.taskId,
+      role: call.role,
+      step: call.step,
       cwd: call.cwd,
-      prompt: call.prompt,
-      model: settings.model,
-      effort: settings.effort,
-      maxBudgetUsd: call.maxBudgetUsd,
-      ...(call.schema === undefined ? {} : { jsonSchema: toJsonSchemaObject(call.schema) }),
-      tools: isPm ? READ_ONLY_TOOLS : WRITING_TOOLS,
-      allowedTools: isPm ? READ_ONLY_TOOLS : WORKTREE_AGENT_ALLOWED_TOOLS,
-      deniedTools: AGENT_DENIED_TOOLS,
-      environment: settings.context.environment,
-      signal: settings.context.signal,
-      timeoutMs: settings.timeoutMinutes * MS_PER_MINUTE,
-    });
+      transcriptPath: claudeTranscriptPath(settings.context.environment, call.cwd, sessionId),
+      startedAt: new Date().toISOString(),
+      endedAt: null,
+      exitCode: null,
+    };
+    await settings.saveSession(session);
+    const end = (exitCode: number | null) =>
+      settings.saveSession({ ...session, endedAt: new Date().toISOString(), exitCode });
+    let result: Awaited<ReturnType<typeof runAgent>>;
+    try {
+      result = await runAgent({
+        cwd: call.cwd,
+        prompt: call.prompt,
+        model: settings.model,
+        effort: settings.effort,
+        maxBudgetUsd: call.maxBudgetUsd,
+        ...(call.schema === undefined ? {} : { jsonSchema: toJsonSchemaObject(call.schema) }),
+        tools: isPm ? READ_ONLY_TOOLS : WRITING_TOOLS,
+        allowedTools: isPm ? READ_ONLY_TOOLS : WORKTREE_AGENT_ALLOWED_TOOLS,
+        deniedTools: AGENT_DENIED_TOOLS,
+        environment: settings.context.environment,
+        signal: settings.context.signal,
+        timeoutMs: settings.timeoutMinutes * MS_PER_MINUTE,
+        sessionId,
+      });
+    } catch (error) {
+      // The agent's failure is what the run must report, even if recording its end fails too.
+      await end(error instanceof AgentCallError ? error.exitCode : null).catch(() => undefined);
+      throw error;
+    }
+    // The agent's work and cost count even if recording its end fails.
+    await end(0).catch(() => undefined);
     return { costUsd: result.costUsd, finalMessage: result.finalMessage, output: result.structuredOutput };
   };
 }
@@ -289,7 +318,13 @@ export async function runAutoCommand(options: AutoOptions, context: CommandConte
     context.reporter.info(`Started run ${runId} on branch ${runBranch}. Progress is in ${folder}.`);
     const ports: AutomationPorts = {
       git: repository,
-      runAgent: agentRunner({ model, effort, timeoutMinutes: options.timeoutMinutes, context }),
+      runAgent: agentRunner({
+        model,
+        effort,
+        timeoutMinutes: options.timeoutMinutes,
+        context,
+        saveSession: files.saveSession,
+      }),
       tasks: taskList(target),
       saveState: files.saveState,
       saveLog: files.saveLog,

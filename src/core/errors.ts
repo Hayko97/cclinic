@@ -39,12 +39,16 @@ export class BudgetError extends LlmError {}
 export class ProviderError extends LlmError {}
 /** An agent's `claude` process failed. It keeps what the process cost before it stopped. */
 export class AgentCallError extends LlmError {
+  /** The agent process's exit code, or null when it didn't exit on its own (FR-AUTO-039). */
+  readonly exitCode: number | null;
+
   constructor(
     message: string,
     readonly costUsd: number | null,
-    options?: ErrorOptions,
+    options?: ErrorOptions & { readonly exitCode?: number | null },
   ) {
     super(message, options);
+    this.exitCode = options?.exitCode ?? null;
   }
 }
 

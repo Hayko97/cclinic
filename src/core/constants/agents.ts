@@ -41,6 +41,8 @@ export const AUTO_LOCK_FILE = ".lock";
 export const RUN_STATE_FILE = "run.json";
 export const RUN_REPORT_FILE = "report.md";
 export const RUN_LOGS_FOLDER = "logs";
+/** FR-AUTO-039: one file per agent session, so the GUI can show it. */
+export const RUN_SESSIONS_FOLDER = "sessions";
 export const RUN_WORKTREES_FOLDER = "worktrees";
 export const WIP_COMMIT_MARKER = "WIP";
 

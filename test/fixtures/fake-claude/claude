@@ -35,7 +35,10 @@ if (record) {
     ),
   );
   const cwdEntries = fs.readdirSync(process.cwd());
-  fs.appendFileSync(record, `${JSON.stringify({ args, cwd: process.cwd(), cwdEntries, env, prompt, watched: process.env.FAKE_CLAUDE_WATCH ? fs.existsSync(process.env.FAKE_CLAUDE_WATCH) : null })}\n`);
+  // In an auto run the agent works in <run>/worktrees/task-N, and its session file is in <run>/sessions.
+  const sessionId = args.includes("--session-id") ? args[args.indexOf("--session-id") + 1] : null;
+  const sessionRecorded = sessionId === null ? null : fs.existsSync(require("node:path").join(process.cwd(), "..", "..", "sessions", `${sessionId}.json`));
+  fs.appendFileSync(record, `${JSON.stringify({ args, cwd: process.cwd(), cwdEntries, env, prompt, watched: process.env.FAKE_CLAUDE_WATCH ? fs.existsSync(process.env.FAKE_CLAUDE_WATCH) : null, sessionRecorded })}\n`);
 }
 
 const emit = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);

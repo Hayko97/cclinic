@@ -125,6 +125,20 @@ describe("cclinic mcp", () => {
   });
 });
 
+describe("cclinic session-link", () => {
+  it("TC-CLI-062: it's left out of the help, and with empty input it exits 0 and prints nothing", () => {
+    expect(cclinic(["--help"]).stdout).not.toContain("session-link");
+    const result = spawnSync(process.execPath, [BIN, "session-link"], {
+      cwd: makeTempFolder(),
+      encoding: "utf8",
+      env: environment(),
+      input: "{}",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("");
+  });
+});
+
 describe("cclinic approve", () => {
   it("TC-CLI-059 and TC-MCP-045: without a terminal it exits 2 and answers nothing", () => {
     const result = cclinic(["approve", makeProject()]);

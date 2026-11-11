@@ -34,6 +34,23 @@ export interface TaskRun {
   readonly requirementIds: readonly string[];
 }
 
+export const AGENT_SESSION_ROLES = ["developer", "pm", "qa", "reviewer"] as const;
+
+/** FR-AUTO-039: which Claude Code session each agent of a run used. It never holds a prompt or output. */
+export const agentSessionSchema = z.strictObject({
+  sessionId: z.uuid(),
+  taskId: z.number().int().positive(),
+  role: z.enum(AGENT_SESSION_ROLES),
+  step: z.string(),
+  cwd: z.string(),
+  transcriptPath: z.string(),
+  startedAt: z.string(),
+  endedAt: z.string().nullable(),
+  /** Null while running, or when the process was stopped before it exited. */
+  exitCode: z.number().int().nullable(),
+});
+export type AgentSession = z.infer<typeof agentSessionSchema>;
+
 export interface RunState {
   readonly runId: string;
   readonly roadmapId: number;

@@ -28,6 +28,9 @@ import type { Task, TaskStatus } from "../core/tasks.js";
 export type AgentRole = "developer" | "qa" | "pm";
 
 export interface AgentCall {
+  readonly taskId: number;
+  /** The step the call is for, such as `qa-2`. It also names the call's log. */
+  readonly step: string;
   readonly role: AgentRole;
   readonly cwd: string;
   readonly prompt: string;
@@ -111,7 +114,7 @@ export async function runAutomation(input: AutomationInput, ports: AutomationPor
   const callAgent = async <T>(
     taskId: number,
     name: string,
-    call: Omit<AgentCall, "maxBudgetUsd">,
+    call: Omit<AgentCall, "maxBudgetUsd" | "taskId" | "step">,
     schema?: ReplySchema<T>,
   ) => {
     if (isStopped()) throw new TaskStop("open", "The run was stopped.");
@@ -123,6 +126,8 @@ export async function runAutomation(input: AutomationInput, ports: AutomationPor
     try {
       reply = await ports.runAgent({
         ...call,
+        taskId,
+        step: name,
         maxBudgetUsd: remainingUsd(spending, state.budgetUsd),
         ...(schema === undefined ? {} : { schema }),
       });

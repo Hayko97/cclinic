@@ -1,4 +1,7 @@
 /** Runs one PM, developer or QA agent as a `claude -p` process with limited tools (FR-PLAN-005, FR-AUTO-016). */
+import { realpathSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { BUDGET_DECIMAL_PLACES } from "../../core/constants/llm.js";
 import { LIMITS } from "../../core/constants/limits.js";
 import { AgentCallError, LlmError } from "../../core/errors.js";
@@ -22,6 +25,8 @@ export interface AgentRequest extends AgentToolSettings {
   readonly environment: NodeJS.ProcessEnv;
   readonly signal: AbortSignal;
   readonly timeoutMs: number;
+  /** FR-AUTO-016: keeps the session under this ID. Without it, no session is saved (FR-PLAN-005). */
+  readonly sessionId?: string;
 }
 
 export interface AgentResult {
@@ -36,6 +41,7 @@ export function buildAgentArgs(
     effort: string;
     maxBudgetUsd: number;
     jsonSchema?: Record<string, unknown>;
+    sessionId?: string;
   },
 ): string[] {
   return [
@@ -56,7 +62,7 @@ export function buildAgentArgs(
     ...input.deniedTools,
     "--permission-mode",
     "dontAsk",
-    "--no-session-persistence",
+    ...(input.sessionId === undefined ? ["--no-session-persistence"] : ["--session-id", input.sessionId]),
     // Keeps the login, and stops the project's own hooks and settings from running.
     "--safe-mode",
     "--max-budget-usd",
@@ -81,6 +87,18 @@ export async function runAgent(request: AgentRequest): Promise<AgentResult> {
     };
   } catch (error) {
     if (!(error instanceof LlmError)) throw error;
-    throw new AgentCallError(error.message, findResult(events)?.total_cost_usd ?? null, { cause: error });
+    throw new AgentCallError(error.message, findResult(events)?.total_cost_usd ?? null, { cause: error, exitCode });
   }
+}
+
+/**
+ * Where Claude Code writes a session's transcript: its config folder, then the working folder with every
+ * character other than a letter or digit turned into "-" (FR-AUTO-039).
+ */
+export function claudeTranscriptPath(environment: NodeJS.ProcessEnv, cwd: string, sessionId: string): string {
+  const given = environment["CLAUDE_CONFIG_DIR"];
+  const configFolder =
+    given !== undefined && given !== "" ? given : path.join(environment["HOME"] ?? os.homedir(), ".claude");
+  const projectFolder = realpathSync(cwd).replace(/[^a-zA-Z0-9]/g, "-");
+  return path.join(configFolder, "projects", projectFolder, `${sessionId}.jsonl`);
 }

@@ -2,18 +2,20 @@
 import { existsSync } from "node:fs";
 import { mkdir, open, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { RunState } from "../../core/automation.js";
+import type { AgentSession, RunState } from "../../core/automation.js";
 import {
   AUTO_FOLDER,
   AUTO_LOCK_FILE,
   RUN_LOGS_FOLDER,
   RUN_REPORT_FILE,
+  RUN_SESSIONS_FOLDER,
   RUN_STATE_FILE,
 } from "../../core/constants/agents.js";
 import { LOCK_ATTEMPTS } from "../../core/constants/limits.js";
 import { JSON_INDENT } from "../../core/constants/terminal.js";
 import { UsageError } from "../../core/errors.js";
 import { redact } from "../../core/redaction.js";
+import { isProcessRunning } from "./document-store.js";
 
 export function autoFolder(target: string): string {
   return path.join(target, AUTO_FOLDER);
@@ -25,15 +27,6 @@ export function runFolder(target: string, runId: string): string {
 
 export function isRunFolderUsed(target: string, runId: string): boolean {
   return existsSync(runFolder(target, runId));
-}
-
-function isProcessRunning(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
 }
 
 async function readLiveLock(lockFile: string): Promise<{ pid: number; runId?: string } | undefined> {
@@ -132,6 +125,11 @@ export function createRunFiles(folder: string) {
       writeRedacted(path.join(folder, RUN_STATE_FILE), `${JSON.stringify(state, null, JSON_INDENT)}\n`),
     saveLog: (name: string, text: string) =>
       writeRedacted(path.join(folder, RUN_LOGS_FOLDER, `${name}.txt`), `${text}\n`),
+    saveSession: (session: AgentSession) =>
+      writeRedacted(
+        path.join(folder, RUN_SESSIONS_FOLDER, `${session.sessionId}.json`),
+        `${JSON.stringify(session, null, JSON_INDENT)}\n`,
+      ),
     saveReport: async (markdown: string) => {
       const file = path.join(folder, RUN_REPORT_FILE);
       await writeRedacted(file, markdown);

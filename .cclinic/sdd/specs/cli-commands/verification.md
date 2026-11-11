@@ -56,3 +56,6 @@ Test cases for automation testers. Start each automated test's name with its `TC
 | TC-CLI-057 | FR-CLI-029 | e2e | A project with one waiting G1 question | Run `cclinic approve` in a pseudo-TTY and choose `approve` | The answer is recorded with approver `user`, exit 0 |
 | TC-CLI-058 | FR-CLI-029 | e2e | A project with no waiting question | Run `cclinic approve` in a pseudo-TTY | It says nothing is waiting, exit 0 |
 | TC-CLI-059 | FR-CLI-029 | e2e | A project with one waiting question | Run `cclinic approve` with stdin not a TTY | Exit 2, and the question is still waiting |
+| TC-CLI-060 | FR-CLI-030 | e2e | A project | Run `cclinic gui --help` | It lists `-C, --dir`, `--port`, `--no-open` and `--json`, and exit 0 |
+| TC-CLI-061 | FR-CLI-030 | e2e | A project | Run `cclinic gui --port abc` | Exit 2, with the usage error |
+| TC-CLI-062 | FR-CLI-031 | e2e | A project | Run `cclinic --help`, then pipe `{}` to `cclinic session-link` | `session-link` isn't listed in help. The command exits 0 with empty stdout |

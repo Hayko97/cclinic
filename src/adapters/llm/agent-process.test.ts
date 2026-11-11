@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AGENT_DENIED_TOOLS, READ_ONLY_TOOLS } from "../../core/constants/agents.js";
-import { buildAgentArgs } from "./agent-process.js";
+import { buildAgentArgs, claudeTranscriptPath } from "./agent-process.js";
 
 const between = (args: readonly string[], from: string, to: string): readonly string[] =>
   args.slice(args.indexOf(from) + 1, args.indexOf(to));
@@ -28,5 +28,28 @@ describe("agent process arguments", () => {
     expect(args.slice(-2)).toEqual(["--max-budget-usd", "2.000000"]);
     for (const tool of ["Bash", "Write", "Edit"])
       expect(between(args, "--tools", "--allowedTools")).not.toContain(tool);
+  });
+
+  it("TC-AUTO-021: with a session ID, the session is kept under that ID", () => {
+    const args = buildAgentArgs({
+      model: "haiku",
+      effort: "low",
+      maxBudgetUsd: 2,
+      tools: READ_ONLY_TOOLS,
+      allowedTools: READ_ONLY_TOOLS,
+      deniedTools: AGENT_DENIED_TOOLS,
+      sessionId: "7c1e0000-0000-4000-8000-00000000a90f",
+    });
+    expect(args).not.toContain("--no-session-persistence");
+    expect(args[args.indexOf("--session-id") + 1]).toBe("7c1e0000-0000-4000-8000-00000000a90f");
+  });
+
+  it("TC-AUTO-057: the transcript is in Claude Code's config folder, and an empty CLAUDE_CONFIG_DIR counts as unset", () => {
+    const id = "7c1e0000-0000-4000-8000-00000000a90f";
+    const folder = process.cwd().replace(/[^a-zA-Z0-9]/g, "-");
+    expect(claudeTranscriptPath({ CLAUDE_CONFIG_DIR: "/cfg" }, ".", id)).toBe(`/cfg/projects/${folder}/${id}.jsonl`);
+    expect(claudeTranscriptPath({ CLAUDE_CONFIG_DIR: "", HOME: "/home/me" }, ".", id)).toBe(
+      `/home/me/.claude/projects/${folder}/${id}.jsonl`,
+    );
   });
 });

@@ -132,6 +132,17 @@ export const workflowStateSchema = z.strictObject({
   isCommitted: z.boolean().nullable(),
   pending: pendingSchema.nullable(),
   costUsd: z.number().min(0),
+  /** FR-MCP-045: the Claude Code sessions that worked on this change. Older states have none. */
+  sessions: z
+    .array(
+      z.strictObject({
+        sessionId: z.string(),
+        transcriptPath: z.string(),
+        firstSeenAt: atSchema,
+        lastSeenAt: atSchema,
+      }),
+    )
+    .default([]),
   startedAt: atSchema,
   updatedAt: atSchema,
 });
@@ -157,6 +168,28 @@ export function stateKey(taskId: number | null, branch: string): string {
 
 export function isOpenChange(state: WorkflowState): boolean {
   return state.status === "open" || state.status === "stopped";
+}
+
+/** The fields cclinic reads from Claude Code's `PostToolUse` hook input (FR-MCP-045). Others are ignored. */
+export const hookInputSchema = z.object({
+  session_id: z.string().min(1),
+  transcript_path: z.string().min(1),
+  cwd: z.string().min(1),
+});
+
+/** FR-MCP-045: adds a session once, and after that only moves its last-seen time. */
+export function linkSession(
+  state: WorkflowState,
+  session: { readonly sessionId: string; readonly transcriptPath: string },
+  now: string,
+): WorkflowState {
+  const isKnown = state.sessions.some((item) => item.sessionId === session.sessionId);
+  return {
+    ...state,
+    sessions: isKnown
+      ? state.sessions.map((item) => (item.sessionId === session.sessionId ? { ...item, lastSeenAt: now } : item))
+      : [...state.sessions, { ...session, firstSeenAt: now, lastSeenAt: now }],
+  };
 }
 
 /** FR-MCP-010: a feature or bug starts at the spec, a change with no new behaviour skips the spec gate. */
@@ -190,6 +223,7 @@ export function beginChange(
     isCommitted: null,
     pending: null,
     costUsd: 0,
+    sessions: [],
     startedAt: context.now,
     updatedAt: context.now,
   };

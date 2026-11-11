@@ -5,6 +5,7 @@ import { AUTO_LIMITS, PLAN_LIMITS } from "../core/constants/agents.js";
 import { LIMITS, SHUTDOWN_TIMEOUT_MS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ARGV_OFFSET } from "../core/constants/terminal.js";
+import { SESSION_LINK_COMMAND } from "../core/constants/workflow.js";
 import { APPROVERS } from "../core/workflow.js";
 import {
   EXIT_CODES,
@@ -23,7 +24,7 @@ import { runClean, runDoctor, runModelCommand, runSkillsCommand, type SkillsComm
 import { createReporter, type ColorMode, type Reporter } from "./reporter.js";
 import { runAutoCommand, type AutoOptions } from "./auto-command.js";
 import { runPlanCommand, type PlanOptions } from "./plan-command.js";
-import { runApproveCommand, runMcpCommand, type McpOptions } from "./mcp-command.js";
+import { runApproveCommand, runMcpCommand, runSessionLink, type McpOptions } from "./mcp-command.js";
 import { addTasksCommand } from "./tasks-command.js";
 
 const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
@@ -250,6 +251,11 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .action(async (given: string | undefined) => {
       await runApproveCommand(given, context);
     });
+
+  // FR-CLI-031: run by Claude Code's hook, not by people, so it's left out of the help.
+  program.command(SESSION_LINK_COMMAND, { hidden: true }).action(async () => {
+    await runSessionLink(process.stdin, context.environment);
+  });
 
   program
     .command("environment")

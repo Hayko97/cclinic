@@ -1,6 +1,6 @@
 /** `cclinic auto` in-process, on real Git repositories, with a scripted fake `claude`. */
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { confirm, select } from "@inquirer/prompts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +8,7 @@ import { notifyUser } from "../../src/adapters/notify/desktop-notifier.js";
 import { openTaskStore, tasksDatabaseFile, type TaskStore } from "../../src/adapters/storage/task-store.js";
 import { runAutoCommand, type AutoOptions } from "../../src/cli/auto-command.js";
 import { runClean } from "../../src/cli/other-commands.js";
+import { agentSessionSchema } from "../../src/core/automation.js";
 import { AUTO_REQUIRED_SKILLS } from "../../src/core/constants/agents.js";
 import { exitCodeFor, UsageError } from "../../src/core/errors.js";
 import type { RoadmapPlan } from "../../src/core/tasks.js";
@@ -309,11 +310,11 @@ describe("cclinic auto on a real repository", () => {
         expect(tools).toEqual(expect.arrayContaining(["Write", "Edit", "Bash"]));
         expect(allowed).toEqual(expect.arrayContaining(["Write(./**)", "Edit(./**)", "Bash(npm *)"]));
       }
-      for (const flag of ["--safe-mode", "--no-session-persistence"]) expect(call.args).toContain(flag);
+      expect(call.args).toContain("--safe-mode");
     }
   });
 
-  it("TC-AUTO-021: every agent call is non-interactive, uses the run's model and effort, and stays within the budget left", async () => {
+  it("TC-AUTO-021: every agent call is non-interactive, keeps its own session, uses the run's model and effort, and stays within the budget left", async () => {
     const root = repository();
     roadmap(root, planned("a"));
     const harness = agentHarness({ rules: happyRules([1]).map((rule) => ({ ...rule, cost: 0.5 })) });
@@ -324,11 +325,59 @@ describe("cclinic auto on a real repository", () => {
     calls.forEach((call, index) => {
       expect(call.args[0]).toBe("-p");
       expect(after(call.args, "--permission-mode")).toBe("dontAsk");
-      for (const flag of ["--safe-mode", "--no-session-persistence"]) expect(call.args).toContain(flag);
+      expect(call.args).toContain("--safe-mode");
+      expect(call.args).not.toContain("--no-session-persistence");
+      expect(after(call.args, "--session-id")).toMatch(/^[0-9a-f-]{36}$/);
       expect(after(call.args, "--model")).toBe("sonnet");
       expect(after(call.args, "--effort")).toBe("high");
       expect(Number(after(call.args, "--max-budget-usd"))).toBeLessThanOrEqual(5 - 0.5 * index);
     });
+    expect(new Set(calls.map((call) => after(call.args, "--session-id"))).size).toBe(calls.length);
+  });
+
+  it("TC-AUTO-057: each agent call has a session file with its task, role, step, folder and transcript, and no prompt or output", async () => {
+    const root = repository();
+    roadmap(root, planned("a"), planned("b"));
+    const harness = agentHarness({ rules: happyRules([1, 2]) });
+    expect(await auto(root, harness, { developers: 1 })).toBe(0);
+    const folder = path.join(runFolderOf(root), "sessions");
+    const calls = harness.calls();
+    const ids = calls.map((call) => call.args[call.args.indexOf("--session-id") + 1]);
+    expect(readdirSync(folder).sort()).toEqual(ids.map((id) => `${id}.json`).sort());
+    const home = harness.environment["HOME"] ?? "";
+    for (const [index, call] of calls.entries()) {
+      const text = readFileSync(path.join(folder, `${ids[index]}.json`), "utf8");
+      const session = agentSessionSchema.parse(JSON.parse(text));
+      expect(session.taskId).toBe(Number(/Task #(\d+):/.exec(call.prompt)?.[1]));
+      expect(["developer", "pm", "qa"]).toContain(session.role);
+      expect(session.step).toMatch(/^[a-z-]+-\d+$/);
+      // The worktree is gone by now, so the real path is worked out from the project's.
+      expect(path.join(realpathSync(root), path.relative(root, session.cwd))).toBe(call.cwd);
+      const projectFolder = call.cwd.replace(/[^a-zA-Z0-9]/g, "-");
+      expect(session.transcriptPath).toBe(
+        path.join(home, ".claude", "projects", projectFolder, `${session.sessionId}.jsonl`),
+      );
+      expect(session.endedAt).not.toBeNull();
+      expect(session.exitCode).toBe(0);
+      expect(text).not.toContain(call.prompt.slice(0, 40));
+      expect(text).not.toContain("Done.");
+    }
+  });
+
+  it("TC-AUTO-058: the session file exists before the agent starts, and a crashed agent gets its end time and exit code", async () => {
+    const root = repository();
+    roadmap(root, planned("a"));
+    const crash: FakeClaudeRule = { match: "QA agent", times: 1, exitCode: 3 };
+    const harness = agentHarness({ rules: happyRules([1], [crash]) });
+    await auto(root, harness);
+    const calls = harness.calls();
+    expect(calls.every((call) => call.sessionRecorded === true)).toBe(true);
+    const sessions = readdirSync(path.join(runFolderOf(root), "sessions")).map((name) =>
+      agentSessionSchema.parse(JSON.parse(readFileSync(path.join(runFolderOf(root), "sessions", name), "utf8"))),
+    );
+    const crashed = sessions.find((session) => session.role === "qa" && session.exitCode !== 0);
+    expect(crashed?.exitCode).toBe(3);
+    expect(crashed?.endedAt).not.toBeNull();
   });
 
   it("TC-AUTO-032, TC-AUTO-033: run.json, logs and the report are written, with secrets redacted", async () => {

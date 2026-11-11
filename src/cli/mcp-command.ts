@@ -2,6 +2,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import type { Readable } from "node:stream";
 import { listChangedFiles, readCurrentBranch } from "../adapters/git/git-repository.js";
 import { createMcpServer, type McpConnection } from "../adapters/mcp/mcp-server.js";
 import { startPreview } from "../adapters/preview/preview-runner.js";
@@ -11,11 +12,20 @@ import { readEnvironmentFile } from "../adapters/storage/environment-store.js";
 import { openTaskStore, type OpenMode, type TaskStore } from "../adapters/storage/task-store.js";
 import { openWorkflowStore } from "../adapters/storage/workflow-store.js";
 import { createWorkflowTools, type RunSummary } from "../application/workflow-tools.js";
-import { MCP_SERVER_NAME } from "../core/constants/workflow.js";
+import { TOOL_FOLDER_NAME } from "../core/constants/paths.js";
+import { MCP_SERVER_NAME, SESSION_LINK_LOCK_WAIT_MS, SESSION_LINK_TIMEOUT_MS } from "../core/constants/workflow.js";
 import { ENVIRONMENT_FILE_PATH } from "../core/environment.js";
 import { UsageError } from "../core/errors.js";
 import { renderOverview } from "../core/tasks.js";
-import { answerPending, APPROVERS, isNotesAnswer, type Approver, type WorkflowState } from "../core/workflow.js";
+import {
+  answerPending,
+  APPROVERS,
+  hookInputSchema,
+  isNotesAnswer,
+  linkSession,
+  type Approver,
+  type WorkflowState,
+} from "../core/workflow.js";
 import type { CommandContext } from "./command-context.js";
 import { askText, chooseFrom, isInteractive } from "./menus.js";
 import { projectFolder, readOverview } from "./tasks-command.js";
@@ -156,4 +166,43 @@ export async function runApproveCommand(given: string | undefined, context: Comm
   if ("refusal" in outcome) throw new UsageError(outcome.refusal);
   await store.save(outcome.state);
   context.reporter.result(outcome.message);
+}
+
+/**
+ * The project the hook's session works on: Claude Code's project folder, else the nearest folder with
+ * `.cclinic`. Undefined when there's none, so nothing is written outside a cclinic project.
+ */
+function hookProject(cwd: string, environment: NodeJS.ProcessEnv): string | undefined {
+  const given = environment["CLAUDE_PROJECT_DIR"];
+  if (given !== undefined && given !== "") return given;
+  for (let folder = cwd; ; folder = path.dirname(folder)) {
+    if (existsSync(path.join(folder, TOOL_FOLDER_NAME))) return folder;
+    if (path.dirname(folder) === folder) return undefined;
+  }
+}
+
+async function linkFromHook(stdin: Readable, environment: NodeJS.ProcessEnv, signal: AbortSignal): Promise<void> {
+  let text = "";
+  for await (const chunk of stdin) text += String(chunk);
+  const input = hookInputSchema.safeParse(JSON.parse(text));
+  if (!input.success) return;
+  const project = hookProject(input.data.cwd, environment);
+  if (project === undefined) return;
+  const store = openWorkflowStore(project);
+  const session = { sessionId: input.data.session_id, transcriptPath: input.data.transcript_path };
+  await store.updateOpen((open) => linkSession(open, session, new Date().toISOString()), signal);
+}
+
+/**
+ * FR-MCP-045, FR-CLI-031: links the Claude Code session that just used a cclinic tool to the open change.
+ * It runs inside the user's session, so it never fails, never prints and never waits long.
+ */
+export async function runSessionLink(stdin: Readable, environment: NodeJS.ProcessEnv): Promise<void> {
+  const timeout = new Promise<void>((resolve) => {
+    setTimeout(resolve, SESSION_LINK_TIMEOUT_MS).unref();
+  });
+  // Counted from the start, so the lock is given up before the hook's own time runs out, however slow stdin was.
+  const lockDeadline = AbortSignal.timeout(SESSION_LINK_LOCK_WAIT_MS);
+  await Promise.race([linkFromHook(stdin, environment, lockDeadline).catch(() => undefined), timeout]);
+  stdin.destroy();
 }

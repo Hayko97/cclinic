@@ -29,3 +29,4 @@ Acceptance criteria from the user's point of view.
 | VAL-MCP-023 | FR-MCP-041 | The new state doesn't disturb cclinic | Cleaning keeps the workflow state, and it never changes analysis or generated docs |
 | VAL-MCP-024 | FR-MCP-042 | Adding the server doesn't cost me a re-analysis | After cclinic adds itself to `.mcp.json`, running `cclinic` again doesn't treat the project as changed |
 | VAL-MCP-025 | FR-MCP-043 | A change I stop doesn't block my next one | After QA stops a change and I choose not to continue, the agent can start a new change right away, and my task is left as it was |
+| VAL-MCP-026 | FR-MCP-044, FR-MCP-045 | The Claude Code sessions I work on a change in are linked to it without extra steps | After I use cclinic's tools in a Claude Code session, that session is listed on the change's task or spec, and my session is never slowed or broken by it |

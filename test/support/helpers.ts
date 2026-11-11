@@ -256,6 +256,8 @@ export interface FakeClaudeCall {
   readonly args: readonly string[];
   readonly cwd: string;
   readonly prompt: string;
+  /** With `--session-id`: whether the run's session file existed when the agent started. */
+  readonly sessionRecorded: boolean | null;
 }
 
 /** Runs commands in-process with a fake `claude` on PATH, scripted replies, and captured output. */

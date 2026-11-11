@@ -18,3 +18,4 @@ Acceptance criteria from the user's point of view.
 | VAL-CLI-012 | FR-CLI-019 | Learn the workflow from the terminal. | cclinic guide works offline and covers steps, commands, skills, limits and exit codes. |
 | VAL-CLI-013 | FR-CLI-026, FR-CLI-027 | Set a default model and install agent skills from the CLI. | model lists, sets and resets the default, and skills installs the skills without Claude usage. |
 | VAL-CLI-014 | FR-CLI-028, FR-CLI-029 | I can run the MCP server and answer approvals from a terminal | `cclinic mcp` starts the server, and `cclinic approve` shows what's waiting and records my answer, but only when I run it myself in a terminal |
+| VAL-CLI-015 | FR-CLI-030, FR-CLI-031 | I can open the GUI from the CLI, and my sessions get linked by themselves | `cclinic gui` starts the GUI, and the hook command works without showing up as something I must run |
