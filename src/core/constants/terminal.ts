@@ -10,6 +10,8 @@ export const COMMANDS = [
   "environment",
   "clean",
   "guide",
+  // After "guide", so a near miss such as "guid" still suggests the guide.
+  "gui",
   "help",
 ] as const;
 export const MAX_TYPO_DISTANCE = 2;

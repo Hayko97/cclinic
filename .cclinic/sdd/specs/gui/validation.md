@@ -4,7 +4,7 @@ Acceptance criteria from the user's point of view.
 
 | ID | Covers | User need | Accepted when |
 |---|---|---|---|
-| VAL-GUI-001 | FR-GUI-001, FR-GUI-003, FR-GUI-004, FR-GUI-005, FR-GUI-006, FR-GUI-007 | I can open cclinic's GUI for my project with one command | `cclinic gui` in my project opens the GUI in my browser, prints its link, stops cleanly on Ctrl+C, and a second one tells me where the first one is |
+| VAL-GUI-001 | FR-GUI-001, FR-GUI-003, FR-GUI-004, FR-GUI-005, FR-GUI-006, FR-GUI-007 | I can open cclinic's GUI for my project with one command | `cclinic gui` in my project opens the GUI in my browser, prints its link, stops cleanly on Ctrl+C or when I close the terminal, and a second one tells me where the first one is |
 | VAL-GUI-002 | FR-GUI-002, FR-GUI-008, FR-GUI-009, FR-GUI-010, FR-GUI-012 | Nobody else, and no website, can use my GUI | Other machines can't reach it, and a request without my link's token, or from another website, gets nothing |
 | VAL-GUI-003 | FR-GUI-011, FR-GUI-013 | The GUI never leaks my secrets or runs commands I didn't choose | Secrets in output, logs and transcripts show as redacted, and nothing I type can run a command other than the one I picked |
 | VAL-GUI-004 | FR-GUI-014, FR-GUI-015, FR-GUI-016, FR-GUI-017, FR-GUI-018 | I can set up cclinic for my project without the terminal | From Setup I can check, generate with any option, install skills, set up the environment, choose a model and clean, answering the same questions the CLI asks, and I can see how to connect my agent |

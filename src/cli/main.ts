@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { Command, CommanderError, Option } from "commander";
 import { AUTO_LIMITS, PLAN_LIMITS } from "../core/constants/agents.js";
+import { GUI_MAX_PORT } from "../core/constants/gui.js";
 import { LIMITS, SHUTDOWN_TIMEOUT_MS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ARGV_OFFSET } from "../core/constants/terminal.js";
@@ -24,6 +25,7 @@ import { runClean, runDoctor, runModelCommand, runSkillsCommand, type SkillsComm
 import { createReporter, type ColorMode, type Reporter } from "./reporter.js";
 import { runAutoCommand, type AutoOptions } from "./auto-command.js";
 import { runPlanCommand, type PlanOptions } from "./plan-command.js";
+import { runGuiCommand, type GuiOptions } from "./gui-command.js";
 import { runApproveCommand, runMcpCommand, runSessionLink, type McpOptions } from "./mcp-command.js";
 import { addTasksCommand } from "./tasks-command.js";
 
@@ -250,6 +252,23 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .addHelpText("after", commandHelp("cclinic approve", "cclinic approve ./my-project"))
     .action(async (given: string | undefined) => {
       await runApproveCommand(given, context);
+    });
+
+  program
+    .command("gui")
+    .description("Open the local GUI: roadmaps, tasks, auto runs and Claude sessions, in your browser")
+    .argument("[path]", "project folder (default: the current folder)")
+    .option("-C, --dir <path>", "project folder (default: the current folder)")
+    .option(
+      "--port <n>",
+      `port to serve on, 0 for any free port (0 to ${GUI_MAX_PORT})`,
+      integerInRange(0, GUI_MAX_PORT),
+    )
+    .option("--no-open", "don't open the browser")
+    .option("--json", "write the link and port as JSON on stdout")
+    .addHelpText("after", commandHelp("cclinic gui", "cclinic gui ./my-project --port 4417"))
+    .action(async (given: string | undefined, options: GuiOptions) => {
+      await runGuiCommand(given, options, context);
     });
 
   // FR-CLI-031: run by Claude Code's hook, not by people, so it's left out of the help.

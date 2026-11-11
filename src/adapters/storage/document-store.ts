@@ -1,8 +1,8 @@
 /** Everything that touches .cclinic on disk: cache, safe writes, hand-edit checks and the run lock. */
 import { createHash } from "node:crypto";
-import { access, constants, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, constants, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { LOCK_ATTEMPTS } from "../../core/constants/limits.js";
+import { LOCK_WAIT_MS } from "../../core/constants/limits.js";
 import {
   BACKUP_FOLDER_SUFFIX,
   CACHE_FOLDER_NAME,
@@ -17,6 +17,7 @@ import {
 import { UsageError } from "../../core/errors.js";
 import type { Cache, DocumentStore } from "../../core/ports.js";
 import { manifestSchema, type Manifest } from "../../core/schemas.js";
+import { takeLock } from "./file-lock.js";
 
 export function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex");
@@ -213,36 +214,19 @@ export async function checkWritable(paths: ProjectPaths): Promise<void> {
   }
 }
 
-export function isProcessRunning(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
-}
-
-/** Allows one run per target. A lock from a dead process gets replaced (FR-CLI-018). */
+/** Allows one run per target. A lock from a dead process gets replaced (FR-CLI-022). */
 export async function acquireLock(lockFile: string): Promise<() => Promise<void>> {
   await mkdir(path.dirname(lockFile), { recursive: true });
-  for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
-    try {
-      const handle = await open(lockFile, "wx");
-      await handle.writeFile(String(process.pid));
-      await handle.close();
-      return () => rm(lockFile, { force: true });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const holder = Number(await readFile(lockFile, "utf8").catch(() => "0"));
-      if (holder > 0 && isProcessRunning(holder)) {
-        throw new UsageError(`Another cclinic run (process ${holder}) is already working on this folder.`, {
-          cause: error,
-        });
-      }
-      await rm(lockFile, { force: true });
-    }
-  }
-  throw new UsageError(`Couldn't create the lock file ${lockFile}.`);
+  const lock = await takeLock(
+    lockFile,
+    {},
+    {
+      signal: AbortSignal.timeout(LOCK_WAIT_MS),
+      refuse: (holder) =>
+        new UsageError(`Another cclinic run (process ${holder.pid}) is already working on this folder.`),
+    },
+  );
+  return lock.release;
 }
 
 async function folderSize(folder: string): Promise<number> {

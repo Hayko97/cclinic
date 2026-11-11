@@ -3,7 +3,7 @@ import { existsSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { openWorkflowStore } from "../../src/adapters/storage/workflow-store.js";
-import { STATE_LOCK_WRITE_GRACE_MS } from "../../src/core/constants/workflow.js";
+import { LOCK_WRITE_GRACE_MS } from "../../src/core/constants/limits.js";
 import { beginChange, linkSession, stateKey, type WorkflowState } from "../../src/core/workflow.js";
 import { makeTempFolder } from "../support/helpers.js";
 
@@ -46,9 +46,9 @@ describe("workflow state lock without hard links", () => {
     writeFileSync(lock, "");
     const stopped = new AbortController();
     stopped.abort();
-    await expect(store.updateOpen(add("s1"), stopped.signal)).rejects.toThrow("Another cclinic process");
+    await expect(store.updateOpen(add("s1"), stopped.signal)).rejects.toThrow("Another cclinic process holds");
     expect(readFileSync(lock, "utf8")).toBe("");
-    const old = new Date(Date.now() - STATE_LOCK_WRITE_GRACE_MS - 1_000);
+    const old = new Date(Date.now() - LOCK_WRITE_GRACE_MS - 1_000);
     utimesSync(lock, old, old);
     await store.updateOpen(add("s2"));
     expect((await store.list())[0]?.sessions.map((session) => session.sessionId)).toEqual(["s2"]);

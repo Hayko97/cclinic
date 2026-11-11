@@ -1,3 +1,4 @@
+import { cp } from "node:fs/promises";
 import { defineConfig } from "tsup";
 
 export const tsupConfig = defineConfig({
@@ -10,6 +11,10 @@ export const tsupConfig = defineConfig({
   sourcemap: true,
   // Keeps "node:sqlite", which only exists with the prefix.
   removeNodeProtocol: false,
+  // The GUI's pages ship with the package, next to the code that serves them (FR-GUI-045).
+  onSuccess: async () => {
+    await cp("src/gui", "dist/gui", { recursive: true });
+  },
 });
 
 // tsup loads its configuration through the default export.

@@ -28,7 +28,10 @@ export const MIN_PDF_CHARS_PER_PAGE = 20;
 
 export const EXTRACTION_CONCURRENCY = 8;
 export const ESTIMATION_CONCURRENCY = 8;
-export const LOCK_ATTEMPTS = 2;
+/** File locks: how often to try again, how long a lock may be empty while it's written, and the longest wait. */
+export const LOCK_RETRY_MS = 20;
+export const LOCK_WRITE_GRACE_MS = 1_000;
+export const LOCK_WAIT_MS = 10_000;
 export const SHUTDOWN_TIMEOUT_MS = 5000;
 export const VERSION_CHECK_TIMEOUT_MS = 5000;
 export const MAX_AREA_LETTERS = 8;

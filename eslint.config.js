@@ -13,6 +13,22 @@ const config = tseslint.config(
     },
   },
   {
+    // The GUI's browser script isn't part of the TypeScript project, so it's linted without type information.
+    files: ["src/gui/**/*.js"],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      ...tseslint.configs.disableTypeChecked.languageOptions,
+      sourceType: "module",
+      globals: {
+        document: "readonly",
+        location: "readonly",
+        history: "readonly",
+        fetch: "readonly",
+        EventSource: "readonly",
+      },
+    },
+  },
+  {
     // Values belong in src/core/constants (see "Hardcoded values" in the developer guidelines).
     files: ["src/**/*.ts"],
     ignores: ["src/**/*.test.ts", "src/core/constants/**"],

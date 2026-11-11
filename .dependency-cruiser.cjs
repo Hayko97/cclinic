@@ -44,6 +44,13 @@ module.exports = {
       // The SDK's subpath imports go through its exports map, which depcruise leaves unresolved, so match the name too.
       to: { path: "(^|node_modules/)@modelcontextprotocol/sdk" },
     },
+    {
+      // FR-GUI-046: the GUI's server is the only HTTP code.
+      name: "http-only-in-http-adapter",
+      severity: "error",
+      from: { pathNot: "^src/adapters/http/" },
+      to: { dependencyTypes: ["core"], path: "^(node:)?https?$" },
+    },
     { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
   ],
   options: {

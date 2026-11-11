@@ -1,6 +1,6 @@
 /** The files of an automated run in `.cclinic/auto/<run-id>`, and the lock that allows one run at a time. */
 import { existsSync } from "node:fs";
-import { mkdir, open, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentSession, RunState } from "../../core/automation.js";
 import {
@@ -11,11 +11,11 @@ import {
   RUN_SESSIONS_FOLDER,
   RUN_STATE_FILE,
 } from "../../core/constants/agents.js";
-import { LOCK_ATTEMPTS } from "../../core/constants/limits.js";
+import { LOCK_WAIT_MS } from "../../core/constants/limits.js";
 import { JSON_INDENT } from "../../core/constants/terminal.js";
 import { UsageError } from "../../core/errors.js";
 import { redact } from "../../core/redaction.js";
-import { isProcessRunning } from "./document-store.js";
+import { readLiveHolder, takeLock, type LockHolder } from "./file-lock.js";
 
 export function autoFolder(target: string): string {
   return path.join(target, AUTO_FOLDER);
@@ -29,21 +29,20 @@ export function isRunFolderUsed(target: string, runId: string): boolean {
   return existsSync(runFolder(target, runId));
 }
 
-async function readLiveLock(lockFile: string): Promise<{ pid: number; runId?: string } | undefined> {
-  const holder = JSON.parse(await readFile(lockFile, "utf8").catch(() => "{}")) as { pid?: number; runId?: string };
-  return typeof holder.pid === "number" && isProcessRunning(holder.pid) ? { ...holder, pid: holder.pid } : undefined;
+function runIdOf(holder: LockHolder): string | undefined {
+  return typeof holder["runId"] === "string" ? holder["runId"] : undefined;
 }
 
-function lockedError(holder: { pid: number; runId?: string }, cause?: unknown): UsageError {
+function lockedError(holder: LockHolder, cause?: unknown): UsageError {
   return new UsageError(
-    `Automated run ${holder.runId ?? "unknown"} (process ${holder.pid}) is already working on this project.`,
+    `Automated run ${runIdOf(holder) ?? "unknown"} (process ${holder.pid}) is already working on this project.`,
     cause === undefined ? undefined : { cause },
   );
 }
 
 /** Refuses early, creating nothing, when another run is working on the project (FR-AUTO-032). */
 export async function checkNoRunGoing(target: string): Promise<void> {
-  const holder = await readLiveLock(path.join(autoFolder(target), AUTO_LOCK_FILE));
+  const holder = await readLiveHolder(path.join(autoFolder(target), AUTO_LOCK_FILE));
   if (holder !== undefined) throw lockedError(holder);
 }
 
@@ -51,20 +50,12 @@ export async function checkNoRunGoing(target: string): Promise<void> {
 export async function acquireRunLock(target: string, runId: string): Promise<() => Promise<void>> {
   const lockFile = path.join(autoFolder(target), AUTO_LOCK_FILE);
   await mkdir(path.dirname(lockFile), { recursive: true });
-  for (let attempt = 0; attempt < LOCK_ATTEMPTS; attempt += 1) {
-    try {
-      const handle = await open(lockFile, "wx");
-      await handle.writeFile(JSON.stringify({ pid: process.pid, runId }));
-      await handle.close();
-      return () => rm(lockFile, { force: true });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const holder = await readLiveLock(lockFile);
-      if (holder !== undefined) throw lockedError(holder, error);
-      await rm(lockFile, { force: true });
-    }
-  }
-  throw new UsageError(`Couldn't create the lock file ${lockFile}.`);
+  const lock = await takeLock(
+    lockFile,
+    { runId },
+    { signal: AbortSignal.timeout(LOCK_WAIT_MS), refuse: (holder) => lockedError(holder) },
+  );
+  return lock.release;
 }
 
 function parseRunState(text: string, runId: string): RunState {
@@ -96,12 +87,11 @@ export async function readRunState(target: string, runId?: string): Promise<RunS
 
 /** The ID of the live run working on this task, if any (FR-MCP-012). */
 export async function findRunHoldingTask(target: string, taskId: number): Promise<string | undefined> {
-  const holder = await readLiveLock(path.join(autoFolder(target), AUTO_LOCK_FILE));
-  if (holder?.runId === undefined) return undefined;
-  const state = await readRunState(target, holder.runId);
-  return state?.tasks.some((task) => task.taskId === taskId && task.status === "running") === true
-    ? holder.runId
-    : undefined;
+  const holder = await readLiveHolder(path.join(autoFolder(target), AUTO_LOCK_FILE));
+  const runId = holder === undefined ? undefined : runIdOf(holder);
+  if (runId === undefined) return undefined;
+  const state = await readRunState(target, runId);
+  return state?.tasks.some((task) => task.taskId === taskId && task.status === "running") === true ? runId : undefined;
 }
 
 /** Secrets are redacted from everything a run saves (FR-AUTO-027). */

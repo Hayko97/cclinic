@@ -215,7 +215,7 @@ describe("cclinic session-link", () => {
     const holder = JSON.stringify({ pid: process.pid, owner: "someone else" });
     writeFileSync(lock, holder);
     const change = (state: WorkflowState) => linkSession(state, { sessionId: "s1", transcriptPath: "t" }, "now");
-    await expect(store.updateOpen(change, AbortSignal.timeout(50))).rejects.toThrow("Another cclinic process");
+    await expect(store.updateOpen(change, AbortSignal.timeout(50))).rejects.toThrow("Another cclinic process holds");
     expect((await store.list())[0]?.sessions).toEqual([]);
     expect(readFileSync(lock, "utf8")).toBe(holder);
   });

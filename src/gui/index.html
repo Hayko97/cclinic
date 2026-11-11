@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>cclinic</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <header class="top-bar">
+      <span class="logo" aria-hidden="true">c</span>
+      <div>
+        <strong id="project-name">cclinic</strong>
+        <div id="project-folder" class="muted"></div>
+      </div>
+    </header>
+    <main class="content">
+      <section aria-labelledby="jobs-title">
+        <div class="section-head">
+          <h1 id="jobs-title">Jobs</h1>
+          <button id="run-doctor" type="button" class="primary">Run doctor</button>
+        </div>
+        <p id="notice" class="muted" role="status" aria-live="polite"></p>
+        <div class="jobs">
+          <ul id="job-list" class="job-list" aria-label="Jobs"></ul>
+          <article class="job-output" aria-labelledby="output-title">
+            <div class="section-head">
+              <h2 id="output-title">Choose a job</h2>
+              <button id="cancel-job" type="button" hidden>Cancel</button>
+            </div>
+            <pre id="output" tabindex="0"></pre>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

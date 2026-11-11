@@ -12,10 +12,14 @@ interface SecretPattern {
 
 const placeholder = (type: string): string => `[REDACTED:${type}]`;
 
+/** A private key's first and last lines, used by `redact` and by the line-by-line redactor alike. */
+const KEY_BEGIN = /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----/;
+const KEY_END = /-----END [A-Z ]{0,40}PRIVATE KEY-----/;
+
 const PATTERNS: readonly SecretPattern[] = [
   {
     type: "private-key",
-    pattern: /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----[\s\S]{0,20000}?-----END [A-Z ]{0,40}PRIVATE KEY-----/g,
+    pattern: new RegExp(`${KEY_BEGIN.source}[\\s\\S]{0,20000}?${KEY_END.source}`, "g"),
     // Keeps line numbers stable, so citations stay correct.
     replace: (match) => `${placeholder("private-key")}${"\n".repeat(match.split("\n").length - 1)}`,
   },
@@ -49,6 +53,25 @@ export function redact(text: string): RedactionResult {
     });
   }
   return { text: result, counts };
+}
+
+/**
+ * Redacts text that arrives one line at a time, such as a command's output (FR-GUI-011). A private key spans
+ * several lines, so every line from its BEGIN line to its END line is replaced, wherever the chunks break.
+ */
+export function createLineRedactor(): (line: string) => string {
+  let isInKey = false;
+  return (line) => {
+    if (isInKey) {
+      if (KEY_END.test(line)) isInKey = false;
+      return placeholder("private-key");
+    }
+    if (KEY_BEGIN.test(line) && !KEY_END.test(line)) {
+      isInKey = true;
+      return placeholder("private-key");
+    }
+    return redact(line).text;
+  };
 }
 
 export function countRedactions(counts: Readonly<Record<string, number>>): number {

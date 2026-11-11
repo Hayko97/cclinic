@@ -5,6 +5,8 @@ export const DOCUMENTS_FOLDER_NAME = "sdd";
 export const CACHE_FOLDER_NAME = "cache";
 export const FAILED_FOLDER_NAME = "failed";
 export const LOCK_FILE_NAME = ".lock";
+/** Held for a moment by the one process removing an abandoned lock. */
+export const LOCK_BREAKER_SUFFIX = ".break";
 export const TASKS_DB_FILE = "tasks.db";
 /** Visual review docs written by the review-doc skill, outside the documents folder (FR-SKILL-033). */
 export const REVIEWS_FOLDER = `${TOOL_FOLDER_NAME}/reviews`;
