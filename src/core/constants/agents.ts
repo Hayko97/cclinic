@@ -61,5 +61,9 @@ export const AUTO_REQUIRED_SKILLS: readonly string[] = [
 export const NOTIFY_TIMEOUT_MS = 10_000;
 export const TERMINAL_BELL = "\u0007";
 export const RUN_ID_FIELD_DIGITS = 2;
+/** What `createRunId` makes: UTC `YYYYMMDD-HHMMSS`, maybe with `-2`, `-3`... */
+export const RUN_ID_PATTERN = /^\d{8}-\d{6}(-\d+)?$/;
+/** The `YYYYMMDD-HHMMSS` part of a run ID. */
+export const RUN_ID_TIME_LENGTH = 15;
 /** The second run started in the same second gets `-2`. */
 export const FIRST_RUN_ID_SUFFIX = 2;

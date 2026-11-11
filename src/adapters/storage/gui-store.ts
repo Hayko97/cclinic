@@ -1,6 +1,9 @@
 /** The GUI's lock in `.cclinic/gui/`, which allows one GUI per project (FR-GUI-007, FR-GUI-047). */
+import { randomUUID } from "node:crypto";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { GUI_FOLDER, GUI_HOST, GUI_LOCK_FILE } from "../../core/constants/gui.js";
+import { layoutSchema, type Layout } from "../../core/canvas.js";
+import { GUI_FOLDER, GUI_HOST, GUI_LAYOUT_FILE, GUI_LOCK_FILE } from "../../core/constants/gui.js";
 import { LOCK_WAIT_MS } from "../../core/constants/limits.js";
 import { UsageError } from "../../core/errors.js";
 import { ensureIgnoredFolder } from "./document-store.js";
@@ -34,4 +37,33 @@ export async function acquireGuiLock(target: string): Promise<GuiLock> {
     { signal: AbortSignal.timeout(LOCK_WAIT_MS), refuse: alreadyRunning },
   );
   return { setPort: (port) => lock.rewrite({ port }), release: lock.release };
+}
+
+/** FR-GUI-073: the saved canvas layout. A missing, damaged or older file means everything is placed automatically. */
+export async function readLayout(target: string): Promise<Layout | undefined> {
+  try {
+    const parsed = layoutSchema.safeParse(
+      JSON.parse(await readFile(path.join(guiFolder(target), GUI_LAYOUT_FILE), "utf8")),
+    );
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Written whole and renamed into place, so a reader never sees half a layout. */
+export async function saveLayout(target: string, layout: Layout): Promise<void> {
+  const folder = guiFolder(target);
+  await ensureIgnoredFolder(folder);
+  const file = path.join(folder, GUI_LAYOUT_FILE);
+  // Its own temporary file per save, so two saves at once can't mix their content (FR-GUI-073).
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, `${JSON.stringify(layout)}\n`);
+    await rename(temporary, file);
+  } catch (error) {
+    // Only the lock and the layout belong in the GUI's folder (FR-GUI-047).
+    await rm(temporary, { force: true });
+    throw error;
+  }
 }

@@ -5,16 +5,19 @@ import {
   GUI_CONTENT_SECURITY_POLICY,
   GUI_COOKIE_PREFIX,
   GUI_HOST_NAMES,
+  GUI_MAX_DEPENDENCIES,
   GUI_MAX_PATTERN_LENGTH,
   GUI_MAX_PATTERNS,
   GUI_TOKEN_HEADER,
   GUI_TOKEN_QUERY,
   HTTP_DEFAULT_PORT,
   HTTP_STATUS,
+  SESSION_ID_PATTERN,
 } from "./constants/gui.js";
 import { LIMITS } from "./constants/limits.js";
 import { PROVIDER_CHOICES } from "./constants/llm.js";
 import { EXIT_CODES } from "./errors.js";
+import { idSchema, specNameSchema, textSchema, titleSchema } from "./tasks.js";
 
 export interface GuiRequest {
   readonly method: string;
@@ -120,10 +123,17 @@ export type Route =
   | { readonly name: "start-job" }
   | { readonly name: "job"; readonly id: string }
   | { readonly name: "job-events"; readonly id: string }
-  | { readonly name: "cancel-job"; readonly id: string };
+  | { readonly name: "cancel-job"; readonly id: string }
+  | { readonly name: "canvas" }
+  | { readonly name: "canvas-events" }
+  | { readonly name: "save-layout" }
+  | { readonly name: "tidy-layout" }
+  | { readonly name: "session"; readonly id: string }
+  | { readonly name: "session-events"; readonly id: string };
 
 const ASSET_FILES: ReadonlySet<string> = new Set(GUI_ASSETS.files);
 const JOB_PATH = "/api/jobs/(job-[1-9][0-9]{0,5})";
+const SESSION_PATH = `/api/sessions/(${SESSION_ID_PATTERN})`;
 
 /** FR-GUI-010: every route, with each parameter's pattern. Anything else is not found. */
 const ROUTES: readonly {
@@ -143,6 +153,12 @@ const ROUTES: readonly {
   { method: "GET", pattern: new RegExp(`^${JOB_PATH}$`), route: (id) => ({ name: "job", id }) },
   { method: "GET", pattern: new RegExp(`^${JOB_PATH}/events$`), route: (id) => ({ name: "job-events", id }) },
   { method: "POST", pattern: new RegExp(`^${JOB_PATH}/cancel$`), route: (id) => ({ name: "cancel-job", id }) },
+  { method: "GET", pattern: /^\/api\/canvas$/, route: () => ({ name: "canvas" }) },
+  { method: "GET", pattern: /^\/api\/canvas\/events$/, route: () => ({ name: "canvas-events" }) },
+  { method: "PUT", pattern: /^\/api\/layout$/, route: () => ({ name: "save-layout" }) },
+  { method: "POST", pattern: /^\/api\/layout\/tidy$/, route: () => ({ name: "tidy-layout" }) },
+  { method: "GET", pattern: new RegExp(`^${SESSION_PATH}$`), route: (id) => ({ name: "session", id }) },
+  { method: "GET", pattern: new RegExp(`^${SESSION_PATH}/events$`), route: (id) => ({ name: "session-events", id }) },
 ];
 
 export function matchRoute(method: string, path: string): Route | undefined {
@@ -191,6 +207,19 @@ export const jobRequestSchema = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("model-reset") }),
   // The user answered the CLI's confirmation in the GUI, so the run is started with --yes.
   z.strictObject({ command: z.literal("generate"), confirmed: z.literal(true), options: generateOptionsSchema }),
+  // FR-GUI-020: every `cclinic tasks` change. Creating a roadmap or milestone isn't one (FR-GUI-021).
+  z.strictObject({
+    command: z.literal("tasks-add"),
+    title: titleSchema,
+    description: textSchema.optional(),
+    spec: specNameSchema.optional(),
+    dependsOn: z.array(idSchema).max(GUI_MAX_DEPENDENCIES).default([]),
+  }),
+  z.strictObject({ command: z.enum(["tasks-depend", "tasks-undepend"]), id: idSchema, on: idSchema }),
+  z.strictObject({
+    command: z.enum(["tasks-start", "tasks-done", "tasks-remove", "milestone-remove", "roadmap-remove"]),
+    id: idSchema,
+  }),
 ]);
 export type JobRequest = z.output<typeof jobRequestSchema>;
 export type JobKind = JobRequest["command"];
@@ -229,6 +258,8 @@ function generateArgs(options: GenerateOptions): string[] {
   ];
 }
 
+const TASKS_PREFIX = "tasks-";
+
 /** FR-GUI-013, FR-GUI-033: the arguments of the `cclinic` child process, run in the project's folder. */
 export function jobArgs(request: JobRequest): string[] {
   switch (request.command) {
@@ -244,6 +275,27 @@ export function jobArgs(request: JobRequest): string[] {
       return ["model", "--reset", "--json"];
     case "generate":
       return ["--json", "--yes", ...generateArgs(request.options)];
+    case "tasks-add":
+      return [
+        "tasks",
+        "add",
+        `--title=${request.title}`,
+        ...(request.description === undefined ? [] : [`--description=${request.description}`]),
+        ...(request.spec === undefined ? [] : [`--spec=${request.spec}`]),
+        ...request.dependsOn.map((id) => `--depends-on=${id}`),
+        "--json",
+      ];
+    case "tasks-depend":
+    case "tasks-undepend":
+      return ["tasks", request.command.slice(TASKS_PREFIX.length), String(request.id), `--on=${request.on}`, "--json"];
+    case "tasks-start":
+    case "tasks-done":
+    case "tasks-remove":
+      return ["tasks", request.command.slice(TASKS_PREFIX.length), String(request.id), "--json"];
+    case "milestone-remove":
+      return ["tasks", "milestone", "remove", String(request.id), "--json"];
+    case "roadmap-remove":
+      return ["tasks", "roadmap", "remove", String(request.id), "--json"];
   }
 }
 

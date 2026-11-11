@@ -15,6 +15,8 @@ const STATE_EXTENSION = ".json";
 
 export interface WorkflowStore {
   list(): Promise<readonly WorkflowState[]>;
+  /** Every state that can be read, and why each other one can't, so one damaged file hides nothing else. */
+  listReadable(): Promise<{ readonly states: readonly WorkflowState[]; readonly problems: readonly string[] }>;
   /** Saves under the folder's lock, keeping the sessions a hook linked meanwhile (FR-MCP-038, FR-MCP-045). */
   save(state: WorkflowState): Promise<void>;
   /** Re-reads the open change under the lock and saves what `change` makes of it (FR-MCP-045). */
@@ -103,6 +105,20 @@ export function openWorkflowStore(target: string): WorkflowStore {
   };
   return {
     list,
+    listReadable: async () => {
+      const names = (await readdir(folder).catch(() => [])).filter((name) => name.endsWith(STATE_EXTENSION));
+      const results = await Promise.allSettled(names.map((name) => readState(path.join(folder, name))));
+      return {
+        states: results.flatMap((result) =>
+          result.status === "fulfilled" && result.value !== undefined ? [result.value] : [],
+        ),
+        problems: results.flatMap((result) =>
+          result.status === "rejected"
+            ? [result.reason instanceof Error ? result.reason.message : String(result.reason)]
+            : [],
+        ),
+      };
+    },
     // Written to a temporary file and renamed, so a failed write leaves the last state whole (FR-MCP-038, FR-MCP-039).
     save: (state) =>
       withLock(folder, AbortSignal.timeout(LOCK_WAIT_MS), async () => {

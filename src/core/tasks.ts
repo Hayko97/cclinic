@@ -48,7 +48,7 @@ export const textSchema = z.string().max(TASK_LIMITS.text, `It can have at most 
 export const specNameSchema = z
   .string()
   .regex(SPEC_NAME, "A spec name uses lowercase letters, digits and single hyphens, such as user-login.");
-const idSchema = z.number().int().positive();
+export const idSchema = z.number().int().positive();
 
 export const taskInputSchema = z.object({
   title: titleSchema,

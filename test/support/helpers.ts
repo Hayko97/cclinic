@@ -1,4 +1,5 @@
 /** Shared test helpers: temp projects, sample documents and a fake LLM provider. */
+import type { CanvasPorts } from "../../src/application/gui-canvas.js";
 import {
   chmodSync,
   copyFileSync,
@@ -303,3 +304,16 @@ export function agentHarness(
       : [];
   return { context, controller, environment, output, calls, bin };
 }
+
+/** A canvas for GUI tests that don't use it: empty, and never asked to save or read a transcript. */
+export const EMPTY_CANVAS: CanvasPorts = {
+  readSources: () =>
+    Promise.resolve({ overview: { roadmaps: [], unassigned: [] }, runs: [], workflows: [], problems: [] }),
+  readLayout: () => Promise.resolve(undefined),
+  updateLayout: () => Promise.resolve(),
+  locateTranscript: () => Promise.resolve({ kind: "missing" }),
+  readTranscript: () =>
+    Promise.resolve({ lines: [], next: { offset: 0, fileId: "" }, isRestart: false, isTruncated: false }),
+  now: () => new Date(0),
+  every: () => () => undefined,
+};

@@ -10,6 +10,16 @@ import {
   type GuiRequest,
   type GuiResponse,
 } from "../core/gui.js";
+import {
+  findSession,
+  readCanvas,
+  readSessionTranscript,
+  saveCanvasLayout,
+  streamCanvas,
+  streamTranscript,
+  tidyCanvasFrame,
+  type CanvasPorts,
+} from "./gui-canvas.js";
 import type { Jobs } from "./gui-jobs.js";
 
 export interface GuiProject {
@@ -25,6 +35,7 @@ export interface GuiPorts {
   readonly jobs: Jobs;
   /** One of the GUI's own bundled files, by name (FR-GUI-010). */
   readonly readAsset: (name: string) => Promise<string>;
+  readonly canvas: CanvasPorts;
 }
 
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
@@ -121,6 +132,37 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
             if (!subscription.job.isRunning) finish();
             return subscription.stop;
           },
+        };
+      }
+      case "canvas":
+        return json(HTTP_STATUS.ok, await readCanvas(ports.canvas));
+      case "canvas-events":
+        return { kind: "events", headers: SECURITY_HEADERS, open: (send) => streamCanvas(ports.canvas, send) };
+      case "save-layout": {
+        const layout = await saveCanvasLayout(ports.canvas, await request.readBody());
+        return layout === undefined
+          ? json(HTTP_STATUS.badRequest, { error: "That isn't a canvas layout." })
+          : json(HTTP_STATUS.ok, { layout });
+      }
+      case "tidy-layout": {
+        const tidied = await tidyCanvasFrame(ports.canvas, await request.readBody());
+        if (tidied.status === "done") return json(HTTP_STATUS.ok, { layout: tidied.layout });
+        return tidied.status === "unknown"
+          ? json(HTTP_STATUS.notFound, NOT_FOUND)
+          : json(HTTP_STATUS.badRequest, { error: "That isn't a frame on the canvas." });
+      }
+      case "session": {
+        const session = await findSession(ports.canvas, route.id);
+        if (session === undefined) return json(HTTP_STATUS.notFound, NOT_FOUND);
+        return json(HTTP_STATUS.ok, { session, transcript: await readSessionTranscript(ports.canvas, session) });
+      }
+      case "session-events": {
+        const session = await findSession(ports.canvas, route.id);
+        if (session === undefined) return json(HTTP_STATUS.notFound, NOT_FOUND);
+        return {
+          kind: "events",
+          headers: SECURITY_HEADERS,
+          open: (send) => streamTranscript(ports.canvas, session, send),
         };
       }
       case "cancel-job": {

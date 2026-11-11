@@ -142,6 +142,53 @@ describe("cclinic gui", () => {
     },
   );
 
+  it("TC-GUI-028, TC-GUI-029: every tasks change runs as a job, and a dependency cycle is refused with the CLI's message", async () => {
+    const root = makeTempFolder();
+    const env = environment();
+    const tasks = (...args: string[]) =>
+      JSON.parse(
+        spawnSync(process.execPath, [BIN, "tasks", ...args, "-C", root, "--json"], { encoding: "utf8", env }).stdout,
+      ) as { task?: { id: number; status: string; dependsOn: number[] } };
+    tasks("add", "--title", "First");
+    const gui = await startGui(root, env);
+    const run = async (body: Record<string, unknown>) => {
+      const started = await fetch(`http://127.0.0.1:${gui.port}/api/jobs`, {
+        method: "POST",
+        headers: { "x-cclinic-token": gui.token, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      expect(started.status).toBe(201);
+      const { job } = (await started.json()) as { job: { id: string } };
+      return vi.waitFor(
+        async () => {
+          const reply = await fetch(`http://127.0.0.1:${gui.port}/api/jobs/${job.id}`, {
+            headers: { "x-cclinic-token": gui.token },
+          });
+          const { job: done } = (await reply.json()) as {
+            job: { isRunning: boolean; exitCode: number; output: { lines: { text: string }[] } };
+          };
+          if (done.isRunning) throw new Error("still running");
+          return done;
+        },
+        { timeout: 20_000, interval: 100 },
+      );
+    };
+    expect((await run({ command: "tasks-add", title: "Second", spec: "auth" })).exitCode).toBe(0);
+    expect((await run({ command: "tasks-depend", id: 2, on: 1 })).exitCode).toBe(0);
+    expect(tasks("show", "2").task?.dependsOn).toEqual([1]);
+    const cycle = await run({ command: "tasks-depend", id: 1, on: 2 });
+    expect(cycle.exitCode).toBe(2);
+    expect(cycle.output.lines.map((line) => line.text).join("\n")).toMatch(/cycle/i);
+    expect((await run({ command: "tasks-undepend", id: 2, on: 1 })).exitCode).toBe(0);
+    expect(tasks("show", "2").task?.dependsOn).toEqual([]);
+    expect((await run({ command: "tasks-start", id: 2 })).exitCode).toBe(0);
+    expect(tasks("show", "2").task?.status).toBe("in-progress");
+    expect((await run({ command: "tasks-done", id: 2 })).exitCode).toBe(0);
+    expect(tasks("show", "2").task?.status).toBe("done");
+    expect((await run({ command: "tasks-remove", id: 2 })).exitCode).toBe(0);
+    expect(spawnSync(process.execPath, [BIN, "tasks", "show", "2", "-C", root], { env }).status).toBe(2);
+  }, 120_000);
+
   it("TC-GUI-061: no production dependency was added, and the GUI's files are in the package", () => {
     const manifest = JSON.parse(readFileSync(path.join(REPO, "package.json"), "utf8")) as {
       dependencies: Record<string, string>;

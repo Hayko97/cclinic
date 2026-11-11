@@ -91,14 +91,18 @@ export async function runAgent(request: AgentRequest): Promise<AgentResult> {
   }
 }
 
+/** Where Claude Code keeps its settings and sessions: `CLAUDE_CONFIG_DIR`, or `.claude` in the home folder. */
+export function claudeConfigFolder(environment: NodeJS.ProcessEnv): string {
+  const given = environment["CLAUDE_CONFIG_DIR"];
+  return given !== undefined && given !== "" ? given : path.join(environment["HOME"] ?? os.homedir(), ".claude");
+}
+
 /**
  * Where Claude Code writes a session's transcript: its config folder, then the working folder with every
  * character other than a letter or digit turned into "-" (FR-AUTO-039).
  */
 export function claudeTranscriptPath(environment: NodeJS.ProcessEnv, cwd: string, sessionId: string): string {
-  const given = environment["CLAUDE_CONFIG_DIR"];
-  const configFolder =
-    given !== undefined && given !== "" ? given : path.join(environment["HOME"] ?? os.homedir(), ".claude");
+  const configFolder = claudeConfigFolder(environment);
   const projectFolder = realpathSync(cwd).replace(/[^a-zA-Z0-9]/g, "-");
   return path.join(configFolder, "projects", projectFolder, `${sessionId}.jsonl`);
 }

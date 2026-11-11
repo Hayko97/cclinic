@@ -69,5 +69,4 @@
 | Should the GUI let the user attach a Claude Code session to a task or spec by hand, for sessions that never called a cclinic tool? | `.cclinic/sdd/specs/gui/spec.md` FR-GUI-039, `.cclinic/sdd/specs/mcp-server/spec.md` FR-MCP-045 |
 | When the GUI stops, should an auto run it started be interrupted (as now specified), or keep running on its own? | `.cclinic/sdd/specs/gui/spec.md` FR-GUI-005 |
 | Recording agent sessions (FR-AUTO-016) stores full agent transcripts, which may contain project code, under `~/.claude/projects/`. Should there be an option to keep `--no-session-persistence` for auto runs? | `.cclinic/sdd/specs/automated-mode/spec.md` FR-AUTO-016 |
-| The GUI's UI tests (TC-GUI-066 onward) need a headless browser, which the project doesn't have. Is adding Playwright as a dev dependency (with a `stack.md` row) acceptable, or should those cases be manual? | `.cclinic/sdd/specs/gui/verification.md`, `.cclinic/sdd/stack.md` |
 | Should the canvas layout (`.cclinic/gui/layout.json`) stay on this machine (as specified, ignored by Git), or be committed so a team shares one arrangement? | `.cclinic/sdd/specs/gui/spec.md` FR-GUI-047, FR-GUI-073 |

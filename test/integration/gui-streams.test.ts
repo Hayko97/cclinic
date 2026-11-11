@@ -1,4 +1,5 @@
 /** Job streams whose browser goes away (spec: gui, FR-GUI-034). */
+import { EMPTY_CANVAS } from "../support/helpers.js";
 import { request as httpRequest } from "node:http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { startGuiServer, type GuiServer } from "../../src/adapters/http/gui-server.js";
@@ -104,6 +105,7 @@ describe("GUI event streams", () => {
       token: TOKEN,
       project: { name: "p", folder: "/nowhere", hasDocuments: () => false },
       jobs,
+      canvas: EMPTY_CANVAS,
       readAsset: () => Promise.resolve(""),
     });
     server = await startGuiServer({ host: "127.0.0.1", port: 0, isPortFixed: false, handle });

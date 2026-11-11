@@ -2,11 +2,13 @@
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { AgentSession, RunState } from "../../core/automation.js";
+import { agentSessionSchema, type AgentSession, type RunState } from "../../core/automation.js";
 import {
   AUTO_FOLDER,
   AUTO_LOCK_FILE,
   RUN_LOGS_FOLDER,
+  RUN_ID_PATTERN,
+  RUN_ID_TIME_LENGTH,
   RUN_REPORT_FILE,
   RUN_SESSIONS_FOLDER,
   RUN_STATE_FILE,
@@ -92,6 +94,81 @@ export async function findRunHoldingTask(target: string, taskId: number): Promis
   if (runId === undefined) return undefined;
   const state = await readRunState(target, runId);
   return state?.tasks.some((task) => task.taskId === taskId && task.status === "running") === true ? runId : undefined;
+}
+
+/** The sessions recorded for a run's agents (FR-AUTO-039), and why any file of them couldn't be read. */
+async function readRunSessions(
+  target: string,
+  runId: string,
+): Promise<{ readonly sessions: AgentSession[]; readonly problems: string[] }> {
+  const folder = path.join(runFolder(target, runId), RUN_SESSIONS_FOLDER);
+  const names = (await readdir(folder).catch(() => [])).filter((name) => name.endsWith(".json"));
+  const sessions: AgentSession[] = [];
+  const problems: string[] = [];
+  for (const name of names) {
+    const file = path.join(folder, name);
+    try {
+      sessions.push(agentSessionSchema.parse(JSON.parse(await readFile(file, "utf8"))));
+    } catch {
+      problems.push(`${file} isn't a readable agent session, so it's left out.`);
+    }
+  }
+  return { sessions, problems };
+}
+
+/** Run IDs newest first: by time, then by the `-2`, `-3`... added to a second run in the same second. */
+function newestFirst(a: string, b: string): number {
+  const time = (id: string) => id.slice(0, RUN_ID_TIME_LENGTH);
+  // The first run in a second has no suffix, and counts as 1.
+  const suffix = (id: string) => (id.length > RUN_ID_TIME_LENGTH ? Number(id.slice(RUN_ID_TIME_LENGTH + 1)) : 1);
+  return time(b).localeCompare(time(a)) || suffix(b) - suffix(a);
+}
+
+export interface RunListing {
+  readonly runs: { readonly state: RunState; readonly sessions: AgentSession[]; readonly isLive: boolean }[];
+  /** Run states and session files that couldn't be read, left out instead of failing (FR-GUI-014). */
+  readonly problems: string[];
+}
+
+type RunEntry = RunListing["runs"][number];
+
+/**
+ * Lists the project's runs, newest first, with their agents' sessions and whether each is still going
+ * (FR-GUI-029, FR-GUI-068, FR-GUI-077). Every run is listed, since a task's cost and earlier agents come from
+ * all of them. A finished run never changes, so it's read once; runs are read one at a time, so a long history
+ * can't exhaust open files.
+ */
+export function createRunLister(target: string): () => Promise<RunListing> {
+  const finished = new Map<string, RunEntry>();
+  return async () => {
+    const holder = await readLiveHolder(path.join(autoFolder(target), AUTO_LOCK_FILE));
+    const liveRunId = holder === undefined ? undefined : runIdOf(holder);
+    const ids = (await readdir(autoFolder(target)).catch(() => []))
+      .filter((name) => RUN_ID_PATTERN.test(name))
+      .sort(newestFirst);
+    const listing: RunListing = { runs: [], problems: [] };
+    for (const id of ids) {
+      const known = finished.get(id);
+      if (known !== undefined && id !== liveRunId) {
+        listing.runs.push(known);
+        continue;
+      }
+      const state = await readRunState(target, id).catch((error: unknown) => {
+        listing.problems.push(error instanceof Error ? error.message : String(error));
+        return undefined;
+      });
+      if (state === undefined) continue;
+      const { sessions, problems } = await readRunSessions(target, id);
+      listing.problems.push(...problems);
+      const entry = { state, sessions, isLive: id === liveRunId };
+      // Kept only once whole: a run with a damaged session file is read again, in case it's fixed.
+      if (state.finishedAt !== null && !entry.isLive && problems.length === 0) finished.set(id, entry);
+      listing.runs.push(entry);
+    }
+    // Forget runs whose folders were removed.
+    for (const id of finished.keys()) if (!ids.includes(id)) finished.delete(id);
+    return listing;
+  };
 }
 
 /** Secrets are redacted from everything a run saves (FR-AUTO-027). */

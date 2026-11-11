@@ -48,3 +48,33 @@ export const JOB_OUTPUT_MAX_LINES = 5_000;
 export const JOB_CANCEL_GRACE_MS = SHUTDOWN_TIMEOUT_MS + 1_000;
 /** FR-GUI-004: how long the platform's opener may take before the GUI just prints the link. */
 export const BROWSER_OPEN_TIMEOUT_MS = 10_000;
+
+/** FR-GUI-022, FR-GUI-042, FR-GUI-075: how often the canvas and an open transcript are checked for changes. */
+export const CANVAS_POLL_MS = 1_000;
+export const TRANSCRIPT_POLL_MS = 1_000;
+/** FR-GUI-077: an interactive session seen within this long counts as working now. */
+export const SESSION_ACTIVITY_MS = 300_000;
+/** A transcript shows at most its newest entries, and each entry's text is cut to this length. */
+export const TRANSCRIPT_MAX_ENTRIES = 2_000;
+export const TRANSCRIPT_MAX_TEXT_CHARS = 4_000;
+/** Claude Code's own session IDs are UUIDs; this also allows any ID cclinic records, and nothing path-like. */
+export const SESSION_ID_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,99}";
+
+/** FR-GUI-073, FR-GUI-074: the saved canvas layout, and the automatic one's sizes in canvas pixels. */
+export const GUI_LAYOUT_FILE = "layout.json";
+export const LAYOUT_VERSION = 1;
+export const LAYOUT_MAX_ITEMS = 5_000;
+export const LAYOUT_MAX_COORDINATE = 1_000_000;
+export const LAYOUT = {
+  cardWidth: 220,
+  cardHeight: 140,
+  columnGap: 32,
+  rowGap: 20,
+  framePadding: 24,
+  frameHeader: 96,
+  frameGap: 80,
+} as const;
+/** At most this much of a transcript is read at once; for a larger one, only its newest part is shown. */
+export const TRANSCRIPT_MAX_READ_BYTES = 16_777_216;
+/** The most dependencies a task added from the GUI may name. */
+export const GUI_MAX_DEPENDENCIES = 100;

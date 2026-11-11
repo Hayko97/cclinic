@@ -4,16 +4,22 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openInBrowser } from "../adapters/browser/open-browser.js";
+import { claudeConfigFolder } from "../adapters/llm/agent-process.js";
 import { createAssetReader, startGuiServer } from "../adapters/http/gui-server.js";
 import { startProcess } from "../adapters/process/job-process.js";
 import { projectPaths } from "../adapters/storage/document-store.js";
-import { acquireGuiLock } from "../adapters/storage/gui-store.js";
+import { acquireGuiLock, readLayout, saveLayout } from "../adapters/storage/gui-store.js";
+import { createRunLister } from "../adapters/storage/run-store.js";
+import { openTaskStore } from "../adapters/storage/task-store.js";
+import { openWorkflowStore } from "../adapters/storage/workflow-store.js";
+import { locateTranscript, readTranscriptLines } from "../adapters/transcripts/transcript-reader.js";
+import { problemOf, type CanvasPorts } from "../application/gui-canvas.js";
 import { createJobs, type JobProcess } from "../application/gui-jobs.js";
 import { createGuiHandler } from "../application/gui-routes.js";
 import { GUI_DEFAULT_PORT, GUI_HOST, GUI_TOKEN_BYTES, GUI_TOKEN_QUERY } from "../core/constants/gui.js";
 import { UsageError } from "../core/errors.js";
 import type { CommandContext } from "./command-context.js";
-import { projectFolder } from "./tasks-command.js";
+import { projectFolder, readOverview } from "./tasks-command.js";
 
 export interface GuiOptions {
   readonly dir?: string;
@@ -27,6 +33,8 @@ export interface GuiDependencies {
   readonly startJob?: (args: readonly string[], cwd: string) => JobProcess;
   /** Whether stdout is a terminal, so a person is there to see the browser open (FR-GUI-004). */
   readonly isTerminal?: boolean;
+  /** How the canvas and transcripts are checked for changes; replaced in tests, so no real clock is used. */
+  readonly every?: (ms: number, run: () => Promise<void>) => () => void;
 }
 
 /** The `cclinic` entry point that started this process: `bin/cclinic.js`, from `dist` or from `src/cli`. */
@@ -37,6 +45,62 @@ function cclinicBin(): string {
   const found = candidates.find((candidate) => existsSync(candidate));
   if (found === undefined) throw new UsageError("cclinic's own program file is missing. Reinstall cclinic.");
   return found;
+}
+
+function every(ms: number, run: () => Promise<void>): () => void {
+  const timer = setInterval(() => void run(), ms);
+  return () => {
+    clearInterval(timer);
+  };
+}
+
+/** FR-GUI-019, FR-GUI-037, FR-GUI-039: what the canvas is built from, and where transcripts are read. */
+function canvasPorts(
+  target: string,
+  environment: NodeJS.ProcessEnv,
+  repeat: (ms: number, run: () => Promise<void>) => () => void,
+): CanvasPorts {
+  let layoutChanges: Promise<unknown> = Promise.resolve();
+  const listRuns = createRunLister(target);
+  return {
+    readSources: async () => {
+      const problems: string[] = [];
+      const note = (error: unknown): void => {
+        problems.push(problemOf(error));
+      };
+      let overview = readOverview(undefined);
+      try {
+        const store = openTaskStore(projectPaths(target, undefined).tool, "read");
+        try {
+          overview = readOverview(store);
+        } finally {
+          store?.close();
+        }
+      } catch (error) {
+        note(error);
+      }
+      const workflows = await openWorkflowStore(target).listReadable();
+      for (const problem of workflows.problems) note(new Error(problem));
+      const runs = await listRuns().catch((error: unknown) => {
+        note(error);
+        return { runs: [], problems: [] };
+      });
+      for (const problem of runs.problems) note(new Error(problem));
+      return { overview, runs: runs.runs, workflows: workflows.states, problems };
+    },
+    readLayout: () => readLayout(target),
+    updateLayout: (change) => {
+      // One change at a time: a drag saved during Tidy up isn't overwritten by Tidy's older copy.
+      const next = layoutChanges.then(async () => saveLayout(target, change(await readLayout(target))));
+      layoutChanges = next.catch(() => undefined);
+      return next;
+    },
+    locateTranscript: (session) =>
+      locateTranscript(session.transcriptPath, session.id, path.join(claudeConfigFolder(environment), "projects")),
+    readTranscript: readTranscriptLines,
+    now: () => new Date(),
+    every: repeat,
+  };
 }
 
 function waitForStop(signal: AbortSignal): Promise<void> {
@@ -98,6 +162,7 @@ export async function runGuiCommand(
       },
       jobs,
       readAsset: createAssetReader(),
+      canvas: canvasPorts(target, context.environment, dependencies.every ?? every),
     });
     const server = await startGuiServer({
       host: GUI_HOST,
