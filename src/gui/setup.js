@@ -248,7 +248,7 @@ async function setUpEnvironment(consent) {
   const budget = numberOrText((data.get("maxBudgetUsd") ?? "").toString());
   if (budget !== undefined) options.maxBudgetUsd = budget;
   // FR-GUI-017: the same consent the terminal asks for, before anything runs.
-  if (!(await confirmAction(consent, "Set it up"))) return;
+  if (!(await confirmAction(consent, "Set it up", { isDanger: false }))) return;
   try {
     await startAndShow({ command: "environment", confirmed: true, options });
   } catch (failure) {
@@ -257,7 +257,12 @@ async function setUpEnvironment(consent) {
 }
 
 async function clean() {
-  if (!(await confirmAction("Delete the cache and failed drafts? Generated documents aren't touched.", "Clean")))
+  if (
+    !(await confirmAction(
+      `Delete the cache and failed drafts? Generated documents aren't touched. This can't be undone.`,
+      "Clean",
+    ))
+  )
     return;
   await runReported({ command: "clean" }, "Cleaned the cache and failed drafts.");
 }

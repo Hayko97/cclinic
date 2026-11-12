@@ -311,7 +311,7 @@ describe("QA: transcript search, filter, fold and follow", () => {
       withRun([{ n: 1, step: "qa-1", start: 5, end: null }], { isLive: true, transcripts: { 1: transcript.join("") } }),
     );
     await page.locator('[data-key="task-2"]').click();
-    await expect.poll(() => page.locator("#transcript .entries > li").count()).toBe(2);
+    await expect.poll(() => page.locator("#transcript .entries > li:not(.skeleton-entry)").count()).toBe(2);
     await page.locator('#transcript input[type="search"]').fill("needle");
     expect(await page.locator("#transcript .match-count").textContent()).toBe("1 match");
   });
@@ -342,7 +342,7 @@ describe("QA: transcript search, filter, fold and follow", () => {
       withRun([{ n: 1, step: "qa-1", start: 5, end: null }], { isLive: true, transcripts: { 1: transcript.join("") } }),
     );
     await page.locator('[data-key="task-2"]').click();
-    await expect.poll(() => page.locator("#transcript .entries > li").count()).toBe(3);
+    await expect.poll(() => page.locator("#transcript .entries > li:not(.skeleton-entry)").count()).toBe(3);
     const search = page.locator('#transcript input[type="search"]');
     await search.fill("npm");
     // DEF-3: the result's matches past line 20 are shown and counted, so it isn't folded while they are.
@@ -366,7 +366,7 @@ describe("QA: transcript search, filter, fold and follow", () => {
       }),
     );
     await page.locator('[data-key="task-2"]').click();
-    await expect.poll(() => page.locator("#transcript .entries > li").count()).toBe(1);
+    await expect.poll(() => page.locator("#transcript .entries > li:not(.skeleton-entry)").count()).toBe(1);
     const search = page.locator('#transcript input[type="search"]');
     await search.fill("head");
     expect(await page.locator("#transcript .match-count").textContent()).toBe("3 matches");

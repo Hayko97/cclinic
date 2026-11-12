@@ -1,5 +1,5 @@
 // Run with AI on a roadmap (FR-GUI-027, FR-GUI-028) and Stop (FR-GUI-031): the plan first, then the run as a job.
-import { api, element, notify } from "./api.js";
+import { api, confirmAction, element, JOBS_CHANGED, notify } from "./api.js";
 import { ensureModels, numberOrText } from "./setup.js";
 
 /**
@@ -90,6 +90,8 @@ async function startRun() {
       method: "POST",
       body: JSON.stringify({ command: "auto", confirmed: true, options: state.previewed }),
     });
+    // FR-GUI-062: the job count and the notice when the run ends follow it.
+    document.dispatchEvent(new Event(JOBS_CHANGED));
     byId("auto-dialog").close();
     notify(`Started an automated run of roadmap #${state.roadmap.id}.`);
   } catch (error) {
@@ -99,8 +101,16 @@ async function startRun() {
   }
 }
 
-/** FR-GUI-031: stops the run the GUI started, as Ctrl+C does; for one started elsewhere, says which process to stop. */
-export async function stopRun() {
+/**
+ * FR-GUI-031, FR-GUI-061: asks first, then stops the run the GUI started, as Ctrl+C does; for one started elsewhere,
+ * says which process to stop.
+ */
+export async function stopRun(roadmap) {
+  const isSure = await confirmAction(
+    `Stop run ${roadmap.run.runId} of roadmap #${roadmap.id} "${roadmap.title}"? Its tasks in progress go back to open, and work that isn't approved isn't merged.`,
+    "Stop run",
+  );
+  if (!isSure) return;
   try {
     await api("/api/run/stop", { method: "POST" });
     notify("Stopping the run. Its tasks in progress go back to open.");
@@ -142,7 +152,7 @@ export function runButtons(roadmap, className = "small") {
           className: `${className} danger`,
           "data-action": "stop-run",
           "aria-label": `Stop the run of ${roadmap.title}`,
-          onClick: () => void stopRun(),
+          onClick: () => void stopRun(roadmap),
         },
         "Stop",
       );

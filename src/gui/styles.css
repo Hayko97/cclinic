@@ -324,8 +324,7 @@ body {
   color: var(--muted);
 }
 
-.error,
-.notice.error {
+.error {
   color: var(--danger);
 }
 
@@ -345,15 +344,47 @@ body {
   font-size: var(--text-m);
   overflow-wrap: anywhere;
   z-index: 6;
-}
-
-.notice.error {
-  background: var(--danger);
-  color: var(--on-danger);
+  /* FR-GUI-062: notices stack, with any failure kept under later ones until it's closed. */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
 }
 
 .notice:empty {
   display: none;
+}
+
+.notice-item {
+  display: flex;
+  gap: var(--space-l);
+  align-items: center;
+}
+
+.notice-item.error {
+  margin: calc(-1 * var(--space-s)) calc(-1 * var(--space-xl));
+  padding: var(--space-s) var(--space-xl);
+  border-radius: var(--radius);
+  background: var(--danger);
+  color: var(--on-danger);
+}
+
+/* FR-GUI-062: a notice's action, such as Show output, and the close button a failure needs. */
+.notice .link,
+.notice-close {
+  color: inherit;
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 0;
+  height: auto;
+  flex: none;
+}
+
+.notice-close::before {
+  content: "×";
+  font-size: var(--text-l);
+  text-decoration: none;
 }
 
 .section-head {
@@ -2124,4 +2155,43 @@ mark {
 
 .plan-ended .error {
   overflow-wrap: anywhere;
+}
+
+/* FR-GUI-066: the shape of the canvas while it loads, and its reason with Retry when it can't. */
+.canvas-loading {
+  display: grid;
+  gap: var(--space-l);
+  padding: var(--space-3xl);
+}
+
+.skeleton-frame {
+  height: 160px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* FR-GUI-066: lines in the shape of text that's still loading. */
+.skeleton-lines {
+  display: grid;
+  gap: var(--space-s);
+}
+
+.skeleton-line,
+.skeleton-entry {
+  height: 14px;
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-entry {
+  height: 44px;
 }

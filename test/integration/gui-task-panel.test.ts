@@ -366,6 +366,22 @@ describe("following output, search, filter and folding", () => {
     expect(await page.locator("#transcript .jump-latest").isVisible()).toBe(true);
   });
 
+  it("TC-GUI-133: a search matching the folded part of a tool result shows it whole, and clearing it folds it again", async () => {
+    const { page } = await open();
+    await page.locator('[data-key="task-2"]').click();
+    const result = page.locator("#transcript .entries > li").nth(2);
+    await expect.poll(() => result.locator(".fold").textContent()).toBe("Show all 50 lines");
+    const search = page.locator('#transcript input[type="search"]');
+    await search.fill("line 45");
+    expect((await result.locator("pre").textContent())?.split("\n")).toHaveLength(50);
+    expect(await result.locator("mark").allTextContents()).toEqual(["line 45"]);
+    expect(await result.locator(".fold").count()).toBe(0);
+    expect(await page.locator("#transcript .match-count").textContent()).toBe("1 match");
+    await search.fill("");
+    expect((await result.locator("pre").textContent())?.split("\n")).toHaveLength(20);
+    expect(await result.locator(".fold").textContent()).toBe("Show all 50 lines");
+  });
+
   it("TC-GUI-059: the Jobs output can be searched", async () => {
     const job = heldJob();
     const { page } = await open({ startJob: job.startJob });

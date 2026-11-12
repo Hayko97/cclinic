@@ -34,8 +34,12 @@ function failureOf(job, lines) {
 /** Sent on `document` when a job starts or ends. */
 export const JOBS_CHANGED = "cclinic:jobs";
 
+/** Jobs whose starter reports their result itself, so the job notice (FR-GUI-062) doesn't repeat it. */
+export const REPORTED_JOBS = new Set();
+
 export async function runJob(request) {
   const { job } = await api("/api/jobs", { method: "POST", body: JSON.stringify(request) });
+  REPORTED_JOBS.add(job.id);
   // The top bar's job count follows jobs started from anywhere on the page (FR-GUI-049).
   document.dispatchEvent(new Event(JOBS_CHANGED));
   return new Promise((resolve, reject) => {
@@ -73,27 +77,63 @@ export function element(tag, attributes = {}, ...children) {
   return node;
 }
 
-/** Asks before something that can't be undone, in the page's own dialog (FR-GUI-020, FR-GUI-074). */
-export function confirmAction(message, confirmLabel) {
+/**
+ * FR-GUI-061: asks before something that can't be undone or that costs, naming the item and the effect. The action
+ * is in the danger style when it deletes or stops, Cancel has focus, and Escape cancels.
+ */
+export function confirmAction(message, confirmLabel, { isDanger = true } = {}) {
   const dialog = document.getElementById("confirm");
   document.getElementById("confirm-message").textContent = message;
-  document.getElementById("confirm-ok").textContent = confirmLabel;
+  const ok = document.getElementById("confirm-ok");
+  ok.textContent = confirmLabel;
+  ok.className = isDanger ? "danger" : "primary";
   dialog.returnValue = "";
   dialog.showModal();
+  dialog.querySelector('button[value="cancel"]').focus();
   return new Promise((resolve) => {
     dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm"), { once: true });
   });
 }
 
-/** How long a notice stays before it clears. */
-const NOTICE_DURATION_MS = 8000;
+/** FR-GUI-062: how long a notice of success stays before it clears; a failure stays until it's closed. */
+export const NOTICE_DURATION_MS = 6000;
 let noticeTimer;
-export function notify(text, isError = false) {
+
+/**
+ * FR-GUI-062: a notice in the page's polite live region, with an optional action such as a link to a job's output.
+ * A success replaces the success shown before and closes itself; a failure stays, under any later notice, until
+ * it's closed.
+ */
+export function notify(text, isError = false, action = undefined) {
   const notice = document.getElementById("notice");
-  notice.textContent = text;
-  notice.classList.toggle("error", isError);
+  const item = element("div", { className: `notice-item${isError ? " error" : ""}` });
+  const remove = () => {
+    item.remove();
+    notice.classList.toggle("error", notice.querySelector(".notice-item.error") !== null);
+  };
+  item.append(
+    ...[
+      element("span", { className: "notice-text" }, text),
+      action === undefined
+        ? null
+        : element("button", { type: "button", className: "link", onClick: action.run }, action.label),
+      // The close button's mark is drawn by CSS, so the notice's text stays just the message.
+      isError
+        ? element("button", {
+            type: "button",
+            className: "notice-close",
+            "aria-label": "Close the notice",
+            onClick: remove,
+          })
+        : null,
+    ].filter((part) => part !== null),
+  );
+  // Only one success shows at a time; failures stay until they're closed.
+  for (const shown of notice.querySelectorAll(".notice-item:not(.error)")) shown.remove();
   clearTimeout(noticeTimer);
-  noticeTimer = setTimeout(() => (notice.textContent = ""), NOTICE_DURATION_MS);
+  notice.append(item);
+  notice.classList.toggle("error", notice.querySelector(".notice-item.error") !== null);
+  if (!isError) noticeTimer = setTimeout(remove, NOTICE_DURATION_MS);
 }
 
 export const STATUS_LABELS = { open: "Open", "in-progress": "In progress", done: "Done" };
@@ -104,8 +144,21 @@ export function money(value) {
   return `$${value.toFixed(2)}`;
 }
 
+const SECONDS_PER = { minute: 60, hour: 3600, day: 86_400 };
+
+/** FR-GUI-065: how long ago `iso` was, such as "just now", "3 min ago" or "2 h ago". */
+export function ago(iso, now = Date.now()) {
+  const seconds = Math.max(0, Math.floor((now - Date.parse(iso)) / 1000));
+  if (seconds < SECONDS_PER.minute) return "just now";
+  if (seconds < SECONDS_PER.hour) return `${Math.floor(seconds / SECONDS_PER.minute)} min ago`;
+  if (seconds < SECONDS_PER.day) return `${Math.floor(seconds / SECONDS_PER.hour)} h ago`;
+  return `${Math.floor(seconds / SECONDS_PER.day)} d ago`;
+}
+
+/** FR-GUI-065: a time shown as how long ago it was, with the exact local time on hover, kept current by `startClock`. */
 export function when(iso) {
-  return new Date(iso).toLocaleString();
+  const exact = new Date(iso).toLocaleString();
+  return element("time", { datetime: iso, title: exact, "data-ago": iso }, ago(iso));
 }
 
 /** A length of time, such as `45s`, `4m 05s` or `1h 02m`. */
@@ -134,6 +187,7 @@ export function startClock() {
     for (const node of document.querySelectorAll("[data-since]")) {
       node.textContent = `${node.dataset.prefix}${duration(Date.now() - Date.parse(node.dataset.since))}`;
     }
+    for (const node of document.querySelectorAll("[data-ago]")) node.textContent = ago(node.dataset.ago);
   }, CLOCK_TICK_MS);
 }
 

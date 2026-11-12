@@ -453,6 +453,9 @@ describe("Run with AI and the roadmap panel in the browser", () => {
     await expect.poll(() => frame.locator('button[data-action="stop-run"]').count(), { timeout: 20_000 }).toBe(1);
     expect(await frame.locator(".run-progress").textContent()).toContain("of $5.00");
     await frame.locator('button[data-action="stop-run"]').click();
+    // FR-GUI-061: stopping asks first, naming the run and its effect.
+    expect(await page.locator("#confirm-message").textContent()).toContain("Its tasks in progress go back to open");
+    await page.locator("#confirm-ok").click();
     await expect.poll(() => frame.locator('button[data-action="run-ai"]').count(), { timeout: 20_000 }).toBe(1);
     const [runId] = (await canvasOf(gui)).roadmaps[0]?.pastRuns.map((run) => run.runId) ?? [];
     const state = JSON.parse(

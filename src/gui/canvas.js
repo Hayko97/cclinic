@@ -911,6 +911,7 @@ async function frameAction(button) {
     const isSure = await confirmAction(
       `Tidy up "${frame.title}"? Its cards go back to their automatic places.`,
       "Tidy up",
+      { isDanger: false },
     );
     if (!isSure) return;
     try {
@@ -931,14 +932,26 @@ async function frameAction(button) {
   }
   if (action === "remove-roadmap") {
     const { roadmap } = frame;
-    if (!(await confirmAction(`Remove roadmap "${roadmap.title}" and its milestones?`, "Remove roadmap"))) return;
+    if (
+      !(await confirmAction(
+        `Remove roadmap #${roadmap.id} "${roadmap.title}" and its milestones? Its tasks stay, in no milestone. This can't be undone.`,
+        "Remove roadmap",
+      ))
+    )
+      return;
     await runAndReport({ command: "roadmap-remove", id: roadmap.id }, `Removed roadmap ${roadmap.id}.`);
     return;
   }
   if (action === "remove-milestone") {
     const id = Number(button.dataset.milestone);
     const milestone = frame.columns.find((column) => column.milestone?.id === id)?.milestone;
-    if (!(await confirmAction(`Remove milestone "${milestone.title}"?`, "Remove milestone"))) return;
+    if (
+      !(await confirmAction(
+        `Remove milestone "${milestone.title}"? Its tasks stay, in no milestone. This can't be undone.`,
+        "Remove milestone",
+      ))
+    )
+      return;
     await runAndReport({ command: "milestone-remove", id }, `Removed milestone ${id}.`);
   }
 }

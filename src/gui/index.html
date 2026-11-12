@@ -30,7 +30,7 @@
       <button type="button" data-view="jobs">Jobs</button>
     </nav>
     <main class="content">
-      <p id="notice" class="notice" role="status" aria-live="polite"></p>
+      <div id="notice" class="notice" role="status" aria-live="polite"></div>
 
       <section id="view-canvas" class="view-canvas" aria-label="Canvas">
         <div class="toolbar">
@@ -67,6 +67,7 @@
         </div>
         <div id="next-step" class="next-step" hidden></div>
         <ul id="canvas-problems" class="problems" hidden></ul>
+        <div id="canvas-loading" class="canvas-loading" hidden></div>
         <div id="canvas-area" class="canvas-area">
           <div id="board" class="board">
             <svg id="arrows" class="arrows" aria-hidden="true">
@@ -87,9 +88,10 @@
             </svg>
             <div id="frames" class="frames"></div>
           </div>
-          <p id="canvas-empty" class="canvas-empty muted" hidden>
-            There are no roadmaps or tasks yet. Add a task, or plan a roadmap with the PM: New roadmap.
-          </p>
+          <div id="canvas-empty" class="canvas-empty muted" hidden>
+            <p>There are no roadmaps or tasks yet. Plan a roadmap with the PM, or add a task.</p>
+            <button type="button" class="primary" data-new-roadmap>New roadmap</button>
+          </div>
         </div>
         <div id="list" class="list" hidden></div>
       </section>

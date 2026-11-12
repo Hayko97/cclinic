@@ -438,7 +438,9 @@ describe("tasks from the page", () => {
     const { page, started } = await open();
     await page.locator('[data-key="task-3"]').click();
     await page.locator("#panel-body button.danger", { hasText: "Remove" }).click();
-    expect(await page.locator("#confirm-message").textContent()).toBe('Remove task #3 "Task c"?');
+    expect(await page.locator("#confirm-message").textContent()).toBe(
+      'Remove task #3 "Task c"? Tasks that depend on it no longer wait for it. This can\'t be undone.',
+    );
     await page.locator('#confirm button[value="cancel"]').click();
     expect(started).toEqual([]);
     await page.locator("#panel-body button.danger", { hasText: "Remove" }).click();
@@ -613,12 +615,14 @@ describe("QA: tasks from the page", () => {
     const { page, started } = await open();
     const milestone = page.locator('[aria-label="Remove milestone Refunds"]');
     await milestone.click();
-    expect(await page.locator("#confirm-message").textContent()).toBe('Remove milestone "Refunds"?');
+    expect(await page.locator("#confirm-message").textContent()).toBe(
+      'Remove milestone "Refunds"? Its tasks stay, in no milestone. This can\'t be undone.',
+    );
     await page.locator('#confirm button[value="cancel"]').click();
     const roadmap = page.locator('[data-frame="roadmap-2"] [data-action="remove-roadmap"]');
     await roadmap.click();
     expect(await page.locator("#confirm-message").textContent()).toBe(
-      'Remove roadmap "Onboarding" and its milestones?',
+      'Remove roadmap #2 "Onboarding" and its milestones? Its tasks stay, in no milestone. This can\'t be undone.',
     );
     await page.keyboard.press("Escape");
     expect(await page.locator("#confirm").isVisible()).toBe(false);
@@ -806,7 +810,9 @@ describe("QA: canvas edge cases", () => {
     await card.click();
     expect(await page.locator(".panel-task-title").textContent()).toBe(evil);
     await page.locator("#panel-body button.danger", { hasText: "Remove" }).click();
-    expect(await page.locator("#confirm-message").textContent()).toBe(`Remove task #7 "${evil}"?`);
+    expect(await page.locator("#confirm-message").textContent()).toBe(
+      `Remove task #7 "${evil}"? Tasks that depend on it no longer wait for it. This can't be undone.`,
+    );
     await page.locator('#confirm button[value="cancel"]').click();
     await page.locator('[data-layout="list"]').click();
     expect(await page.locator('tr[data-task="7"] button').first().textContent()).toBe(`#7 ${evil}`);
@@ -822,9 +828,11 @@ describe("QA: canvas edge cases", () => {
     expect(await page.locator("#zoom-level").textContent()).toBe("100 %");
     await page.keyboard.press("0");
     await page.locator('[data-layout="list"]').click();
-    expect(await page.locator("#list").textContent()).toBe(
-      "There are no roadmaps or tasks yet. Add a task, or plan a roadmap.",
+    expect(await page.locator("#list p").textContent()).toBe(
+      "There are no roadmaps or tasks yet. Plan a roadmap with the PM, or add a task.",
     );
+    // FR-GUI-053: the empty List offers the one action that fills it.
+    expect(await page.locator("#list button").textContent()).toBe("New roadmap");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(768);
   });
 
@@ -2336,7 +2344,8 @@ describe("QA C2a run 4: the restyle", () => {
         node.click();
       });
       await page.reload();
-      await page.locator('[data-layout="canvas"]').waitFor();
+      // FR-GUI-063: a reload returns to the screen the URL names, here the job's output.
+      await page.locator("#view-jobs:not([hidden])").waitFor();
       expect(problems).toEqual([]);
     });
 
@@ -2419,7 +2428,7 @@ describe("QA C2a run 4: the restyle", () => {
       .locator("#panel-body button.session")
       .evaluateAll((nodes) =>
         nodes.map((node) => [
-          node.textContent.trim().split(" · ").at(-1),
+          /· (live|ended) ·/.exec(node.textContent)?.[1],
           node.querySelector(".live-dot, .ended-dot")?.className,
         ]),
       );
@@ -3069,6 +3078,9 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
     await page.locator("#plan-dialog [data-plan-close]").click();
     expect(await page.locator("#canvas-empty").isVisible()).toBe(true);
     expect(await page.locator("#canvas-empty").textContent()).toContain("There are no roadmaps or tasks yet.");
+    // FR-GUI-053: the empty canvas offers the one action that fills it.
+    await page.locator("#canvas-empty button", { hasText: "New roadmap" }).click();
+    expect(await page.locator("#plan-target").textContent()).toBe("A new roadmap.");
   });
 
   it("TC-GUI-020 (QA D1): the generate banner shows its text and the Open Setup button, and nothing else", async () => {
@@ -3091,6 +3103,9 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
     expect(await page.locator("#view-setup").isVisible()).toBe(true);
     mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
     await page.reload();
+    // FR-GUI-063: the reload returns to Setup, as its URL names; the canvas is one click away.
+    await page.locator("#view-setup:not([hidden])").waitFor();
+    await page.locator('[data-view="canvas"]').click();
     await page.locator('[data-key="task-1"]').waitFor();
     expect(await banner(page).textContent()).toContain('Roadmap "Payments" has open tasks and no run.');
     // D4: the banner's action is the GUI's own Run with AI, with that roadmap chosen.

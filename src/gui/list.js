@@ -86,8 +86,14 @@ export function drawList(canvas, open) {
   const byId = new Map(canvas.tasks.map((task) => [task.id, task]));
   const list = document.getElementById("list");
   if (canvas.roadmaps.length === 0 && canvas.unassigned.length === 0) {
+    // FR-GUI-053: an empty list says why, and offers the one action that fills it.
     list.replaceChildren(
-      element("p", { className: "muted" }, "There are no roadmaps or tasks yet. Add a task, or plan a roadmap."),
+      element(
+        "p",
+        { className: "muted" },
+        "There are no roadmaps or tasks yet. Plan a roadmap with the PM, or add a task.",
+      ),
+      element("button", { type: "button", className: "primary", "data-new-roadmap": true }, "New roadmap"),
     );
     return;
   }

@@ -26,6 +26,7 @@ import {
 import { runButtons } from "./auto.js";
 import { followView, viewTools } from "./follow.js";
 import { openPlan } from "./plan.js";
+import { recordView, urls } from "./router.js";
 
 const ENTRY_LABELS = { user: "User", assistant: "Assistant", "tool-call": "Tool call", "tool-result": "Tool result" };
 const ENTRY_FILTERS = {
@@ -85,6 +86,7 @@ function stopTranscript() {
 }
 
 export function closePanel() {
+  recordView(urls.view("canvas"));
   stopTranscript();
   state.open = undefined;
   state.pickedSessionId = undefined;
@@ -110,6 +112,7 @@ export function openPanel(target, sessionId) {
     stopTranscript();
     state.pickedSessionId = sessionId;
   }
+  recordView(panelUrl());
   panel().hidden = false;
   document.body.classList.add("has-panel");
   render();
@@ -324,7 +327,13 @@ function taskActions(task) {
         "data-focus": "remove",
         onClick: async () => {
           // FR-GUI-020: removing asks first.
-          if (!(await confirmAction(`Remove task #${task.id} "${task.title}"?`, "Remove task"))) return;
+          if (
+            !(await confirmAction(
+              `Remove task #${task.id} "${task.title}"? Tasks that depend on it no longer wait for it. This can't be undone.`,
+              "Remove task",
+            ))
+          )
+            return;
           if ((await runAndReport({ command: "tasks-remove", id: task.id }, `Removed task #${task.id}.`)).isDone)
             closePanel();
         },
@@ -404,9 +413,13 @@ function dependencies(task) {
   );
 }
 
+/** FR-GUI-039: a session's role or source, step, whether it's live, and when it started. */
 function sessionLabel(session) {
   const role = ROLE_LABELS[session.role] ?? session.role;
-  return `${role}${session.step === null ? "" : ` · ${session.step}`} · ${session.isLive ? "live" : "ended"}`;
+  return [
+    `${role}${session.step === null ? "" : ` · ${session.step}`} · ${session.isLive ? "live" : "ended"} · started `,
+    when(session.startedAt),
+  ];
 }
 
 /** FR-GUI-077: who works on the task now, and who worked on it before. */
@@ -429,7 +442,8 @@ function agents(task) {
             element(
               "li",
               {},
-              `${name(session)}${session.step === null ? "" : ` · ${session.step}`} · ${when(session.lastActivityAt)}`,
+              `${name(session)}${session.step === null ? "" : ` · ${session.step}`} · `,
+              when(session.lastActivityAt),
             ),
           ),
         ),
@@ -498,7 +512,15 @@ function transcriptBox(session) {
   let box = document.getElementById("transcript");
   if (state.transcript !== undefined && box !== null && box.dataset.session === session.id) return box;
   stopTranscript();
-  const list = element("ol", { className: "entries", "aria-label": "Transcript", tabindex: 0 });
+  // FR-GUI-066: the shape of entries until the transcript arrives.
+  const list = element(
+    "ol",
+    { className: "entries", "aria-label": "Transcript", tabindex: 0 },
+    [1, 2, 3].map(() => element("li", { className: "entry skeleton-entry", "aria-hidden": "true" })),
+  );
+  const clearPlaceholder = () => {
+    for (const placeholder of list.querySelectorAll(".skeleton-entry")) placeholder.remove();
+  };
   const follow = followView(list);
   const tools = viewTools(list, { kinds: ENTRY_FILTERS, foldLines: foldLines(), follow, label: "transcript" });
   box = element(
@@ -510,6 +532,7 @@ function transcriptBox(session) {
   );
   const note = box.querySelector(".transcript-note");
   const addEntries = (part, isReplace) => {
+    clearPlaceholder();
     const nodes = part.entries.map(entryNode);
     if (isReplace) list.replaceChildren(...nodes);
     else list.append(...nodes);
@@ -528,12 +551,15 @@ function transcriptBox(session) {
   events.addEventListener("transcript", (message) => addEntries(JSON.parse(message.data), true));
   events.addEventListener("entries", (message) => addEntries(JSON.parse(message.data), false));
   events.addEventListener("missing", () => {
+    clearPlaceholder();
     note.textContent = "The transcript file isn't there (yet).";
   });
   events.addEventListener("refused", () => {
+    clearPlaceholder();
     note.textContent = "This transcript is outside Claude Code's projects folder, so it isn't shown.";
   });
   events.addEventListener("problem", (message) => {
+    clearPlaceholder();
     note.textContent = JSON.parse(message.data).message;
   });
   return box;
@@ -586,10 +612,8 @@ function steps(task) {
                 ? timer(row.startedAt)
                 : null
               : duration(Date.parse(row.endedAt) - Date.parse(row.startedAt));
-        const times = [
-          row.startedAt === null ? null : `Started ${when(row.startedAt)}`,
-          row.startedAt === null && row.endedAt !== null ? when(row.endedAt) : null,
-        ].filter((part) => part !== null);
+        const times =
+          row.startedAt !== null ? ["Started ", when(row.startedAt)] : row.endedAt !== null ? [when(row.endedAt)] : [];
         return element(
           "li",
           { className: `step step-${row.status}`, "data-step": `${row.step}-${row.round ?? 0}` },
@@ -601,7 +625,7 @@ function steps(task) {
             taken === null ? null : element("span", { className: "step-time" }, taken),
             row.costUsd === null ? null : element("span", { className: "step-cost" }, money(row.costUsd)),
           ),
-          times.length === 0 ? null : element("div", { className: "muted step-when" }, times.join(" · ")),
+          times.length === 0 ? null : element("div", { className: "muted step-when" }, ...times),
           row.status === "running" || row.status === "waiting" ? nowDoing(row, task) : null,
         );
       }),
@@ -707,6 +731,7 @@ function milestones(roadmap) {
 
 async function showPastRun(runId) {
   state.pastRun = { runId, files: undefined, problem: undefined };
+  if (state.open?.kind === "roadmap") recordView(urls.roadmap(state.open.id, runId));
   render();
   try {
     state.pastRun = { runId, files: await api(`/api/runs/${encodeURIComponent(runId)}`), problem: undefined };
@@ -719,16 +744,55 @@ async function showPastRun(runId) {
 function togglePastRun(runId) {
   if (state.pastRun?.runId === runId) {
     state.pastRun = undefined;
+    if (state.open?.kind === "roadmap") recordView(urls.roadmap(state.open.id));
     render();
   } else void showPastRun(runId);
+}
+
+/** FR-GUI-063: the open panel's URL, or undefined when no panel is open. */
+export function panelUrl() {
+  const { open } = state;
+  if (open === undefined) return undefined;
+  if (open.kind === "task") return urls.task(open.id, state.pickedSessionId);
+  if (open.kind === "roadmap") return urls.roadmap(open.id, state.pastRun?.runId);
+  return urls.change(open.key);
+}
+
+/** FR-GUI-063: opens a roadmap's panel on one of its past runs, as its URL names. */
+export function openPastRun(roadmapId, runId) {
+  openPanel({ kind: "roadmap", id: roadmapId });
+  void showPastRun(runId);
+}
+
+/** FR-GUI-066: a few grey lines in the shape of text that's still loading. */
+function skeletonLines() {
+  return element(
+    "div",
+    { className: "skeleton-lines", "aria-hidden": "true" },
+    [1, 2, 3].map(() => element("div", { className: "skeleton-line" })),
+  );
 }
 
 /** FR-GUI-032: the report and every agent log of the past run that's open. */
 function pastRunFiles(runId) {
   const shown = state.pastRun;
   if (shown?.runId !== runId) return null;
-  if (shown.problem !== undefined) return element("p", { className: "error" }, shown.problem);
-  if (shown.files === undefined) return element("p", { className: "muted", role: "status" }, "Loading the run…");
+  // FR-GUI-066: a failed load says why, in place, with Retry.
+  if (shown.problem !== undefined)
+    return element(
+      "div",
+      {},
+      element("p", { className: "error", role: "alert" }, shown.problem),
+      element("button", { type: "button", onClick: () => void showPastRun(runId) }, "Retry"),
+    );
+  // FR-GUI-066: the shape of a report and logs while they load.
+  if (shown.files === undefined)
+    return element(
+      "div",
+      {},
+      skeletonLines(),
+      element("p", { className: "muted", role: "status" }, "Loading the run…"),
+    );
   const { report, reportIsTruncated, logs } = shown.files;
   return element(
     "div",
@@ -775,7 +839,7 @@ function pastRuns(roadmap) {
                 },
                 `${run.runId} · ${run.outcome ?? "ended"} · ${money(run.spentUsd)} of ${money(run.budgetUsd)}`,
               ),
-              element("span", { className: "muted" }, ` · ${when(run.startedAt)}`),
+              element("span", { className: "muted" }, " · ", when(run.startedAt)),
               pastRunFiles(run.runId),
             ),
           ),
@@ -786,34 +850,37 @@ function pastRuns(roadmap) {
 /** FR-GUI-019, FR-GUI-029, FR-GUI-031, FR-GUI-032: a roadmap's milestones, its live run and its past runs. */
 function renderRoadmap(roadmap) {
   document.getElementById("panel-title").textContent = `Roadmap #${roadmap.id}`;
+  // Parts a roadmap doesn't have, such as a live run, are left out, never shown as text.
   body().replaceChildren(
-    element("h2", { className: "panel-task-title" }, roadmap.title),
-    roadmap.goal === null ? null : element("p", { className: "description" }, roadmap.goal),
-    element(
-      "dl",
-      { className: "details" },
-      row("Status", roadmap.status),
-      row("Done", `${roadmap.done} / ${roadmap.total} tasks`),
-    ),
-    element(
-      "div",
-      { className: "actions" },
-      runButtons(roadmap, ""),
-      // FR-GUI-023: plan more into this roadmap with the PM.
+    ...[
+      element("h2", { className: "panel-task-title" }, roadmap.title),
+      roadmap.goal === null ? null : element("p", { className: "description" }, roadmap.goal),
       element(
-        "button",
-        { type: "button", onClick: () => void openPlan({ kind: "task", roadmapId: roadmap.id }) },
-        "Plan a task",
+        "dl",
+        { className: "details" },
+        row("Status", roadmap.status),
+        row("Done", `${roadmap.done} / ${roadmap.total} tasks`),
       ),
       element(
-        "button",
-        { type: "button", onClick: () => void openPlan({ kind: "extend-roadmap", roadmapId: roadmap.id }) },
-        "Extend with the PM",
+        "div",
+        { className: "actions" },
+        runButtons(roadmap, ""),
+        // FR-GUI-023: plan more into this roadmap with the PM.
+        element(
+          "button",
+          { type: "button", onClick: () => void openPlan({ kind: "task", roadmapId: roadmap.id }) },
+          "Plan a task",
+        ),
+        element(
+          "button",
+          { type: "button", onClick: () => void openPlan({ kind: "extend-roadmap", roadmapId: roadmap.id }) },
+          "Extend with the PM",
+        ),
       ),
-    ),
-    liveRun(roadmap),
-    milestones(roadmap),
-    pastRuns(roadmap),
+      liveRun(roadmap),
+      milestones(roadmap),
+      pastRuns(roadmap),
+    ].filter((part) => part !== null),
   );
 }
 

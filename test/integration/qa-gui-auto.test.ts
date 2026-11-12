@@ -622,6 +622,7 @@ describe("QA: Run with AI in the browser", () => {
     expect(await second.locator('button[data-action="run-ai"]').count()).toBe(1);
     expect(await second.locator('button[data-action="stop-run"]').count()).toBe(0);
     await first.locator('button[data-action="stop-run"]').click();
+    await page.locator("#confirm-ok").click();
     await expect.poll(() => page.locator("#notice").textContent()).toContain(`process ${process.pid}`);
     await second.locator('button[data-action="run-ai"]').click();
     const dialog = page.locator("#auto-dialog");

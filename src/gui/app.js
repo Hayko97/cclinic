@@ -1,20 +1,33 @@
 // The GUI's page: a top bar, a rail with Canvas, Setup and Jobs, and a side panel (FR-GUI-049).
-import { api, money, notify, remember, remembered, startClock } from "./api.js";
+import { api, element, money, notify, remember, remembered, startClock } from "./api.js";
 import { addIcons } from "./icons.js";
 import { startAuto } from "./auto.js";
 import { openPlan, startPlan } from "./plan.js";
 import { onOpenPlan, setTitleBase, showAttention, startAttention } from "./attention.js";
-import { onCanvasChange, onDraw, onOpenTask, onPlan, refresh, selectTask, showCanvas, startCanvas } from "./canvas.js";
+import {
+  currentCanvas,
+  onCanvasChange,
+  onDraw,
+  onOpenTask,
+  onPlan,
+  refresh,
+  selectTask,
+  showCanvas,
+  startCanvas,
+} from "./canvas.js";
 import { applyFilters, startFilters, updateFilterChoices } from "./filters.js";
 import { refreshJobs, show as showJob, startJobs } from "./jobs.js";
 import { refreshSetup, startSetup } from "./setup.js";
 import { drawList } from "./list.js";
-import { openPanel, refreshPanel, startAddTask, startPanel } from "./panel.js";
+import { openPanel, openPastRun, panelUrl, refreshPanel, startAddTask, startPanel } from "./panel.js";
+import { recordView, startRouter, urls } from "./router.js";
 
 // The token was only needed to load the page; keep it out of the address bar and history.
-if (location.search !== "") history.replaceState(null, "", location.pathname);
+if (location.search !== "") history.replaceState(null, "", `${location.pathname}${location.hash}`);
 
 function showView(name) {
+  // The canvas shows its open panel too, so the URL names that panel (FR-GUI-063).
+  recordView((name === "canvas" ? panelUrl() : undefined) ?? urls.view(name));
   for (const view of ["canvas", "setup", "jobs"]) {
     document.getElementById(`view-${view}`).hidden = view !== name;
     document.querySelector(`[data-view="${view}"]`).setAttribute("aria-current", String(view === name));
@@ -37,9 +50,47 @@ function showLayout(name) {
   if (!isList) showCanvas();
 }
 
-function openTask(id) {
+function openTask(id, sessionId) {
   selectTask(id);
-  openPanel({ kind: "task", id });
+  openPanel({ kind: "task", id }, sessionId);
+}
+
+/** FR-GUI-063: a URL for something that isn't there says so, and the URL then names what's shown instead. */
+function notFound(message, shown) {
+  notify(message, true);
+  history.replaceState(null, "", shown);
+}
+
+/** FR-GUI-063: shows what a URL names; one for something that's gone says so and shows the canvas. */
+function showRoute(route) {
+  if (route.view === undefined) return;
+  showView(route.view);
+  if (route.view === "jobs" && route.job !== undefined) {
+    const missing = () => notFound(`Job ${route.job} isn't one of this GUI's jobs.`, urls.view("jobs"));
+    if (!route.isJobKnownShape) missing();
+    else
+      api(`/api/jobs/${encodeURIComponent(route.job)}`)
+        .then(() => showJob(route.job))
+        .catch(missing);
+  }
+  if (route.view !== "canvas") return;
+  const canvas = currentCanvas();
+  if (route.task !== undefined) {
+    if (canvas.tasks.some((task) => task.id === route.task)) openTask(route.task, route.session);
+    else notFound(`Task #${route.task} isn't in this project.`, urls.view("canvas"));
+  } else if (route.roadmap !== undefined) {
+    const roadmap = canvas.roadmaps.find((item) => item.id === route.roadmap);
+    if (roadmap === undefined) notFound(`Roadmap #${route.roadmap} isn't in this project.`, urls.view("canvas"));
+    else if (route.run === undefined) openPanel({ kind: "roadmap", id: roadmap.id });
+    else if (roadmap.pastRuns.some((run) => run.runId === route.run)) openPastRun(roadmap.id, route.run);
+    else {
+      openPanel({ kind: "roadmap", id: roadmap.id });
+      notFound(`Run ${route.run} isn't one of roadmap #${roadmap.id}'s finished runs.`, urls.roadmap(roadmap.id));
+    }
+  } else if (route.change !== undefined) {
+    if (canvas.changes.some((change) => change.key === route.change)) openPanel({ kind: "change", key: route.change });
+    else notFound(`The change ${route.change} isn't in this project.`, urls.view("canvas"));
+  } else openPanel(undefined);
 }
 
 function applyTheme(chosen) {
@@ -108,14 +159,51 @@ startSetup((id) => {
 const LAYOUTS = ["canvas", "list"];
 showLayout(LAYOUTS.includes(remembered("layout", "canvas")) ? remembered("layout", "canvas") : "canvas");
 
+/** FR-GUI-066: data slower than this shows a placeholder of its shape instead of a blank area. */
+const SKELETON_DELAY_MS = 300;
+let isRouting = false;
+
+/**
+ * FR-GUI-066: loads the canvas, with a placeholder while it's slow and its reason with Retry in place when it
+ * fails. Once it's loaded, the URL's task, roadmap or change can be found (FR-GUI-063).
+ */
+async function loadCanvas() {
+  const loading = document.getElementById("canvas-loading");
+  const timer = setTimeout(() => {
+    loading.replaceChildren(
+      ...[1, 2].map(() => element("div", { className: "skeleton-frame", "aria-hidden": "true" })),
+      element("p", { className: "muted", role: "status" }, "Loading the canvas…"),
+    );
+    loading.hidden = false;
+  }, SKELETON_DELAY_MS);
+  try {
+    await refresh();
+    loading.hidden = true;
+    loading.replaceChildren();
+    if (!isRouting) {
+      isRouting = true;
+      startRouter(showRoute);
+    }
+  } catch (error) {
+    loading.replaceChildren(
+      element("p", { className: "error", role: "alert" }, `Couldn't load the canvas: ${error.message}`),
+      element("button", { type: "button", onClick: () => void loadCanvas() }, "Retry"),
+    );
+    loading.hidden = false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 try {
   const project = await api("/api/project");
   document.getElementById("project-name").textContent = project.name;
   document.getElementById("project-folder").textContent = project.folder;
   setTitleBase(`cclinic · ${project.name}`);
   // FR-GUI-014: a project that isn't set up opens on Setup, where generating is the first step.
-  if (!project.hasDocuments) showView("setup");
-  await refresh();
+  // A shared link names its own view, which wins (FR-GUI-063).
+  if (!project.hasDocuments && location.hash === "") showView("setup");
+  await loadCanvas();
   await refreshJobs();
 } catch (error) {
   notify(error.message, true);

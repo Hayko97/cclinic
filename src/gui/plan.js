@@ -214,6 +214,10 @@ export function startPlan() {
     .querySelector("[data-plan-close]")
     .addEventListener("click", () => byId("plan-dialog").close());
   byId("plan-open").addEventListener("click", () => void openPlan({ kind: "new-roadmap" }));
+  // FR-GUI-053: the empty canvas and List offer New roadmap too.
+  document.addEventListener("click", (event) => {
+    if (event.target.closest?.("[data-new-roadmap]")) void openPlan({ kind: "new-roadmap" });
+  });
   byId("plan-form")
     .elements.namedItem("what")
     .addEventListener("change", (event) => {

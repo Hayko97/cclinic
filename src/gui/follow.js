@@ -104,6 +104,8 @@ export function viewTools(list, { kinds, foldLines, follow, label }) {
   /** Draws one item: its text folded or not, with matches marked. Returns how many matches it has. */
   const draw = (item) => {
     const node = item.querySelector(".text");
+    // A placeholder shown while the view loads has no text to search.
+    if (node === null) return 0;
     const text = texts.get(item) ?? node.textContent;
     texts.set(item, text);
     const lines = text.split("\n");

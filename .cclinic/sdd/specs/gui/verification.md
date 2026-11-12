@@ -23,6 +23,8 @@ Test cases for automation testers. Start each automated test's name with its `TC
 
 ## Test cases
 
+TC-GUI-068 to TC-GUI-071 and TC-GUI-083 cover requirements the user deferred (spec.md, Later), so they aren't run until those are picked up.
+
 | ID | Covers | Level | Given | When | Then |
 |---|---|---|---|---|---|
 | TC-GUI-001 | FR-GUI-001, FR-GUI-003 | e2e | A project with `.cclinic/sdd` | Run `node bin/cclinic.js gui --no-open --port 0 --json` | stdout is exactly one JSON document with `url` and `port`. The URL is `http://127.0.0.1:<port>/?token=<t>`, with `t` at least 22 base64url characters. A GET of the URL returns 200 HTML |
@@ -91,7 +93,7 @@ Test cases for automation testers. Start each automated test's name with its `TC
 | TC-GUI-064 | FR-GUI-015, FR-GUI-024, FR-GUI-027, FR-GUI-030, FR-GUI-040, FR-GUI-042 | manual | A real project with Claude Code installed | Run `cclinic gui`. Then set up, plan a roadmap with the PM, start an auto run on it with a small budget, open a task's sessions while the run works, and stop the run | Each screen works as specified, and the session transcripts update live in the browser |
 | TC-GUI-065 | FR-GUI-048 | unit | The GUI's stylesheets | Parse them | Colours, spacing, radius and font sizes are used only through custom properties defined in one token file. No `@font-face` or outside font URL |
 | TC-GUI-066 | FR-GUI-048 | integration | A headless browser with `prefers-color-scheme: dark`, then light | Open the canvas, then switch the theme toggle and reload | The dark tokens apply first, then light. The toggle's choice wins over the system after reload |
-| TC-GUI-067 | FR-GUI-049 | integration | A headless browser at 1280 px, then 768 px | Open the canvas, then a task panel, then Setup and Jobs | At 1280 px: the rail has Canvas, Setup and Jobs, the top bar shows project, Needs you count, job count, budget used, ⌘K and theme, and the panel opens beside the canvas and closes with Escape. At 768 px: the panel takes the full width, and no page is wider than the window |
+| TC-GUI-067 | FR-GUI-049 | integration | A headless browser at 1280 px, then 768 px | Open the canvas, then a task panel, then Setup and Jobs | At 1280 px: the rail has Canvas, Setup and Jobs, the top bar shows project, Needs you count, job count, budget used and theme, and the panel opens beside the canvas and closes with Escape. At 768 px: the panel takes the full width, and no page is wider than the window |
 | TC-GUI-068 | FR-GUI-050 | integration | The canvas open | Press Ctrl+K and type `roadm` | The palette lists the roadmap actions (new, show, run with AI, remove), each with its `cclinic` command. Enter runs the chosen one |
 | TC-GUI-069 | FR-GUI-050 | unit | The palette's action list and the CLI's command list | Compare them | Every `cclinic` command and `tasks` subcommand the GUI supports has an entry, except `mcp` and `session-link` |
 | TC-GUI-070 | FR-GUI-050 | integration | Focus in a text field, then on the page | Press `?` and `g`, then Ctrl+K | In the field, the keys are typed as text. On the page, `?` opens the shortcut list. Ctrl+K opens the palette both times. No handler calls `preventDefault` on ⌘+N, ⌘+W or ⌘+L |
@@ -157,3 +159,4 @@ Test cases for automation testers. Start each automated test's name with its `TC
 | TC-GUI-130 | FR-GUI-024, FR-GUI-052 | integration | A fake PM that asks one question and then proposes a roadmap, in a headless browser | Press New roadmap, start, answer the question in its form, then approve | The question shows as a form and Needs you counts it, the proposal shows in full, and approving saves the roadmap and clears Needs you |
 | TC-GUI-131 | FR-GUI-026, FR-GUI-052 | integration | A planning session waiting at a question, and a page opened afterwards | Open Needs you and its PM item, then cancel | The Plan dialog shows the waiting question, and cancelling ends the session with nothing saved |
 | TC-GUI-132 | FR-GUI-023 | integration | A fake PM that proposes one task, in a headless browser | Press New roadmap, choose One standalone task, start and approve | The task is saved in no roadmap, with the CLI's message for a standalone task |
+| TC-GUI-133 | FR-GUI-059 | integration | A transcript with a 30-line tool result whose lines 21 to 30 hold `npm`, in a headless browser | Search `npm`, then clear the search | While searching, the result is shown whole with all its matches counted and no fold button; once cleared, it's folded again with "Show all 30 lines" |
