@@ -25,6 +25,8 @@ export interface RunSource {
   readonly sessions: readonly AgentSession[];
   /** The run still holds the project's run lock. */
   readonly isLive: boolean;
+  /** The process running a live run (FR-GUI-031); null for a run that has ended. */
+  readonly pid: number | null;
 }
 
 export interface CanvasSources {
@@ -126,12 +128,67 @@ export interface RoadmapView {
   readonly budgetUsd: number | null;
   /** FR-GUI-056: when its live run started. */
   readonly runStartedAt: string | null;
+  /** FR-GUI-029: its live run, as `run.json` has it now. */
+  readonly run: LiveRunView | null;
+  /** FR-GUI-032: its finished runs, newest first. */
+  readonly pastRuns: readonly PastRunView[];
   readonly milestones: readonly {
     readonly id: number;
     readonly title: string;
     readonly goal: string | null;
     readonly taskIds: readonly number[];
   }[];
+}
+
+export interface LiveRunView {
+  readonly runId: string;
+  readonly startedAt: string;
+  readonly spentUsd: number;
+  readonly budgetUsd: number;
+  readonly developers: number;
+  readonly runBranch: string;
+  /** FR-GUI-031: the process to stop, for a run the GUI didn't start. */
+  readonly pid: number | null;
+  readonly tasks: readonly {
+    readonly taskId: number;
+    readonly title: string;
+    readonly status: string;
+    readonly branch: string | null;
+    readonly rounds: RunState["tasks"][number]["rounds"];
+    readonly costUsd: number;
+    readonly reason: string | null;
+  }[];
+}
+
+export interface PastRunView {
+  readonly runId: string;
+  readonly startedAt: string;
+  readonly finishedAt: string | null;
+  readonly outcome: string | null;
+  readonly spentUsd: number;
+  readonly budgetUsd: number;
+}
+
+function liveRunView(run: RunSource): LiveRunView {
+  const { state } = run;
+  return {
+    runId: state.runId,
+    startedAt: state.startedAt,
+    spentUsd: state.spentUsd,
+    budgetUsd: state.budgetUsd,
+    developers: state.developers,
+    runBranch: state.runBranch,
+    pid: run.pid,
+    tasks: state.tasks.map((task) => ({
+      taskId: task.taskId,
+      title: shown(task.title),
+      status: task.status,
+      branch: task.branch,
+      rounds: task.rounds,
+      costUsd: task.costUsd,
+      reason: task.reason === null ? null : shown(task.reason),
+    })),
+  };
 }
 
 export interface CanvasView {
@@ -332,6 +389,18 @@ export function buildCanvas(sources: CanvasSources, now: Date): CanvasView {
       spentUsd: isRunning ? liveRun.state.spentUsd : null,
       budgetUsd: isRunning ? liveRun.state.budgetUsd : null,
       runStartedAt: isRunning ? liveRun.state.startedAt : null,
+      run: isRunning ? liveRunView(liveRun) : null,
+      // Listed newest first already (FR-GUI-032).
+      pastRuns: sources.runs
+        .filter((run) => !run.isLive && run.state.roadmapId === roadmap.id)
+        .map(({ state }) => ({
+          runId: state.runId,
+          startedAt: state.startedAt,
+          finishedAt: state.finishedAt,
+          outcome: state.outcome,
+          spentUsd: state.spentUsd,
+          budgetUsd: state.budgetUsd,
+        })),
       milestones: roadmap.milestones.map((milestone) => ({
         id: milestone.id,
         title: shown(milestone.title),

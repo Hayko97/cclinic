@@ -41,6 +41,8 @@ export const AUTO_LOCK_FILE = ".lock";
 export const RUN_STATE_FILE = "run.json";
 export const RUN_REPORT_FILE = "report.md";
 export const RUN_LOGS_FOLDER = "logs";
+/** FR-GUI-032: the most of a run's report or one log the GUI shows; a longer one shows its newest part. */
+export const RUN_FILE_MAX_CHARS = 500_000;
 /** FR-AUTO-039: one file per agent session, so the GUI can show it. */
 export const RUN_SESSIONS_FOLDER = "sessions";
 export const RUN_WORKTREES_FOLDER = "worktrees";
@@ -62,7 +64,9 @@ export const NOTIFY_TIMEOUT_MS = 10_000;
 export const TERMINAL_BELL = "\u0007";
 export const RUN_ID_FIELD_DIGITS = 2;
 /** What `createRunId` makes: UTC `YYYYMMDD-HHMMSS`, maybe with `-2`, `-3`... */
-export const RUN_ID_PATTERN = /^\d{8}-\d{6}(-\d+)?$/;
+/** A run ID, such as `20261112-150000` or `20261112-150000-2` (FR-AUTO-010). */
+export const RUN_ID_SOURCE = "\\d{8}-\\d{6}(?:-\\d{1,6})?";
+export const RUN_ID_PATTERN = new RegExp(`^${RUN_ID_SOURCE}$`);
 /** The `YYYYMMDD-HHMMSS` part of a run ID. */
 export const RUN_ID_TIME_LENGTH = 15;
 /** The second run started in the same second gets `-2`. */

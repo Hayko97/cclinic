@@ -94,7 +94,7 @@ function fill(select, options, chosen) {
 }
 
 /** A typed number is sent as a number; anything else as typed, so the server names it in the CLI's words. */
-function numberOrText(value) {
+export function numberOrText(value) {
   const text = value.trim();
   if (text === "") return undefined;
   // The CLI reads values with Number(), so anything Number() reads is sent as a number.
@@ -298,6 +298,11 @@ function drawDefaults(defaults) {
   const provider = document.querySelector('#generate-form select[name="provider"]');
   if (provider.options.length === 1)
     provider.append(...defaults.providers.map((value) => element("option", { value }, value)));
+}
+
+/** The model and reasoning choices, loaded once, for any form that offers them (FR-GUI-017, FR-GUI-027). */
+export async function ensureModels() {
+  if (state.choices === undefined) await loadModels();
 }
 
 /** Called each time Setup is shown. */

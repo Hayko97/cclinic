@@ -430,6 +430,54 @@ describe("cclinic auto on a real repository", () => {
       expect(report).toContain(part);
   });
 
+  it("TC-AUTO-061: a dry run prints the plan as JSON and starts nothing", async () => {
+    const root = repository();
+    roadmap(root, planned("a"), planned("b", ["a"]));
+    const harness = agentHarness({ rules: happyRules([1, 2]) });
+    const branchesBefore = git(root, "branch", "--list");
+    expect(await auto(root, harness, { dryRun: true, json: true, yes: false })).toBe(0);
+    const result = JSON.parse(harness.output.out.trim()) as Record<string, unknown>;
+    expect(result).toMatchObject({ status: "plan", roadmapId: 1, runnable: [1, 2], blocked: [] });
+    expect(result["plan"]).toContain("Roadmap #1: Launch");
+    expect(harness.calls()).toEqual([]);
+    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+    expect(git(root, "branch", "--list")).toBe(branchesBefore);
+  });
+
+  it("TC-AUTO-062: a dry run is refused for the same reasons as a run, with the same message, creating nothing", async () => {
+    const root = repository();
+    roadmap(root, planned("a"));
+    writeProject(root, { "src/shared.txt": "changed\n" });
+    const real = await auto(root, agentHarness()).catch((caught: unknown) => caught);
+    const dry = await auto(root, agentHarness(), { dryRun: true }).catch((caught: unknown) => caught);
+    expect(dry).toBeInstanceOf(UsageError);
+    expect((dry as Error).message).toBe((real as Error).message);
+
+    const locked = repository();
+    roadmap(locked, planned("a"));
+    writeProject(locked, { ".cclinic/auto/.lock": JSON.stringify({ pid: process.pid, runId: "20261112-100000" }) });
+    const refused = await auto(locked, agentHarness(), { dryRun: true }).catch((caught: unknown) => caught);
+    expect(refused).toBeInstanceOf(UsageError);
+    expect((refused as Error).message).toContain("Automated run 20261112-100000");
+    expect(readdirSync(path.join(locked, ".cclinic/auto"))).toEqual([".lock"]);
+  });
+
+  it("TC-AUTO-062: a dry run refuses a model the run would refuse, without opening a menu", async () => {
+    const root = repository();
+    roadmap(root, planned("a"));
+    // No --model or --effort, so the run reads them from the environment.
+    const run = (dryRun: boolean) =>
+      runAutoCommand(
+        { dir: root, roadmap: 1, developers: 1, maxBudgetUsd: 5, timeoutMinutes: 30, yes: true, dryRun },
+        agentHarness({ env: { CCLINIC_MODEL: "not-a-model" } }).context,
+      ).catch((caught: unknown) => caught);
+    const dry = await run(true);
+    const real = await run(false);
+    expect(dry).toBeInstanceOf(UsageError);
+    expect((dry as Error).message).toBe((real as Error).message);
+    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+  });
+
   it("TC-AUTO-039: a lock left by a process that has ended is replaced", async () => {
     const root = repository();
     roadmap(root, planned("a"));

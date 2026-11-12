@@ -58,6 +58,8 @@ export interface AutoOptions {
   readonly timeoutMinutes: number;
   readonly yes?: boolean;
   readonly json?: boolean;
+  /** FR-AUTO-040: check and show the plan, then stop before anything starts. */
+  readonly dryRun?: boolean;
 }
 
 /** FR-AUTO-003 */
@@ -272,15 +274,38 @@ export async function runAutoCommand(options: AutoOptions, context: CommandConte
     throw new UsageError(`Branch ${runBranch} already exists. Try again in a second.`);
   }
 
+  const ordered = runOrder(runnable);
   const plan = renderPlan({
     roadmap,
-    runnable: runOrder(runnable),
+    runnable: ordered,
     blockedBefore,
     inProgress,
     runBranch,
     developers: options.developers,
     budgetUsd: options.maxBudgetUsd,
   });
+  if (options.dryRun === true) {
+    // The model and reasoning are checked as the run checks them, but no menu opens.
+    await resolveModelAndEffort(
+      {
+        model: options.model === true ? undefined : options.model,
+        effort: options.effort === true ? undefined : options.effort,
+      },
+      context,
+    );
+    context.reporter.result(
+      options.json === true
+        ? JSON.stringify({
+            status: "plan",
+            roadmapId: roadmap.id,
+            plan,
+            runnable: ordered.map((task) => task.id),
+            blocked: [...blockedBefore.keys()],
+          })
+        : plan,
+    );
+    return 0;
+  }
   if (options.yes !== true) {
     if (!isInteractive()) {
       throw new UsageError("Confirmation needs an interactive terminal. Use --yes to run without asking.");

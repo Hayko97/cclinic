@@ -9,7 +9,7 @@ import { createAssetReader, startGuiServer } from "../adapters/http/gui-server.j
 import { startProcess } from "../adapters/process/job-process.js";
 import { projectPaths } from "../adapters/storage/document-store.js";
 import { acquireGuiLock, readLayout, readMcpConfig, saveLayout } from "../adapters/storage/gui-store.js";
-import { createRunLister } from "../adapters/storage/run-store.js";
+import { createRunLister, readRunFiles } from "../adapters/storage/run-store.js";
 import { openTaskStore } from "../adapters/storage/task-store.js";
 import { openWorkflowStore } from "../adapters/storage/workflow-store.js";
 import {
@@ -176,6 +176,7 @@ export async function runGuiCommand(
       readAsset: createAssetReader(),
       canvas: canvasPorts(target, context.environment, dependencies.every ?? every),
       answers: { update: (key, decide) => openWorkflowStore(target).update(key, decide), now: () => new Date() },
+      readRunFiles: (runId) => readRunFiles(target, runId),
     });
     const server = await startGuiServer({
       host: GUI_HOST,

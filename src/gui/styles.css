@@ -2029,3 +2029,74 @@ mark {
   width: 100%;
   min-width: 0;
 }
+
+/* FR-GUI-019, FR-GUI-029, FR-GUI-032: the roadmap panel's live run, milestones and past runs. */
+.run-tasks,
+.past-runs {
+  display: grid;
+  gap: var(--space-s);
+}
+
+.run-tasks li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  align-items: center;
+  padding: var(--space-s) var(--space-l);
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+  font-size: var(--text-s);
+  min-width: 0;
+}
+
+.run-task-title {
+  font-weight: 600;
+  margin-right: auto;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.run-tasks code {
+  overflow-wrap: anywhere;
+}
+
+.run-reason {
+  flex-basis: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.run-status.is-running {
+  color: var(--progress);
+  background: var(--progress-soft);
+}
+
+.run-status.is-done {
+  color: var(--done);
+  background: var(--done-soft);
+}
+
+.run-status.is-blocked,
+.run-status.is-skipped {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.milestone h4 {
+  margin: var(--space-l) 0 var(--space-xs);
+}
+
+.milestone li,
+.past-runs li {
+  overflow-wrap: anywhere;
+  font-size: var(--text-s);
+}
+
+.past-run-files {
+  margin-top: var(--space-s);
+}
+
+.run-log summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}

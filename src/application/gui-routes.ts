@@ -22,11 +22,14 @@ import {
 } from "./gui-canvas.js";
 import { ENVIRONMENT_CONSENT_MESSAGE } from "../core/environment.js";
 import { mcpInfo, type McpFile } from "../core/gui-setup.js";
+import { AUTO_LIMITS } from "../core/constants/agents.js";
 import { LIMITS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ENVIRONMENT_MAX_BUDGET_USD } from "../core/constants/environment.js";
+import type { RunFiles } from "../core/automation.js";
 import { answerChange, type AnswerPorts } from "./gui-answers.js";
 import type { Jobs } from "./gui-jobs.js";
+import { askAuto } from "./gui-auto.js";
 import { askGenerate } from "./gui-setup.js";
 
 export interface GuiProject {
@@ -47,6 +50,8 @@ export interface GuiPorts {
   readonly canvas: CanvasPorts;
   /** FR-GUI-038: the changes' saved states, to answer a waiting question. */
   readonly answers: AnswerPorts;
+  /** FR-GUI-032: a run's report and logs, or undefined when there's no such run. */
+  readonly readRunFiles: (runId: string) => Promise<RunFiles | undefined>;
 }
 
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
@@ -80,6 +85,24 @@ async function file(
 }
 
 const NOT_FOUND = { error: "Not found." };
+
+/**
+ * FR-GUI-031: stops the auto run the GUI started, as Ctrl+C does. A run started elsewhere is left alone, and the
+ * reply names the process to stop. Only one auto job runs at a time, so the running one is the live run.
+ */
+async function stopRun(ports: GuiPorts): Promise<GuiResponse> {
+  const job = ports.jobs.list().find((item) => item.kind === "auto" && item.isRunning);
+  if (job !== undefined) {
+    ports.jobs.cancel(job.id);
+    return json(HTTP_STATUS.accepted, { cancelling: job.id });
+  }
+  const live = (await ports.canvas.readSources()).runs.find((run) => run.isLive);
+  if (live === undefined) return json(HTTP_STATUS.conflict, { error: "No automated run is going." });
+  const process = live.pid === null ? "its process" : `process ${live.pid}`;
+  return json(HTTP_STATUS.conflict, {
+    error: `Run ${live.state.runId} wasn't started from this GUI. Stop it with Ctrl+C in its terminal, or stop ${process}.`,
+  });
+}
 
 export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Promise<GuiResponse> {
   return async (request) => {
@@ -119,6 +142,8 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
           defaults: {
             limits: Object.fromEntries(Object.entries(LIMITS).map(([name, limit]) => [name, limit.default])),
             environmentBudgetUsd: ENVIRONMENT_MAX_BUDGET_USD,
+            // FR-GUI-027: Run with AI's developers default.
+            autoDevelopers: AUTO_LIMITS.developers.default,
             providers: PROVIDER_CHOICES,
           },
         });
@@ -136,6 +161,9 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
           // FR-GUI-016: unanswered, generate gets the CLI's questions back, and no generate job starts.
           if (parsed.data.command === "generate" && !parsed.data.confirmed)
             return json(HTTP_STATUS.ok, await askGenerate(ports.jobs, parsed.data.options));
+          // FR-GUI-027: unconfirmed, a run gets its plan back, and nothing starts.
+          if (parsed.data.command === "auto" && !parsed.data.confirmed)
+            return json(HTTP_STATUS.ok, { plan: await askAuto(ports.jobs, parsed.data.options) });
           return json(HTTP_STATUS.created, { job: ports.jobs.start(parsed.data) });
         } catch (error) {
           if (error instanceof UsageError) return json(HTTP_STATUS.conflict, { error: error.message });
@@ -215,6 +243,17 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
             return json(HTTP_STATUS.conflict, { error: result.message });
         }
       }
+      case "run-files": {
+        try {
+          const files = await ports.readRunFiles(route.id);
+          return files === undefined ? json(HTTP_STATUS.notFound, NOT_FOUND) : json(HTTP_STATUS.ok, files);
+        } catch (error) {
+          if (error instanceof UsageError) return json(HTTP_STATUS.conflict, { error: error.message });
+          throw error;
+        }
+      }
+      case "stop-run":
+        return stopRun(ports);
       case "cancel-job": {
         const outcome = ports.jobs.cancel(route.id);
         if (outcome === "unknown") return json(HTTP_STATUS.notFound, NOT_FOUND);

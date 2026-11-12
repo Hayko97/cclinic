@@ -23,6 +23,7 @@ import {
   selectTask,
   taskById,
 } from "./canvas.js";
+import { runButtons } from "./auto.js";
 import { followView, viewTools } from "./follow.js";
 
 const ENTRY_LABELS = { user: "User", assistant: "Assistant", "tool-call": "Tool call", "tool-result": "Tool result" };
@@ -57,7 +58,15 @@ const STEP_STATUS_LABELS = {
  * `transcript` is the open transcript's event stream and its follow view. `answering` is an answer whose notes are
  * being written, kept across redraws.
  */
-const state = { open: undefined, pickedSessionId: undefined, transcript: undefined, shown: "", answering: undefined };
+const state = {
+  open: undefined,
+  pickedSessionId: undefined,
+  transcript: undefined,
+  shown: "",
+  answering: undefined,
+  /** FR-GUI-032: the past run whose report and logs are shown, with what was read. */
+  pastRun: undefined,
+};
 
 const panel = () => document.getElementById("panel");
 const body = () => document.getElementById("panel-body");
@@ -95,6 +104,7 @@ export function openPanel(target, sessionId) {
     state.open.id === target.id &&
     state.open.key === target.key;
   state.open = target;
+  if (!isSame) state.pastRun = undefined;
   if (!isSame || sessionId !== undefined) {
     stopTranscript();
     state.pickedSessionId = sessionId;
@@ -108,6 +118,11 @@ export function openPanel(target, sessionId) {
 /** Called with each new canvas, so the open panel shows the task as it is now (FR-GUI-075). */
 export function refreshPanel() {
   if (state.open === undefined) return;
+  if (state.open.kind === "roadmap" && roadmapById(state.open.id) === undefined) {
+    body().replaceChildren(element("p", { className: "muted" }, `Roadmap #${state.open.id} was removed.`));
+    state.shown = "";
+    return;
+  }
   if (state.open.kind === "task" && taskById(state.open.id) === undefined) {
     body().replaceChildren(element("p", { className: "muted" }, `Task #${state.open.id} was removed.`));
     stopTranscript();
@@ -120,9 +135,13 @@ export function refreshPanel() {
 
 function shownItem() {
   const { open } = state;
-  return open.kind === "change"
-    ? currentCanvas().changes.find((change) => change.key === open.key)
-    : { task: taskById(open.id), pickedSessionId: state.pickedSessionId };
+  if (open.kind === "change") return currentCanvas().changes.find((change) => change.key === open.key);
+  if (open.kind === "roadmap") {
+    const roadmap = roadmapById(open.id);
+    const ids = new Set(roadmap?.milestones.flatMap((milestone) => milestone.taskIds) ?? []);
+    return { roadmap, tasks: currentCanvas().tasks.filter((task) => ids.has(task.id)), pastRun: state.pastRun };
+  }
+  return { task: taskById(open.id), pickedSessionId: state.pickedSessionId };
 }
 
 /** Redraws the panel, keeping what has focus and what's typed, so an update never loses the user's place. */
@@ -131,6 +150,7 @@ function render() {
   const focused = document.activeElement?.closest?.("#panel-body [data-focus]")?.dataset.focus;
   const typed = document.querySelector('#panel-body [data-focus="depend-on"]')?.value ?? "";
   if (open.kind === "change") renderChange(currentCanvas().changes.find((change) => change.key === open.key));
+  else if (open.kind === "roadmap") renderRoadmap(roadmapById(open.id));
   else renderTask(taskById(open.id));
   state.shown = JSON.stringify(shownItem());
   const input = document.querySelector('#panel-body [data-focus="depend-on"]');
@@ -600,6 +620,184 @@ function runSection(task) {
     element("h3", {}, `Run ${roadmap.runId}`),
     element("p", {}, `${roadmap.done} / ${roadmap.total} tasks done in ${roadmap.title}`),
     runProgress(roadmap),
+  );
+}
+
+function roundsText(rounds) {
+  return `${rounds.specReviews} spec · ${rounds.qaRuns} QA · ${rounds.implementationReviews} review`;
+}
+
+/** FR-GUI-029: the live run, as `run.json` has it now: each task's status, branch, rounds and cost. */
+function liveRun(roadmap) {
+  const { run } = roadmap;
+  if (run === null) return null;
+  return element(
+    "section",
+    { className: "run-section" },
+    element("h3", {}, `Run ${run.runId}`),
+    runProgress(roadmap),
+    element(
+      "ul",
+      { className: "plain run-tasks" },
+      run.tasks.map((task) =>
+        element(
+          "li",
+          { "data-run-task": task.taskId },
+          element("span", { className: "run-task-title" }, `#${task.taskId} ${task.title}`),
+          element("span", { className: `badge run-status is-${task.status}` }, task.status),
+          element("span", { className: "muted" }, roundsText(task.rounds)),
+          element("span", { className: "muted" }, money(task.costUsd)),
+          task.branch === null ? null : element("code", {}, task.branch),
+          task.reason === null ? null : element("p", { className: "muted run-reason" }, task.reason),
+        ),
+      ),
+    ),
+  );
+}
+
+/** FR-GUI-019: the roadmap's milestones in order, each task with its status, dependencies, spec and run. */
+function milestones(roadmap) {
+  return element(
+    "section",
+    {},
+    element("h3", {}, "Milestones"),
+    roadmap.milestones.length === 0 ? element("p", { className: "muted" }, "No milestones.") : null,
+    roadmap.milestones.map((milestone) =>
+      element(
+        "div",
+        { className: "milestone", "data-milestone": milestone.id },
+        element("h4", {}, milestone.title),
+        element(
+          "ul",
+          { className: "plain" },
+          milestone.taskIds.map((id) => {
+            const task = taskById(id);
+            if (task === undefined) return null;
+            const facts = [
+              STATUS_LABELS[task.status] ?? task.status,
+              task.spec === null ? null : `spec ${task.spec}`,
+              task.dependsOn.length === 0 ? null : `after ${task.dependsOn.map((other) => `#${other}`).join(", ")}`,
+              task.runId === null ? null : `in run ${task.runId}`,
+            ].filter((fact) => fact !== null);
+            return element(
+              "li",
+              {},
+              element(
+                "button",
+                {
+                  type: "button",
+                  className: "link",
+                  "data-focus": `roadmap-task-${task.id}`,
+                  onClick: () => {
+                    selectTask(task.id);
+                    openPanel({ kind: "task", id: task.id });
+                  },
+                },
+                `#${task.id} ${task.title}`,
+              ),
+              element("span", { className: "muted" }, ` · ${facts.join(" · ")}`),
+            );
+          }),
+        ),
+      ),
+    ),
+  );
+}
+
+async function showPastRun(runId) {
+  state.pastRun = { runId, files: undefined, problem: undefined };
+  render();
+  try {
+    state.pastRun = { runId, files: await api(`/api/runs/${encodeURIComponent(runId)}`), problem: undefined };
+  } catch (error) {
+    state.pastRun = { runId, files: undefined, problem: error.message };
+  }
+  if (state.open?.kind === "roadmap") render();
+}
+
+function togglePastRun(runId) {
+  if (state.pastRun?.runId === runId) {
+    state.pastRun = undefined;
+    render();
+  } else void showPastRun(runId);
+}
+
+/** FR-GUI-032: the report and every agent log of the past run that's open. */
+function pastRunFiles(runId) {
+  const shown = state.pastRun;
+  if (shown?.runId !== runId) return null;
+  if (shown.problem !== undefined) return element("p", { className: "error" }, shown.problem);
+  if (shown.files === undefined) return element("p", { className: "muted", role: "status" }, "Loading the run…");
+  const { report, reportIsTruncated, logs } = shown.files;
+  return element(
+    "div",
+    { className: "past-run-files" },
+    element("h4", {}, "Report"),
+    reportIsTruncated ? element("p", { className: "muted" }, "Only the newest part of this report is shown.") : null,
+    element("pre", { className: "run-report" }, report ?? "This run has no report."),
+    element("h4", {}, `Logs (${logs.length})`),
+    logs.map((log) =>
+      element(
+        "details",
+        { className: "run-log" },
+        element("summary", {}, log.name),
+        log.isTruncated ? element("p", { className: "muted" }, "Only the newest part of this log is shown.") : null,
+        element("pre", {}, log.text),
+      ),
+    ),
+  );
+}
+
+/** FR-GUI-032: the roadmap's finished runs, newest first. */
+function pastRuns(roadmap) {
+  return element(
+    "section",
+    {},
+    element("h3", {}, "Past runs"),
+    roadmap.pastRuns.length === 0
+      ? element("p", { className: "muted" }, "No finished runs yet. Run with AI starts one.")
+      : element(
+          "ul",
+          { className: "plain past-runs" },
+          roadmap.pastRuns.map((run) =>
+            element(
+              "li",
+              { "data-past-run": run.runId },
+              element(
+                "button",
+                {
+                  type: "button",
+                  className: "link",
+                  "data-focus": `past-run-${run.runId}`,
+                  "aria-expanded": String(state.pastRun?.runId === run.runId),
+                  onClick: () => togglePastRun(run.runId),
+                },
+                `${run.runId} · ${run.outcome ?? "ended"} · ${money(run.spentUsd)} of ${money(run.budgetUsd)}`,
+              ),
+              element("span", { className: "muted" }, ` · ${when(run.startedAt)}`),
+              pastRunFiles(run.runId),
+            ),
+          ),
+        ),
+  );
+}
+
+/** FR-GUI-019, FR-GUI-029, FR-GUI-031, FR-GUI-032: a roadmap's milestones, its live run and its past runs. */
+function renderRoadmap(roadmap) {
+  document.getElementById("panel-title").textContent = `Roadmap #${roadmap.id}`;
+  body().replaceChildren(
+    element("h2", { className: "panel-task-title" }, roadmap.title),
+    roadmap.goal === null ? null : element("p", { className: "description" }, roadmap.goal),
+    element(
+      "dl",
+      { className: "details" },
+      row("Status", roadmap.status),
+      row("Done", `${roadmap.done} / ${roadmap.total} tasks`),
+    ),
+    element("div", { className: "actions" }, runButtons(roadmap, "")),
+    liveRun(roadmap),
+    milestones(roadmap),
+    pastRuns(roadmap),
   );
 }
 

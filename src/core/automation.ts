@@ -53,6 +53,13 @@ export const agentSessionSchema = z.strictObject({
 });
 export type AgentSession = z.infer<typeof agentSessionSchema>;
 
+/** FR-GUI-032: a run's report and agent logs, each cut to its newest part when it's very long. */
+export interface RunFiles {
+  readonly report: string | null;
+  readonly reportIsTruncated: boolean;
+  readonly logs: readonly { readonly name: string; readonly text: string; readonly isTruncated: boolean }[];
+}
+
 export interface RunState {
   readonly runId: string;
   readonly roadmapId: number;

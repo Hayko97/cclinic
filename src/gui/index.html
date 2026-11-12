@@ -296,6 +296,33 @@
       </form>
     </dialog>
 
+    <dialog id="auto-dialog" aria-labelledby="auto-title">
+      <form id="auto-form">
+        <h2 id="auto-title">Run with AI</h2>
+        <p id="auto-roadmap" class="muted"></p>
+        <div>
+          <label>Budget, US dollars <input name="maxBudgetUsd" inputmode="decimal" required /></label>
+          <label>Developers <input name="developers" inputmode="numeric" /></label>
+          <label
+            >Model
+            <select name="model" data-models data-optional></select
+          ></label>
+          <label
+            >Reasoning
+            <select name="effort" data-efforts></select
+          ></label>
+          <label>Time limit per agent, minutes <input name="timeoutMinutes" inputmode="numeric" /></label>
+        </div>
+        <pre id="auto-plan" hidden></pre>
+        <p id="auto-error" class="error" role="alert"></p>
+        <div class="actions">
+          <button id="auto-cancel" type="button">Cancel</button>
+          <button id="auto-show-plan" type="submit" class="primary">Show the plan</button>
+          <button id="auto-start" type="button" class="primary" hidden>Start the run</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="add-task" aria-labelledby="add-task-title">
       <form id="add-task-form">
         <h2 id="add-task-title">Add a task</h2>

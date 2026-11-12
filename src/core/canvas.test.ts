@@ -76,7 +76,7 @@ function run(roadmapId: number, taskIds: number[], sessions: AgentSession[], isL
     })),
     skippedInProgress: [],
   };
-  return { state, sessions, isLive };
+  return { state, sessions, isLive, pid: isLive ? 4242 : null };
 }
 
 function agent(taskId: number, role: AgentSession["role"], step: string, started: number, ended: number | null) {

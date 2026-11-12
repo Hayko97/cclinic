@@ -37,6 +37,7 @@ export const GUI_ASSETS = {
     "attention.js",
     "setup.js",
     "follow.js",
+    "auto.js",
     "styles.css",
   ],
 } as const;

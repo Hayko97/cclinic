@@ -15,6 +15,7 @@ import {
   SESSION_ID_PATTERN,
   TRANSCRIPT_MAX_TEXT_CHARS,
 } from "./constants/gui.js";
+import { AUTO_LIMITS, RUN_ID_SOURCE } from "./constants/agents.js";
 import { LIMITS } from "./constants/limits.js";
 import { PROVIDER_CHOICES } from "./constants/llm.js";
 import { parseEffort, parseModel } from "./models.js";
@@ -141,7 +142,9 @@ export type Route =
   | { readonly name: "tidy-layout" }
   | { readonly name: "session"; readonly id: string }
   | { readonly name: "session-events"; readonly id: string }
-  | { readonly name: "answer"; readonly key: string };
+  | { readonly name: "answer"; readonly key: string }
+  | { readonly name: "run-files"; readonly id: string }
+  | { readonly name: "stop-run" };
 
 const ASSET_FILES: ReadonlySet<string> = new Set(GUI_ASSETS.files);
 const JOB_PATH = "/api/jobs/(job-[1-9][0-9]{0,5})";
@@ -175,6 +178,10 @@ const ROUTES: readonly {
   { method: "GET", pattern: new RegExp(`^${SESSION_PATH}$`), route: (id) => ({ name: "session", id }) },
   { method: "GET", pattern: new RegExp(`^${SESSION_PATH}/events$`), route: (id) => ({ name: "session-events", id }) },
   { method: "POST", pattern: new RegExp(`^${CHANGE_PATH}/answer$`), route: (key) => ({ name: "answer", key }) },
+  // FR-GUI-032: a run's report and logs, by run ID only.
+  { method: "GET", pattern: new RegExp(`^/api/runs/(${RUN_ID_SOURCE})$`), route: (id) => ({ name: "run-files", id }) },
+  // FR-GUI-031: stops the run the GUI started.
+  { method: "POST", pattern: /^\/api\/run\/stop$/, route: () => ({ name: "stop-run" }) },
 ];
 
 export function matchRoute(method: string, path: string): Route | undefined {
@@ -262,6 +269,39 @@ export const environmentOptionsSchema = z.strictObject({
   allowBroadTarget: z.boolean().default(false),
 });
 
+/** FR-GUI-027: `cclinic auto`'s options, checked with the CLI's own limits. */
+export const autoOptionsSchema = z.strictObject({
+  roadmap: idSchema,
+  maxBudgetUsd: budgetSchema,
+  developers: limit("--developers <n>", AUTO_LIMITS.developers),
+  model: modelValueSchema.optional(),
+  effort: effortValueSchema.optional(),
+  timeoutMinutes: limit("--timeout-minutes <n>", LIMITS.timeoutMinutes),
+});
+export type AutoOptions = z.output<typeof autoOptionsSchema>;
+
+/** FR-AUTO-040: what `cclinic auto --dry-run --json` prints. */
+export const autoPlanSchema = z.object({
+  status: z.literal("plan"),
+  roadmapId: z.number(),
+  plan: z.string(),
+  runnable: z.array(z.number()),
+  blocked: z.array(z.number()),
+});
+export type AutoPlan = z.output<typeof autoPlanSchema>;
+
+function autoArgs(options: AutoOptions): string[] {
+  const valued: [string, string | number | undefined][] = [
+    ["--roadmap", options.roadmap],
+    ["--max-budget-usd", options.maxBudgetUsd],
+    ["--developers", options.developers],
+    ["--model", options.model],
+    ["--effort", options.effort],
+    ["--timeout-minutes", options.timeoutMinutes],
+  ];
+  return valued.flatMap(([flag, value]) => (value === undefined ? [] : [`${flag}=${value}`]));
+}
+
 function environmentArgs(options: z.output<typeof environmentOptionsSchema>): string[] {
   return [
     ...(options.model === undefined ? [] : [`--model=${options.model}`]),
@@ -291,6 +331,9 @@ export const jobRequestSchema = z.discriminatedUnion("command", [
   }),
   // The dry run whose summary the questions are asked from (FR-GUI-016).
   z.strictObject({ command: z.literal("generate-preview"), options: generateOptionsSchema }),
+  // FR-GUI-027: unconfirmed, the GUI answers with the plan from a dry run; confirmed, the run starts with --yes.
+  z.strictObject({ command: z.literal("auto"), confirmed: z.boolean().default(false), options: autoOptionsSchema }),
+  z.strictObject({ command: z.literal("auto-preview"), options: autoOptionsSchema }),
   // FR-GUI-020: every `cclinic tasks` change. Creating a roadmap or milestone isn't one (FR-GUI-021).
   z.strictObject({
     command: z.literal("tasks-add"),
@@ -365,6 +408,10 @@ export function jobArgs(request: JobRequest): string[] {
       return ["--json", "--yes", ...generateArgs(request.options)];
     case "generate-preview":
       return ["--dry-run", "--json", ...generateArgs(request.options)];
+    case "auto":
+      return ["auto", ...autoArgs(request.options), "--yes", "--json"];
+    case "auto-preview":
+      return ["auto", ...autoArgs(request.options), "--dry-run", "--json"];
     case "tasks-add":
       return [
         "tasks",
@@ -397,8 +444,9 @@ export function describeJob(args: readonly string[]): string {
 /** FR-GUI-035: commands that change the same files, of which only one may run. Others, such as doctor, may run side by side. */
 const CONFLICTING: ReadonlySet<JobKind> = new Set<JobKind>(["generate", "clean", "skills", "environment"]);
 
-/** The running job that stops this one from starting, if any (FR-GUI-035). */
+/** The running job that stops this one from starting, if any (FR-GUI-035). Only one auto run goes at a time. */
 export function blockingJob<T extends { readonly kind: JobKind }>(kind: JobKind, running: readonly T[]): T | undefined {
+  if (kind === "auto") return running.find((job) => job.kind === "auto");
   return CONFLICTING.has(kind) ? running.find((job) => CONFLICTING.has(job.kind)) : undefined;
 }
 

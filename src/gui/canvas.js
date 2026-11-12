@@ -14,6 +14,7 @@ import {
   STATUS_LABELS,
   timer,
 } from "./api.js";
+import { runButtons } from "./auto.js";
 
 const ZOOM = { min: 0.25, max: 2, step: 1.2, wheelStep: 1.1 };
 /** A pointer must move this far before a press becomes a drag, so a click still selects. */
@@ -258,6 +259,15 @@ function frameHeader(frame) {
   const actions = element(
     "span",
     { className: "frame-actions" },
+    // FR-GUI-078: a roadmap's run, and its panel.
+    roadmap === undefined ? null : runButtons(roadmap),
+    roadmap === undefined
+      ? null
+      : element(
+          "button",
+          { type: "button", className: "small", "data-action": "open-roadmap", "aria-label": `Open ${roadmap.title}` },
+          "Open",
+        ),
     element(
       "button",
       { type: "button", className: "small", "data-action": "tidy", "aria-label": `Tidy up ${frame.title}` },
@@ -892,6 +902,10 @@ async function frameAction(button) {
     } catch (error) {
       notify(error.message, true);
     }
+    return;
+  }
+  if (action === "open-roadmap") {
+    listeners.open({ kind: "roadmap", id: frame.roadmap.id });
     return;
   }
   if (action === "remove-roadmap") {

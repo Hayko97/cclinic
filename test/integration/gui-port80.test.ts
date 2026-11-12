@@ -52,6 +52,7 @@ describe("GUI on port 80", () => {
       jobs,
       canvas: EMPTY_CANVAS,
       answers: NO_ANSWERS,
+      readRunFiles: () => Promise.resolve(undefined),
       readAsset: () => Promise.resolve("<html></html>"),
     });
     server = await startGuiServer({ host: "127.0.0.1", port: 0, isPortFixed: true, handle });

@@ -230,6 +230,7 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .option("--effort [value]", "reasoning level for every agent. With no value, opens a menu")
     .option(...limitOption("--timeout-minutes <n>", "time limit for each agent call", LIMITS.timeoutMinutes))
     .option("-y, --yes", "skip the confirmation prompt")
+    .option("--dry-run", "check everything and show the plan, without starting the run")
     .option("--json", "print the result as JSON")
     .addHelpText(
       "after",

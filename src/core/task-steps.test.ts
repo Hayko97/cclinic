@@ -167,7 +167,7 @@ describe("session activity", () => {
   };
   const sources = (activity: ReadonlyMap<string, SessionActivity>): CanvasSources => ({
     overview: { roadmaps: [], unassigned: [] },
-    runs: [{ state, sessions: [live, quiet], isLive: true }],
+    runs: [{ state, sessions: [live, quiet], isLive: true, pid: 4242 }],
     workflows: [],
     problems: [],
     activity,
@@ -192,7 +192,7 @@ describe("session activity", () => {
   it("an ended session, or one with no transcript read, has no activity", () => {
     const ended = { ...live, endedAt: minutesAgo(1), exitCode: 0 };
     const views = allSessions(
-      { runs: [{ state, sessions: [ended, quiet], isLive: true }], workflows: [], activity: new Map() },
+      { runs: [{ state, sessions: [ended, quiet], isLive: true, pid: 4242 }], workflows: [], activity: new Map() },
       NOW,
     );
     expect(views.map((view) => [view.currentTool, view.quietMinutes])).toEqual([

@@ -108,6 +108,9 @@ export function createJobs(ports: JobPorts): Jobs {
       // FR-GUI-016: generate starts only once the user has answered its questions.
       if (request.command === "generate" && !request.confirmed)
         throw new UsageError("Answer generate's questions before it starts.");
+      // FR-GUI-027: an auto run starts only once the user has seen and confirmed its plan.
+      if (request.command === "auto" && !request.confirmed)
+        throw new UsageError("Confirm the run's plan before it starts.");
       const blocker = blockingJob(
         request.command,
         running().map((record) => record.summary),
