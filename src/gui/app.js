@@ -1,30 +1,15 @@
 // The GUI's page: a top bar, a rail with Canvas, Setup and Jobs, and a side panel (FR-GUI-049).
-import { api, money, notify } from "./api.js";
+import { api, money, notify, remember, remembered } from "./api.js";
 import { addIcons } from "./icons.js";
-import { onCanvasChange, onOpenTask, refresh, selectTask, showCanvas, startCanvas } from "./canvas.js";
+import { setTitleBase, showAttention, startAttention } from "./attention.js";
+import { onCanvasChange, onDraw, onOpenTask, refresh, selectTask, showCanvas, startCanvas } from "./canvas.js";
+import { applyFilters, startFilters, updateFilterChoices } from "./filters.js";
 import { refreshJobs, startJobs } from "./jobs.js";
 import { drawList } from "./list.js";
 import { openPanel, refreshPanel, startAddTask, startPanel } from "./panel.js";
 
 // The token was only needed to load the page; keep it out of the address bar and history.
 if (location.search !== "") history.replaceState(null, "", location.pathname);
-
-/** What the browser remembers between visits (FR-GUI-054); the page works without it. */
-function remembered(key, fallback) {
-  try {
-    return localStorage.getItem(`cclinic.${key}`) ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function remember(key, value) {
-  try {
-    localStorage.setItem(`cclinic.${key}`, value);
-  } catch {
-    // Private windows may refuse; the choice then lasts only for this visit.
-  }
-}
 
 function showView(name) {
   for (const view of ["canvas", "setup", "jobs"]) {
@@ -41,6 +26,7 @@ function showLayout(name) {
   document.getElementById("canvas-area").hidden = isList;
   document.getElementById("list").hidden = !isList;
   document.getElementById("canvas-tools").hidden = isList;
+  document.getElementById("canvas-filters").hidden = isList;
   for (const button of document.querySelectorAll("[data-layout]"))
     button.setAttribute("aria-pressed", String(button.dataset.layout === name));
   remember("layout", name);
@@ -74,8 +60,11 @@ document.getElementById("theme").addEventListener("click", () => {
 
 applyTheme(theme);
 addIcons();
-onOpenTask((target) => openPanel(target));
-onCanvasChange((canvas) => {
+onOpenTask((target, sessionId) => openPanel(target, sessionId));
+onDraw(applyFilters);
+onCanvasChange((canvas, payload) => {
+  updateFilterChoices(canvas);
+  showAttention(canvas, payload.nextStep);
   drawList(canvas, openTask);
   refreshPanel();
   const spent = canvas.roadmaps.filter((roadmap) => roadmap.spentUsd !== null);
@@ -88,6 +77,19 @@ startPanel();
 startAddTask();
 startJobs();
 startCanvas();
+startFilters();
+// FR-GUI-052: a waiting item opens where it lives, from any screen.
+startAttention(
+  (target) => {
+    showView("canvas");
+    if (target.kind === "task") openTask(target.id);
+    else openPanel(target);
+  },
+  () => {
+    showView("canvas");
+    showLayout("canvas");
+  },
+);
 // An unknown remembered layout falls back to the Canvas, as an unknown theme falls back to Auto.
 const LAYOUTS = ["canvas", "list"];
 showLayout(LAYOUTS.includes(remembered("layout", "canvas")) ? remembered("layout", "canvas") : "canvas");
@@ -96,7 +98,7 @@ try {
   const project = await api("/api/project");
   document.getElementById("project-name").textContent = project.name;
   document.getElementById("project-folder").textContent = project.folder;
-  document.title = `cclinic · ${project.name}`;
+  setTitleBase(`cclinic · ${project.name}`);
   await refresh();
   await refreshJobs();
 } catch (error) {

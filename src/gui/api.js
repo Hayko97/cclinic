@@ -107,3 +107,20 @@ export function money(value) {
 export function when(iso) {
   return new Date(iso).toLocaleString();
 }
+
+/** What the browser remembers between visits (FR-GUI-054, FR-GUI-070); the page works without it. */
+export function remembered(key, fallback) {
+  try {
+    return localStorage.getItem(`cclinic.${key}`) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function remember(key, value) {
+  try {
+    localStorage.setItem(`cclinic.${key}`, value);
+  } catch {
+    // Private windows may refuse; the choice then lasts only for this visit.
+  }
+}

@@ -15,11 +15,15 @@
         <div id="project-folder" class="muted"></div>
       </div>
       <div class="top-status">
+        <button id="needs-you" type="button" aria-expanded="false" aria-controls="needs-list">
+          Needs you <span id="needs-count" class="count">0</span>
+        </button>
         <span id="job-count" class="muted"></span>
         <span id="budget" class="muted"></span>
         <button id="theme" type="button">Theme: Auto</button>
       </div>
     </header>
+    <div id="needs-list" class="needs-list" role="region" aria-label="Needs you" hidden></div>
     <nav class="rail" aria-label="Places">
       <button type="button" data-view="canvas" aria-current="true">Canvas</button>
       <button type="button" data-view="setup">Setup</button>
@@ -42,6 +46,25 @@
             <button id="zoom-fit" type="button">Fit</button>
           </div>
         </div>
+        <div id="canvas-filters" class="filter-bar" role="search" aria-label="Find cards">
+          <input id="canvas-search" type="search" placeholder="Search by ID, title or spec" aria-label="Search cards" />
+          <select id="filter-status" aria-label="Status"></select>
+          <select id="filter-mode" aria-label="Mode">
+            <option value="">Any mode</option>
+            <option value="ai">AI run</option>
+            <option value="manual">Manual</option>
+            <option value="none">No mode</option>
+          </select>
+          <select id="filter-spec" aria-label="Spec">
+            <option value="">Any spec</option>
+          </select>
+          <label class="switch"><input id="hide-done" type="checkbox" /> Hide done</label>
+          <label class="switch"><input id="show-sessions" type="checkbox" /> Show sessions</label>
+          <select id="go-roadmap" aria-label="Go to roadmap">
+            <option value="">Go to roadmap…</option>
+          </select>
+        </div>
+        <div id="next-step" class="next-step" hidden></div>
         <ul id="canvas-problems" class="problems" hidden></ul>
         <div id="canvas-area" class="canvas-area">
           <div id="board" class="board">

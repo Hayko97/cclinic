@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { AgentSession, RunState } from "./automation.js";
 import {
   buildCanvas,
+  cardOrder,
   frameWidths,
+  nextStep,
   parseTranscriptLine,
   resolveLayout,
   tidyFrame,
@@ -104,6 +106,50 @@ const sources = (change: Partial<CanvasSources>): CanvasSources => ({
   workflows: [],
   problems: [],
   ...change,
+});
+
+describe("next step and card order", () => {
+  const withRoadmap = (tasks: Task[]) =>
+    buildCanvas(sources({ overview: { roadmaps: [roadmap(1, [{ id: 1, tasks }])], unassigned: [] } }), NOW);
+
+  it("TC-GUI-073: suggests Generate, Plan a roadmap, Run with AI, then Open its roadmap, in that order", () => {
+    expect(nextStep(buildCanvas(sources({}), NOW), false)).toEqual({ kind: "generate" });
+    expect(nextStep(buildCanvas(sources({}), NOW), true)).toEqual({ kind: "plan" });
+    expect(nextStep(withRoadmap([task(1, 1), task(2, 1, { status: "done" })]), true)).toEqual({
+      kind: "run",
+      roadmapId: 1,
+    });
+    const running = buildCanvas(
+      sources({
+        overview: { roadmaps: [roadmap(1, [{ id: 1, tasks: [task(1, 1)] }])], unassigned: [] },
+        runs: [run(1, [1], [])],
+      }),
+      NOW,
+    );
+    expect(nextStep(running, true)).toEqual({ kind: "open-run", roadmapId: 1, runId: "20261111-110000" });
+  });
+
+  it("TC-GUI-073: suggests nothing once every roadmap is done and no run is going", () => {
+    expect(nextStep(withRoadmap([task(1, 1, { status: "done" })]), true)).toBeNull();
+  });
+
+  it("TC-GUI-106: cards are ordered frame by frame, column by column, each task after the ones it depends on", () => {
+    const view = buildCanvas(
+      sources({
+        overview: {
+          roadmaps: [
+            roadmap(1, [
+              { id: 1, tasks: [task(3, 1, { dependsOn: [2] }), task(2, 1)] },
+              { id: 2, tasks: [task(4, 2)] },
+            ]),
+          ],
+          unassigned: [task(5, null)],
+        },
+      }),
+      NOW,
+    );
+    expect(cardOrder(view)).toEqual(["task-2", "task-3", "task-4", "task-5"]);
+  });
 });
 
 describe("canvas model", () => {
@@ -310,8 +356,8 @@ describe("layout", () => {
 
   it("TC-GUI-100: each frame's width is its columns' width, the same the layout spaces frames by", () => {
     const widths = frameWidths(view);
-    expect(widths["roadmap-1"]).toBe(2 * LAYOUT.framePadding + 2 * LAYOUT.cardWidth + LAYOUT.columnGap);
-    expect(widths["unassigned"]).toBe(2 * LAYOUT.framePadding + LAYOUT.cardWidth);
+    expect(widths["roadmap-1"]).toBe(2 * LAYOUT.framePadding + 2 * (LAYOUT.cardWidth + LAYOUT.columnGap));
+    expect(widths["unassigned"]).toBe(2 * LAYOUT.framePadding + LAYOUT.cardWidth + LAYOUT.columnGap);
     const layout = resolveLayout(view, undefined);
     expect(layout.frames["roadmap-2"]?.x).toBe((widths["roadmap-1"] ?? 0) + LAYOUT.frameGap);
   });

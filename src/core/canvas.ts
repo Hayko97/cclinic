@@ -425,10 +425,44 @@ function framePlans(view: CanvasView): FramePlan[] {
   ];
 }
 
-/** FR-GUI-074: a frame is as wide as its columns; the page draws it and clamps drops to this same width. */
+/** FR-GUI-080: every card, frame by frame, each frame's columns in order and each task after its dependencies. */
+export function cardOrder(view: CanvasView): string[] {
+  return framePlans(view).flatMap((plan) => plan.columns.flat());
+}
+
+export type NextStep =
+  | { readonly kind: "generate" }
+  | { readonly kind: "plan" }
+  | { readonly kind: "run"; readonly roadmapId: number }
+  | { readonly kind: "open-run"; readonly roadmapId: number; readonly runId: string };
+
+/**
+ * FR-GUI-053: the one step to suggest, checked in this order: not generated, no roadmap, a roadmap with open
+ * tasks and no run, then a run going. Nothing when none applies.
+ */
+export function nextStep(view: CanvasView, hasDocuments: boolean): NextStep | null {
+  if (!hasDocuments) return { kind: "generate" };
+  if (view.roadmaps.length === 0) return { kind: "plan" };
+  const statusOf = new Map(view.tasks.map((task) => [task.id, task.status]));
+  const toRun = view.roadmaps.find(
+    (roadmap) =>
+      roadmap.mode === null &&
+      roadmap.milestones.some((milestone) => milestone.taskIds.some((id) => statusOf.get(id) === "open")),
+  );
+  if (toRun !== undefined) return { kind: "run", roadmapId: toRun.id };
+  const running = view.roadmaps.find((roadmap) => roadmap.mode === "ai" && roadmap.runId !== null);
+  if (running?.runId !== undefined && running.runId !== null)
+    return { kind: "open-run", roadmapId: running.id, runId: running.runId };
+  return null;
+}
+
+/**
+ * FR-GUI-074: a frame is as wide as its columns, each with the room beside it for session nodes (FR-GUI-070);
+ * the page draws it and clamps drops to this same width.
+ */
 export function frameWidth(columnCount: number): number {
   const columns = Math.max(1, columnCount);
-  return LAYOUT.framePadding + LAYOUT.framePadding + columns * LAYOUT.cardWidth + (columns - 1) * LAYOUT.columnGap;
+  return LAYOUT.framePadding + LAYOUT.framePadding + columns * (LAYOUT.cardWidth + LAYOUT.columnGap);
 }
 
 /** Each frame's width, by frame key, so the page never works it out again. */

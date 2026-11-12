@@ -310,6 +310,7 @@ export const EMPTY_CANVAS: CanvasPorts = {
   readSources: () =>
     Promise.resolve({ overview: { roadmaps: [], unassigned: [] }, runs: [], workflows: [], problems: [] }),
   readLayout: () => Promise.resolve(undefined),
+  hasDocuments: () => true,
   updateLayout: () => Promise.resolve(),
   locateTranscript: () => Promise.resolve({ kind: "missing" }),
   readTranscript: () =>

@@ -8,7 +8,7 @@ import { openTaskStore } from "../../src/adapters/storage/task-store.js";
 import { openWorkflowStore } from "../../src/adapters/storage/workflow-store.js";
 import type { JobProcess } from "../../src/application/gui-jobs.js";
 import type { Layout } from "../../src/core/canvas.js";
-import { beginChange, linkSession, stateKey } from "../../src/core/workflow.js";
+import { beginChange, linkSession, stateKey, withPending } from "../../src/core/workflow.js";
 import { makeTempFolder } from "../support/helpers.js";
 import { startTestGui, type TestGui } from "../support/gui.js";
 
@@ -408,8 +408,9 @@ describe("canvas page", () => {
 
   it("TC-GUI-101: Tidy up asks first; cancel changes nothing, confirm puts the frame's cards back in place", async () => {
     const { page, root } = await open();
-    await drag(page, '[data-key="task-4"]', 0, 80);
-    await drag(page, '[data-key="task-5"]', 0, 80);
+    const scale = await scaleOf(page);
+    await drag(page, '[data-key="task-4"]', 0, 80 * scale);
+    await drag(page, '[data-key="task-5"]', 0, 80 * scale);
     await vi.waitFor(() => {
       expect(Object.keys(savedLayout(root).cards).sort()).toEqual(["task-4", "task-5"]);
     });
@@ -675,7 +676,8 @@ describe("QA: live canvas, page side", () => {
     const clock = manualClock();
     const root = project();
     const { page } = await open({ root, every: clock.every });
-    await drag(page, '[data-key="task-3"]', 0, 60);
+    const scale = await scaleOf(page);
+    await drag(page, '[data-key="task-3"]', 0, 60 * scale);
     await vi.waitFor(() => {
       expect(savedLayout(root).cards["task-3"]).toBeDefined();
     });
@@ -690,7 +692,7 @@ describe("QA: live canvas, page side", () => {
     expect(await page.locator('[data-key="task-3"]').count()).toBe(0);
     expect(await page.locator('[data-frame="roadmap-1"] .progress').textContent()).toBe("2 / 3 done");
     // The next save leaves the removed task's position out.
-    await drag(page, '[data-key="task-4"]', 0, 60);
+    await drag(page, '[data-key="task-4"]', 0, 60 * scale);
     await vi.waitFor(() => {
       expect(Object.keys(savedLayout(root).cards)).toEqual(["task-4"]);
     });
@@ -873,9 +875,10 @@ describe("QA: canvas edge cases", () => {
 
   it("TC-GUI-101: Tidy up works on the Unassigned and Changes frames too", async () => {
     const { page, root } = await open({ withSessions: true });
-    await drag(page, '[data-key="task-6"]', 0, 60);
-    await drag(page, '[data-key="change-branch-fix-x"]', 0, 60);
-    await drag(page, '[data-key="task-4"]', 0, 60);
+    const scale = await scaleOf(page);
+    await drag(page, '[data-key="task-6"]', 0, 60 * scale);
+    await drag(page, '[data-key="change-branch-fix-x"]', 0, 60 * scale);
+    await drag(page, '[data-key="task-4"]', 0, 60 * scale);
     await vi.waitFor(() => {
       expect(Object.keys(savedLayout(root).cards).sort()).toEqual(["change-branch-fix-x", "task-4", "task-6"]);
     });
@@ -1603,10 +1606,11 @@ describe("QA C2a run 2: frame width and drops", () => {
     const roadmap1 = await styleBox(page, '[data-frame="roadmap-1"]');
     const roadmap2 = await styleBox(page, '[data-frame="roadmap-2"]');
     const unassigned = await styleBox(page, '[data-frame="unassigned"]');
-    // 2 columns: 24 + 220 + 32 + 220 + 24; 1 column: 24 + 220 + 24.
-    expect(roadmap1.width).toBe(520);
-    expect(roadmap2.width).toBe(268);
-    expect(unassigned.width).toBe(268);
+    // Each column is a card and the room for its session nodes: 2 columns: 24 + 2 × (220 + 148) + 24;
+    // 1 column: 24 + 220 + 148 + 24.
+    expect(roadmap1.width).toBe(784);
+    expect(roadmap2.width).toBe(416);
+    expect(unassigned.width).toBe(416);
     const [left, middle, right] = [roadmap1, roadmap2, unassigned].sort((a, b) => a.x - b.x);
     expect(middle?.x).toBeGreaterThanOrEqual((left?.x ?? 0) + (left?.width ?? 0));
     expect(right?.x).toBeGreaterThanOrEqual((middle?.x ?? 0) + (middle?.width ?? 0));
@@ -1618,9 +1622,10 @@ describe("QA C2a run 2: frame width and drops", () => {
     const start4 = await styleBox(page, '[data-key="task-4"]');
     await drag(page, '[data-key="task-4"]', 100 * scale, 0);
     await vi.waitFor(() => {
-      expect(savedLayout(root).cards["task-4"]).toEqual({ x: 276, y: start4.y });
+      expect(savedLayout(root).cards["task-4"]).toEqual({ x: 392, y: start4.y });
     });
-    expect((await styleBox(page, '[data-key="task-4"]')).x).toBe(276);
+    // The second column, at 24 + 220 + 148: the room beside it is for session nodes, not cards.
+    expect((await styleBox(page, '[data-key="task-4"]')).x).toBe(392);
     await drag(page, '[data-key="task-1"]', -60 * scale, 0);
     await vi.waitFor(() => {
       expect(savedLayout(root).cards["task-1"]?.x).toBe(24);
@@ -1663,7 +1668,7 @@ describe("QA C2a run 2: frame width and drops", () => {
 });
 
 describe("QA C2a run 2: saving only what moved", () => {
-  it("TC-GUI-073: the page PUTs only the moved card or frame", async () => {
+  it("TC-GUI-098: the page PUTs only the moved card or frame", async () => {
     const { page, root } = await open();
     const puts = layoutPuts(page);
     const scale = await scaleOf(page);
@@ -2782,8 +2787,8 @@ describe("QA C2a run 6: frame widths from the server, and the panel's session", 
   it("TC-GUI-100: every frame, three milestones, Unassigned and Changes, is drawn at the width the server sends", async () => {
     const { page } = await open({ root: await wideProject() });
     const { frameWidths } = await payloadOf(page);
-    // 3 columns: 24 + 3 × 220 + 2 × 32 + 24; 1 column: 24 + 220 + 24.
-    expect(frameWidths).toEqual({ "roadmap-1": 772, "roadmap-2": 268, unassigned: 268, changes: 268 });
+    // 3 columns: 24 + 3 × (220 + 148) + 24; 1 column: 24 + 220 + 148 + 24.
+    expect(frameWidths).toEqual({ "roadmap-1": 1152, "roadmap-2": 416, unassigned: 416, changes: 416 });
     const drawn: Record<string, number> = await page
       .locator("[data-frame]")
       .evaluateAll((nodes: HTMLElement[]) =>
@@ -2796,10 +2801,10 @@ describe("QA C2a run 6: frame widths from the server, and the panel's session", 
     const { page, root } = await open({ root: await wideProject() });
     const scale = await scaleOf(page);
     const task1 = await styleBox(page, '[data-key="task-1"]');
-    // Centre still inside the 772 px frame: pulled back to the third column at 24 + 2 × 252.
-    await drag(page, '[data-key="task-1"]', 600 * scale, 0);
+    // Centre still inside the 1152 px frame, past the third column: pulled back to it at 24 + 2 × 368.
+    await drag(page, '[data-key="task-1"]', 900 * scale, 0);
     await vi.waitFor(() => {
-      expect(savedLayout(root).cards["task-1"]).toEqual({ x: 528, y: task1.y });
+      expect(savedLayout(root).cards["task-1"]).toEqual({ x: 760, y: task1.y });
     });
     const task5 = await styleBox(page, '[data-key="task-5"]');
     await drag(page, '[data-key="task-5"]', 100 * scale, 0);
@@ -2813,7 +2818,7 @@ describe("QA C2a run 6: frame widths from the server, and the panel's session", 
     });
     // Centre past the frame's right edge: back where it was, and nothing saved for it.
     const task3 = await styleBox(page, '[data-key="task-3"]');
-    await drag(page, '[data-key="task-3"]', 200 * scale, 0);
+    await drag(page, '[data-key="task-3"]', 400 * scale, 0);
     expect(await styleBox(page, '[data-key="task-3"]')).toEqual(task3);
     expect(savedLayout(root).cards["task-3"]).toBeUndefined();
   });
@@ -2852,5 +2857,1082 @@ describe("QA C2a run 6: frame widths from the server, and the panel's session", 
     expect(await page.locator("#panel").isHidden()).toBe(true);
     await page.locator('[data-key="task-2"]').click();
     await expect.poll(() => entries.allTextContents()).toEqual(["live question", "live answer"]);
+  });
+});
+
+describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
+  const nodes = (page: Page) =>
+    page.locator('.session-node[data-task="2"]').evaluateAll((items) => items.map((item) => item.textContent.trim()));
+
+  it("TC-GUI-095: Show sessions draws a task's sessions beside its card, off leaves the count, and the choice is kept", async () => {
+    const { page } = await open({ withSessions: true });
+    expect(await page.locator(".session-node").count()).toBe(0);
+    await page.locator("#show-sessions").check();
+    expect(await nodes(page)).toEqual(["You (live)", "You (ended)"]);
+    expect(await page.locator('.session-node[data-task="2"] .live-dot').count()).toBe(1);
+    expect(await page.locator('.session-node[data-task="2"] .ended-dot').count()).toBe(1);
+    expect(await page.locator("path.session-link").count()).toBe(2);
+    await page.reload();
+    await page.locator('[data-key="task-1"]').waitFor();
+    expect(await page.locator("#show-sessions").isChecked()).toBe(true);
+    expect(await nodes(page)).toEqual(["You (live)", "You (ended)"]);
+    await page.locator("#show-sessions").uncheck();
+    expect(await page.locator(".session-node").count()).toBe(0);
+    expect(await page.locator("path.session-link").count()).toBe(0);
+    expect(await page.locator('[data-key="task-2"] .sessions').textContent()).toBe("2 sessions");
+    await page.reload();
+    await page.locator('[data-key="task-1"]').waitFor();
+    expect(await page.locator("#show-sessions").isChecked()).toBe(false);
+  });
+
+  it("TC-GUI-095: a session node opens the task's panel on that session, and moves with its card", async () => {
+    const { page } = await open({ withSessions: true });
+    await page.locator("#show-sessions").check();
+    await page.locator(`.session-node[data-session="${SESSION_OLD}"]`).click();
+    expect(await page.locator("#panel-title").textContent()).toBe("Task #2");
+    await expect
+      .poll(() => page.locator(`button.session[data-session="${SESSION_OLD}"]`).getAttribute("aria-pressed"))
+      .toBe("true");
+    await page.keyboard.press("Escape");
+    const before = await styleBox(page, `.session-node[data-session="${SESSION_OLD}"]`);
+    await drag(page, '[data-key="task-2"]', 0, 80);
+    const after = await styleBox(page, `.session-node[data-session="${SESSION_OLD}"]`);
+    expect(after.y - before.y).toBeGreaterThan(40);
+    expect(after.x).toBe(before.x);
+  });
+
+  it("TC-GUI-105: search highlights, filters and Hide done dim in place, and the roadmap picker zooms to a frame", async () => {
+    const { page } = await open({ withSessions: true });
+    const classes = (key: string) => page.locator(`[data-key="${key}"]`).getAttribute("class");
+    const before = await styleBox(page, '[data-key="task-3"]');
+    await page.locator("#canvas-search").fill("refund");
+    expect(await classes("task-2")).toContain("is-match");
+    expect(await classes("task-3")).not.toContain("is-match");
+    await page.locator("#canvas-search").fill("#4");
+    expect(await classes("task-4")).toContain("is-match");
+    await page.locator("#canvas-search").fill("");
+    await page.locator("#filter-mode").selectOption("manual");
+    expect(await classes("task-2")).not.toContain("is-filtered");
+    expect(await classes("task-3")).toContain("is-filtered");
+    await page.locator("#filter-mode").selectOption("");
+    await page.locator("#hide-done").check();
+    expect(await classes("task-1")).toContain("is-filtered");
+    expect(await classes("task-3")).not.toContain("is-filtered");
+    expect(await styleBox(page, '[data-key="task-3"]')).toEqual(before);
+    await page.locator("#filter-spec").selectOption("refunds");
+    expect(await classes("task-2")).not.toContain("is-filtered");
+    expect(await classes("task-6")).toContain("is-filtered");
+    // Filters stay applied when the canvas is drawn again.
+    await page.locator("#show-sessions").check();
+    expect(await classes("task-6")).toContain("is-filtered");
+    await page.locator("#go-roadmap").selectOption("2");
+    const area = (await page.locator("#canvas-area").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+    const frame = (await page.locator('[data-frame="roadmap-2"]').boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+    expect(frame.x).toBeGreaterThanOrEqual(area.x);
+    expect(frame.x + frame.width).toBeLessThanOrEqual(area.x + area.width + 1);
+    expect(frame.height).toBeGreaterThan(area.height / 2);
+    expect(await page.locator("#go-roadmap").inputValue()).toBe("");
+  });
+
+  it("TC-GUI-106: Tab goes through the cards in roadmap and dependency order, Enter opens one, and arrows move and save it", async () => {
+    const { page, root } = await open({ withSessions: true });
+    await page.locator("#go-roadmap").focus();
+    const seen: string[] = [];
+    for (let step = 0; step < 40 && seen.length < 7; step += 1) {
+      await page.keyboard.press("Tab");
+      const key = await page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.key);
+      if (key !== undefined && !seen.includes(key)) seen.push(key);
+    }
+    expect(seen).toEqual(["task-1", "task-2", "task-3", "task-4", "task-5", "task-6", "change-branch-fix-x"]);
+    await page.locator('[data-key="task-6"]').focus();
+    await page.keyboard.press("Enter");
+    expect(await page.locator("#panel-title").textContent()).toBe("Task #6");
+    await page.keyboard.press("Escape");
+    const card = page.locator('[data-key="task-2"]');
+    const from = await styleBox(page, '[data-key="task-2"]');
+    await card.focus();
+    for (let step = 0; step < 3; step += 1) await page.keyboard.press("ArrowRight");
+    expect((await styleBox(page, '[data-key="task-2"]')).x).toBe(from.x + 60);
+    // Focus stays on the card after each redraw.
+    expect(await page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.key)).toBe("task-2");
+    await vi.waitFor(() => {
+      expect(savedLayout(root).cards["task-2"]).toEqual({ x: from.x + 60, y: from.y });
+    });
+    expect(await card.getAttribute("aria-label")).toBe("Task #2: Task b. Open, Manual");
+  });
+
+  it("TC-GUI-106: an arrow can't move a card out of its frame, and nothing is saved then", async () => {
+    const { page, root } = await open();
+    await page.locator('[data-key="task-6"]').focus();
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("ArrowRight");
+    expect(() => readFileSync(layoutFile(root))).toThrow();
+  });
+
+  /** Task 6 waits at the spec gate, and a branch change with no task waits at the commit gate. */
+  async function withGates(root: string): Promise<{ saveTaskGate: (isAnswered: boolean) => Promise<void> }> {
+    const now = new Date().toISOString();
+    const taskChange = beginChange(
+      { changeType: "feature", spec: "loose", taskId: 6 },
+      { key: stateKey(6, "main"), approverMode: "user", now },
+    );
+    const pending = {
+      kind: "gate" as const,
+      gate: "G1" as const,
+      step: null,
+      reason: null,
+      question: 'Approve the spec change for task #6 (spec "loose")?',
+      answers: ["approve", "refine", "review-doc"],
+      answer: null,
+      notes: null,
+    };
+    const branch = beginChange(
+      { changeType: "bug", spec: "auth" },
+      { key: stateKey(null, "fix-y"), approverMode: "user", now },
+    );
+    await openWorkflowStore(root).save(
+      withPending(branch, { ...pending, gate: "G6", question: 'Commit this change to spec "auth"?' }, now),
+    );
+    const saveTaskGate = (isAnswered: boolean) =>
+      openWorkflowStore(root).save(
+        withPending(taskChange, { ...pending, answer: isAnswered ? "approve" : null }, new Date().toISOString()),
+      );
+    await saveTaskGate(false);
+    return { saveTaskGate };
+  }
+
+  it("TC-GUI-072: Needs you counts every waiting gate on every screen, lists them, marks the card and the tab title", async () => {
+    const root = project();
+    const { saveTaskGate } = await withGates(root);
+    const clock = manualClock();
+    const { page } = await open({ root, every: clock.every });
+    await countCanvasMessages(page);
+    const count = page.locator("#needs-count");
+    expect(await count.textContent()).toBe("2");
+    expect(await page.title()).toMatch(/^\(2\) cclinic · /);
+    expect(await page.locator('[data-key="task-6"] .needs-you').count()).toBe(1);
+    await page.locator('[data-view="setup"]').click();
+    expect(await page.locator("#needs-you").isVisible()).toBe(true);
+    expect(await count.textContent()).toBe("2");
+    await page.locator("#needs-you").click();
+    const items = page.locator("#needs-list .needs-item");
+    expect(await items.count()).toBe(2);
+    expect(await items.locator("button", { hasText: "Open" }).count()).toBe(2);
+    await items.filter({ hasText: "Task #6" }).locator("button").click();
+    expect(await page.locator("#view-canvas").isVisible()).toBe(true);
+    expect(await page.locator("#panel-title").textContent()).toBe("Task #6");
+    expect(await page.locator("#needs-list").isHidden()).toBe(true);
+    const before = await canvasMessages(page);
+    await saveTaskGate(true);
+    await clock.tick();
+    await expect.poll(() => canvasMessages(page)).toBeGreaterThan(before);
+    expect(await count.textContent()).toBe("1");
+    expect(await page.title()).toMatch(/^\(1\) cclinic · /);
+    expect(await page.locator('[data-key="task-6"] .needs-you').count()).toBe(0);
+  });
+
+  it("TC-GUI-072: the Needs you list says why it's empty, and Escape closes it", async () => {
+    const { page } = await open();
+    expect(await page.locator("#needs-count").textContent()).toBe("0");
+    expect(await page.title()).toMatch(/^cclinic · /);
+    await page.locator("#needs-you").click();
+    expect(await page.locator("#needs-list").textContent()).toContain("Nothing needs you right now.");
+    await page.keyboard.press("Escape");
+    expect(await page.locator("#needs-list").isHidden()).toBe(true);
+    expect(await page.locator("#needs-you").getAttribute("aria-expanded")).toBe("false");
+  });
+
+  const banner = (page: Page) => page.locator("#next-step");
+
+  it("TC-GUI-074: with documents and no tasks.db, the banner suggests planning a roadmap, and the empty canvas says why", async () => {
+    const root = makeTempFolder();
+    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    const { page } = await open({ root, waitFor: "#next-step:not([hidden])" });
+    expect(await banner(page).textContent()).toContain("There's no roadmap yet.");
+    expect(await banner(page).locator("code").textContent()).toBe("cclinic plan");
+    expect(await page.locator("#canvas-empty").isVisible()).toBe(true);
+    expect(await page.locator("#canvas-empty").textContent()).toContain("There are no roadmaps or tasks yet.");
+  });
+
+  it("TC-GUI-074: the banner suggests generating first, then running a roadmap with open tasks, and copies the command", async () => {
+    const root = project();
+    const { page } = await open({ root });
+    expect(await banner(page).locator("code").textContent()).toBe("cclinic");
+    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    await page.reload();
+    await page.locator('[data-key="task-1"]').waitFor();
+    expect(await banner(page).textContent()).toContain('Roadmap "Payments" has open tasks and no run.');
+    expect(await banner(page).locator("code").textContent()).toBe("cclinic auto --roadmap 1 --max-budget-usd AMOUNT");
+    await page.evaluate(() => {
+      (window as unknown as { copied: string[] }).copied = [];
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: (text: string) => (
+            (window as unknown as { copied: string[] }).copied.push(text),
+            Promise.resolve()
+          ),
+        },
+      });
+    });
+    await banner(page).locator("button", { hasText: "Copy" }).click();
+    expect(await page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual([
+      "cclinic auto --roadmap 1 --max-budget-usd AMOUNT",
+    ]);
+  });
+});
+
+/**
+ * Building 300 tasks and 600 sessions and measuring 3 s of each interaction takes a while on a busy machine,
+ * so these tests get more time. The checks themselves (1.5 s draws, 30 fps) don't change.
+ */
+const PERF_TEST_TIMEOUT_MS = 180_000;
+
+describe("canvas performance (FR-GUI-081)", () => {
+  /** 5 roadmaps of 3 milestones with 20 tasks each: 300 tasks, 400 dependencies, and 2 sessions each: 600. */
+  async function bigProject(): Promise<{ root: string; home: string }> {
+    const root = makeTempFolder();
+    const home = makeTempFolder();
+    const store = storeOf(root);
+    // A chain through each roadmap gives 295 dependencies; 105 more skip a task, for 400.
+    let extras = 0;
+    for (let roadmap = 0; roadmap < 5; roadmap += 1) {
+      const milestones = [0, 1, 2].map((milestone) => ({
+        title: `M${milestone}`,
+        goal: "",
+        tasks: Array.from({ length: 20 }, (_, index) => {
+          const key = `r${roadmap}m${milestone}t${index}`;
+          const after: string[] = [];
+          if (index > 0) after.push(`r${roadmap}m${milestone}t${index - 1}`);
+          else if (milestone > 0) after.push(`r${roadmap}m${milestone - 1}t19`);
+          if (index > 1 && extras < 105) {
+            after.push(`r${roadmap}m${milestone}t${index - 2}`);
+            extras += 1;
+          }
+          return planned(key, after, { spec: `spec-${milestone}` });
+        }),
+      }));
+      store.savePlan({ roadmap: { title: `Roadmap ${roadmap}`, goal: "Big" }, milestones });
+    }
+    store.close();
+    const folder = path.join(home, ".claude/projects/p");
+    mkdirSync(folder, { recursive: true });
+    const now = new Date().toISOString();
+    const workflows = openWorkflowStore(root);
+    for (let id = 1; id <= 300; id += 1) {
+      let state = beginChange(
+        { changeType: "feature", spec: "big", taskId: id },
+        { key: stateKey(id, "main"), approverMode: "user", now },
+      );
+      for (const copy of [0, 1]) {
+        const sessionId = `big-${id}-${copy}`;
+        state = linkSession(state, { sessionId, transcriptPath: path.join(folder, `${sessionId}.jsonl`) }, now);
+      }
+      await workflows.save(state);
+    }
+    return { root, home };
+  }
+
+  /** Frames per second while `act` runs for `ms`, counted with the page's own animation frames. */
+  async function framesDuring(page: Page, ms: number, act: (until: number) => Promise<void>): Promise<number> {
+    await page.evaluate(() => {
+      const counter = window as unknown as { frames: number; counting: boolean };
+      counter.frames = 0;
+      counter.counting = true;
+      const tick = () => {
+        if (!counter.counting) return;
+        counter.frames += 1;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    const start = Date.now();
+    await act(start + ms);
+    const seconds = (Date.now() - start) / 1000;
+    const frames = await page.evaluate(() => {
+      const counter = window as unknown as { frames: number; counting: boolean };
+      counter.counting = false;
+      return counter.frames;
+    });
+    return frames / seconds;
+  }
+
+  it(
+    "TC-GUI-107: 300 tasks, 400 dependencies and 600 sessions draw within 1.5 s, and drag, pan and zoom stay at 30 fps",
+    async () => {
+      const { root, home } = await bigProject();
+      const { page } = await open({ root, home });
+      expect(await page.locator(".task-card").count()).toBe(300);
+      expect(await page.locator("path.arrow").count()).toBe(400);
+      // The data is already here: time drawing all of it, sessions included, from the toggle to the next layout.
+      const drawMs = await page.evaluate(() => {
+        const start = performance.now();
+        (document.getElementById("show-sessions") as HTMLInputElement).click();
+        // Reading a size makes the browser finish the layout inside the timing.
+        document.body.getBoundingClientRect();
+        return performance.now() - start;
+      });
+      expect(await page.locator(".session-node").count()).toBe(600);
+      expect(drawMs).toBeLessThan(1500);
+
+      const area = (await page.locator("#canvas-area").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+      const sway = async (until: number, at: { x: number; y: number }, step: (index: number) => Promise<void>) => {
+        await page.mouse.move(at.x, at.y);
+        for (let index = 0; Date.now() < until; index += 1) await step(index);
+      };
+      const card = await centre(page, '[data-key="task-1"]');
+      const dragFps = await framesDuring(page, 3000, async (until) => {
+        await page.mouse.move(card.x, card.y);
+        await page.mouse.down();
+        await sway(until, card, (index) => page.mouse.move(card.x + (index % 40), card.y + (index % 30)));
+        await page.mouse.up();
+      });
+      const empty = { x: area.x + area.width - 10, y: area.y + area.height - 10 };
+      const panFps = await framesDuring(page, 3000, async (until) => {
+        await page.mouse.move(empty.x, empty.y);
+        await page.mouse.down();
+        await sway(until, empty, (index) => page.mouse.move(empty.x - (index % 60), empty.y - (index % 40)));
+        await page.mouse.up();
+      });
+      const zoomFps = await framesDuring(page, 3000, async (until) => {
+        await page.keyboard.down("Control");
+        await sway(until, { x: area.x + 300, y: area.y + 200 }, (index) =>
+          page.mouse.wheel(0, index % 2 === 0 ? -40 : 40),
+        );
+        await page.keyboard.up("Control");
+      });
+      expect(Math.min(dragFps, panFps, zoomFps), JSON.stringify({ dragFps, panFps, zoomFps })).toBeGreaterThanOrEqual(
+        30,
+      );
+    },
+    PERF_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "TC-GUI-107: the first draw, sessions shown, ends within 1.5 s of the canvas data arriving",
+    async () => {
+      const { root, home } = await bigProject();
+      const { page } = await open({ root, home });
+      // Times the page's own handling of the first canvas message, from its arrival to the finished layout.
+      await page.addInitScript({
+        content: `
+        localStorage.setItem("cclinic.sessions", "on");
+        window.drawTimes = [];
+        const native = EventTarget.prototype.addEventListener;
+        EventSource.prototype.addEventListener = function (type, listener, options) {
+          if (type !== "canvas" || typeof listener !== "function") return native.call(this, type, listener, options);
+          return native.call(this, type, (event) => {
+            const start = performance.now();
+            listener.call(this, event);
+            document.body.getBoundingClientRect();
+            window.drawTimes.push(performance.now() - start);
+          }, options);
+        };
+      `,
+      });
+      await page.reload();
+      await page.locator('[data-key="task-300"]').waitFor();
+      expect(await page.locator(".session-node").count()).toBe(600);
+      const times = await page.evaluate(() => (window as unknown as { drawTimes: number[] }).drawTimes);
+      expect(times.length).toBeGreaterThan(0);
+      expect(times[0]).toBeLessThan(1500);
+    },
+    PERF_TEST_TIMEOUT_MS,
+  );
+});
+
+describe("QA C2b run 1: sessions, search, keyboard, Needs you and the banner", () => {
+  const RUN_ID = "20261112-090000";
+
+  /** A live AI run on roadmap 1 with task 2 running, and session files for it: QA live, Developer ended. */
+  function withRun(root: string, home: string, sessions: { id: string; role: string; ended: boolean }[] = []): void {
+    const folder = path.join(root, ".cclinic/auto", RUN_ID);
+    mkdirSync(path.join(folder, "sessions"), { recursive: true });
+    writeFileSync(
+      path.join(folder, "run.json"),
+      JSON.stringify({
+        runId: RUN_ID,
+        roadmapId: 1,
+        roadmapTitle: "Payments",
+        runBranch: `cclinic/auto/${RUN_ID}/run`,
+        startedAt: new Date(Date.now() - 600_000).toISOString(),
+        finishedAt: null,
+        outcome: null,
+        budgetUsd: 10,
+        spentUsd: 3.4,
+        developers: 2,
+        tasks: [
+          {
+            taskId: 2,
+            title: "Task b",
+            dependsOn: [],
+            status: "running",
+            branch: null,
+            rounds: { specReviews: 1, qaRuns: 1, implementationReviews: 0 },
+            costUsd: 1.3,
+            reason: null,
+            requirementIds: [],
+          },
+        ],
+        skippedInProgress: [],
+      }),
+    );
+    const projects = path.join(home, ".claude/projects/w");
+    mkdirSync(projects, { recursive: true });
+    for (const session of sessions) {
+      const transcriptPath = path.join(projects, `${session.id}.jsonl`);
+      writeFileSync(transcriptPath, `${JSON.stringify({ type: "user", message: { content: session.role } })}\n`);
+      writeFileSync(
+        path.join(folder, "sessions", `${session.id}.json`),
+        JSON.stringify({
+          sessionId: session.id,
+          taskId: 2,
+          role: session.role,
+          step: `${session.role}-1`,
+          cwd: "/w",
+          transcriptPath,
+          startedAt: new Date(Date.now() - 300_000).toISOString(),
+          endedAt: session.ended ? new Date(Date.now() - 100_000).toISOString() : null,
+          exitCode: session.ended ? 0 : null,
+        }),
+      );
+    }
+    writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: RUN_ID }));
+  }
+
+  /** `count` of your sessions on task `taskId`, each seen an hour ago. */
+  async function yourSessions(root: string, home: string, taskId: number, count: number): Promise<void> {
+    const folder = path.join(home, ".claude/projects/p");
+    mkdirSync(folder, { recursive: true });
+    const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    let state = beginChange(
+      { changeType: "feature", spec: "refunds", taskId },
+      { key: stateKey(taskId, "main"), approverMode: "user", now: hourAgo },
+    );
+    for (let index = 0; index < count; index += 1) {
+      const id = `5e550000-0000-4000-8000-0000000001${String(index).padStart(2, "0")}`;
+      writeFileSync(
+        path.join(folder, `${id}.jsonl`),
+        `${JSON.stringify({ type: "user", message: { content: "q" } })}\n`,
+      );
+      state = linkSession(state, { sessionId: id, transcriptPath: path.join(folder, `${id}.jsonl`) }, hourAgo);
+    }
+    await openWorkflowStore(root).save(state);
+  }
+
+  /** `count` changes with no task, each waiting at a gate with a long question. */
+  async function waitingChanges(root: string, count: number): Promise<void> {
+    const now = new Date().toISOString();
+    for (let index = 0; index < count; index += 1) {
+      const change = beginChange(
+        { changeType: "bug", spec: "auth" },
+        { key: stateKey(null, `fix-${index}`), approverMode: "user", now },
+      );
+      await openWorkflowStore(root).save(
+        withPending(
+          change,
+          {
+            kind: "gate",
+            gate: "G1",
+            step: null,
+            reason: null,
+            question: `Approve the spec change ${index} for ${LONG_WORD}?`,
+            answers: ["approve", "refine"],
+            answer: null,
+            notes: null,
+          },
+          now,
+        ),
+      );
+    }
+  }
+
+  /** Pairs of boxes on the page that overlap, among `.session-node` and `.card`. */
+  const overlaps = (page: Page) =>
+    page.evaluate(() => {
+      const boxes = [...document.querySelectorAll("#frames .session-node, #frames .card")].map((node) => ({
+        name: (node as HTMLElement).dataset.key ?? `session ${(node as HTMLElement).dataset.session ?? ""}`,
+        box: node.getBoundingClientRect(),
+      }));
+      const found: string[] = [];
+      for (const [index, a] of boxes.entries())
+        for (const b of boxes.slice(index + 1))
+          if (
+            a.box.left < b.box.right - 0.5 &&
+            b.box.left < a.box.right - 0.5 &&
+            a.box.top < b.box.bottom - 0.5 &&
+            b.box.top < a.box.bottom - 0.5
+          )
+            found.push(`${a.name} / ${b.name}`);
+      return found;
+    });
+
+  it("TC-GUI-095: agent sessions are labelled with their role, QA (live) and Developer (ended), beside your own", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    withRun(root, home, [
+      { id: "a9e00000-0000-4000-8000-000000000001", role: "qa", ended: false },
+      { id: "a9e00000-0000-4000-8000-000000000002", role: "developer", ended: true },
+    ]);
+    await yourSessions(root, home, 2, 1);
+    const { page } = await open({ root, home });
+    await page.locator("#show-sessions").check();
+    const labels = await page
+      .locator('.session-node[data-task="2"]')
+      .evaluateAll((items) => items.map((item) => item.textContent.trim()));
+    expect([...labels].sort()).toEqual(["Developer (ended)", "QA (live)", "You (ended)"]);
+    expect(await page.locator('.session-node[data-task="2"].is-live').textContent()).toContain("QA (live)");
+    expect(await page.locator("path.session-link").count()).toBe(3);
+    // The whole label is shown, not cut off.
+    const clipped = await page
+      .locator(".session-node")
+      .evaluateAll((items) =>
+        items.filter((item) => item.scrollWidth > item.clientWidth).map((item) => item.textContent),
+      );
+    expect(clipped).toEqual([]);
+  });
+
+  it("TC-GUI-095: session nodes don't cover another card, or each other, even with 5 sessions on one task", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    // Task 1 is in the first column of roadmap 1, with task 4 beside it in the next column.
+    await yourSessions(root, home, 1, 5);
+    const { page } = await open({ root, home });
+    await page.locator("#show-sessions").check();
+    expect(await page.locator('.session-node[data-task="1"]').count()).toBe(5);
+    expect(await overlaps(page)).toEqual([]);
+  });
+
+  it("TC-GUI-095: session nodes stay inside their task's frame", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    await yourSessions(root, home, 4, 1);
+    const { page } = await open({ root, home });
+    await page.locator("#show-sessions").check();
+    const outside = await page.evaluate(() =>
+      [...document.querySelectorAll("#frames .session-node")]
+        .filter((node) => {
+          const box = node.getBoundingClientRect();
+          const frame = node.closest("[data-frame]")?.getBoundingClientRect();
+          return frame === undefined || box.right > frame.right + 0.5 || box.bottom > frame.bottom + 0.5;
+        })
+        .map((node) => (node as HTMLElement).dataset.task),
+    );
+    expect(outside).toEqual([]);
+  });
+
+  it("TC-GUI-095: a session node is reached by Tab and opens its session with Enter", async () => {
+    const { page } = await open({ withSessions: true });
+    await page.locator("#show-sessions").check();
+    await page.locator('[data-key="task-2"]').focus();
+    let reached = false;
+    for (let step = 0; step < 10 && !reached; step += 1) {
+      await page.keyboard.press("Tab");
+      reached = await page.evaluate(
+        (id) => (document.activeElement as HTMLElement | null)?.dataset.session === id,
+        SESSION_OLD,
+      );
+    }
+    expect(reached).toBe(true);
+    await page.keyboard.press("Enter");
+    expect(await page.locator("#panel-title").textContent()).toBe("Task #2");
+    await expect
+      .poll(() => page.locator(`button.session[data-session="${SESSION_OLD}"]`).getAttribute("aria-pressed"))
+      .toBe("true");
+  });
+
+  it("TC-GUI-106: typing in the search box with arrows, 0 and - moves no card and doesn't zoom", async () => {
+    const { page, root } = await open();
+    const before = await styleBox(page, '[data-key="task-2"]');
+    const view = await viewOf(page);
+    await page.locator("#canvas-search").focus();
+    await page.keyboard.type("b-0");
+    for (const key of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) await page.keyboard.press(key);
+    expect(await page.locator("#canvas-search").inputValue()).toBe("b-0");
+    expect(await styleBox(page, '[data-key="task-2"]')).toEqual(before);
+    expect(await viewOf(page)).toEqual(view);
+    expect(() => readFileSync(layoutFile(root))).toThrow();
+  });
+
+  it("TC-GUI-106: a focused card keeps focus when an update from the terminal redraws the canvas", async () => {
+    const clock = manualClock();
+    const root = project();
+    const { page } = await open({ root, every: clock.every });
+    await countCanvasMessages(page);
+    await page.locator('[data-key="task-3"]').focus();
+    await updateFromTerminal(page, root, clock, (store) => store.setStatus(2, "done"));
+    expect(await page.locator('[data-key="task-2"] .status').textContent()).toBe("Done");
+    expect(await page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.key)).toBe("task-3");
+  });
+
+  it("TC-GUI-106: an arrow moves a branch-keyed change card too, and it's saved", async () => {
+    const { page, root } = await open({ withSessions: true });
+    const from = await styleBox(page, '[data-key="change-branch-fix-x"]');
+    await page.locator('[data-key="change-branch-fix-x"]').focus();
+    await page.keyboard.press("ArrowDown");
+    expect((await styleBox(page, '[data-key="change-branch-fix-x"]')).y).toBe(from.y + 20);
+    await vi.waitFor(() => {
+      expect(savedLayout(root).cards["change-branch-fix-x"]).toEqual({ x: from.x, y: from.y + 20 });
+    });
+  });
+
+  it("TC-GUI-105: search ignores case and spaces, finds a change by its spec, and a lone # finds nothing", async () => {
+    const { page } = await open({ withSessions: true });
+    const matches = () =>
+      page
+        .locator("#frames .card.is-match")
+        .evaluateAll((items) => items.map((item) => (item as HTMLElement).dataset.key));
+    await page.locator("#canvas-search").fill("  REFUNDS ");
+    expect(await matches()).toEqual(["task-2"]);
+    await page.locator("#canvas-search").fill("auth");
+    expect(await matches()).toEqual(["change-branch-fix-x"]);
+    await page.locator("#canvas-search").fill("#");
+    expect(await matches()).toEqual([]);
+    await page.locator("#canvas-search").fill("#99");
+    expect(await matches()).toEqual([]);
+  });
+
+  it("TC-GUI-105: filtering mode AI run dims every card not in the run", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    withRun(root, home);
+    const { page } = await open({ root, home });
+    await page.locator("#filter-mode").selectOption("ai");
+    const shown = await page
+      .locator("#frames .card:not(.is-filtered)")
+      .evaluateAll((items) => items.map((item) => (item as HTMLElement).dataset.key));
+    expect(shown).toEqual(["task-2"]);
+  });
+
+  it("TC-GUI-105: filters stay applied after a trip to the List, and reach a card added from the terminal", async () => {
+    const clock = manualClock();
+    const root = project();
+    const { page } = await open({ root, every: clock.every });
+    await countCanvasMessages(page);
+    await page.locator("#canvas-search").fill("fresh");
+    await page.locator("#hide-done").check();
+    await page.locator('[data-layout="list"]').click();
+    expect(await page.locator("#canvas-filters").isHidden()).toBe(true);
+    await page.locator('[data-layout="canvas"]').click();
+    expect(await page.locator("#canvas-filters").isVisible()).toBe(true);
+    expect(await page.locator('[data-key="task-1"]').getAttribute("class")).toContain("is-filtered");
+    await updateFromTerminal(page, root, clock, (store) => store.addTask({ title: "Fresh", dependsOn: [] }));
+    expect(await page.locator('[data-key="task-7"]').getAttribute("class")).toContain("is-match");
+    expect(await page.locator('[data-key="task-1"]').getAttribute("class")).toContain("is-filtered");
+  });
+
+  it("TC-GUI-072: Open on a change with no task opens that change's panel, and a click outside closes the list", async () => {
+    const root = project();
+    await waitingChanges(root, 1);
+    const { page } = await open({ root });
+    expect(await page.locator("#needs-count").textContent()).toBe("1");
+    await page.locator("#needs-you").click();
+    await page.locator("#canvas-area").click({ position: { x: 5, y: 5 } });
+    expect(await page.locator("#needs-list").isHidden()).toBe(true);
+    await page.locator("#needs-you").click();
+    await page.locator("#needs-list button", { hasText: "Open" }).click();
+    expect(await page.locator("#panel").isVisible()).toBe(true);
+    expect(await page.locator("#panel-body").textContent()).toContain("fix-0");
+  });
+
+  it("TC-GUI-072: with 12 items at 768 px, the Needs you list fits the window and scrolls down, never sideways", async () => {
+    const root = project();
+    await waitingChanges(root, 12);
+    const { page } = await open({ root, viewport: NARROW });
+    expect(await page.locator("#needs-count").textContent()).toBe("12");
+    expect(await page.title()).toMatch(/^\(12\) /);
+    await page.locator("#needs-you").click();
+    const list = page.locator("#needs-list");
+    const box = (await list.boundingBox()) ?? { x: -1, y: 0, width: 0, height: 0 };
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(NARROW.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(NARROW.height);
+    expect(await list.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+    expect(await overflowAt(page)).toEqual(NOTHING_SIDEWAYS);
+    const last = page.locator("#needs-list .needs-item").last().locator("button");
+    await last.scrollIntoViewIfNeeded();
+    expect(await last.isVisible()).toBe(true);
+  });
+
+  it("FR-GUI-079: at 768 px, the filter bar, banner and session nodes make nothing scroll sideways", async () => {
+    const { page } = await open({ withSessions: true, viewport: NARROW });
+    await page.locator("#show-sessions").check();
+    expect(await page.locator("#next-step").isVisible()).toBe(true);
+    expect(await overflowAt(page)).toEqual(NOTHING_SIDEWAYS);
+    // Every filter control is on screen.
+    for (const id of [
+      "canvas-search",
+      "filter-status",
+      "filter-mode",
+      "filter-spec",
+      "hide-done",
+      "show-sessions",
+      "go-roadmap",
+    ]) {
+      const box = (await page.locator(`#${id}`).boundingBox()) ?? { x: -1, width: 0 };
+      expect(box.x >= 0 && box.x + box.width <= NARROW.width, id).toBe(true);
+    }
+  });
+
+  for (const theme of ["light", "dark"] as const)
+    it(`TC-GUI-087: in the ${theme} theme the banner, filters, session nodes and a full Needs you list are at least 4.5:1`, async () => {
+      const root = project();
+      await waitingChanges(root, 2);
+      const { page } = await openWatched({ colorScheme: theme }, { root, withSessions: true });
+      await page.locator("#show-sessions").check();
+      await page.locator("#needs-you").click();
+      expect(await page.locator("#next-step").isVisible()).toBe(true);
+      expect(await page.locator("#needs-you").getAttribute("class")).toContain("has-items");
+      expect([...new Set(await lowContrast(page, 4.5))]).toEqual([]);
+    });
+
+  it("TC-GUI-087: every new control is reached by Tab with a visible focus outline", async () => {
+    const root = project();
+    await waitingChanges(root, 1);
+    const { page } = await openWatched({}, { root, withSessions: true });
+    await page.locator("#show-sessions").check();
+    await page.locator("#needs-you").click();
+    await page.locator("#needs-you").focus();
+    const wanted = [
+      "needs-you",
+      "canvas-search",
+      "filter-status",
+      "filter-mode",
+      "filter-spec",
+      "hide-done",
+      "show-sessions",
+      "go-roadmap",
+    ];
+    const seen = new Map<string, boolean>();
+    let sawNeedsOpen = false;
+    let sawCopy = false;
+    let sawSession = false;
+    for (let step = 0; step < 60; step += 1) {
+      const focus = await page.evaluate(() => {
+        const node = document.activeElement as HTMLElement | null;
+        if (node === null || node === document.body) return undefined;
+        const style = getComputedStyle(node);
+        return {
+          id: node.id,
+          text: node.textContent.trim(),
+          inNeeds: node.closest("#needs-list") !== null,
+          inBanner: node.closest("#next-step") !== null,
+          session: node.classList.contains("session-node"),
+          outlined: style.outlineStyle !== "none" && parseFloat(style.outlineWidth) >= 2,
+        };
+      });
+      if (focus !== undefined) {
+        if (focus.id !== "") seen.set(focus.id, focus.outlined);
+        if (focus.inNeeds) sawNeedsOpen = focus.outlined;
+        if (focus.inBanner && focus.text === "Copy") sawCopy = focus.outlined;
+        if (focus.session) sawSession = focus.outlined;
+      }
+      await page.keyboard.press("Tab");
+    }
+    expect(Object.fromEntries(wanted.map((id) => [id, seen.get(id)]))).toEqual(
+      Object.fromEntries(wanted.map((id) => [id, true])),
+    );
+    expect({ sawNeedsOpen, sawCopy, sawSession }).toEqual({ sawNeedsOpen: true, sawCopy: true, sawSession: true });
+  });
+
+  it("TC-GUI-088: with reduced motion, the Needs you list, banner, filters and session nodes run no animation or transition", async () => {
+    const root = project();
+    await waitingChanges(root, 1);
+    const { page } = await openWatched({ reducedMotion: "reduce" }, { root, withSessions: true });
+    await page.locator("#show-sessions").check();
+    await page.locator("#needs-you").click();
+    await page.locator("#canvas-search").fill("refund");
+    await page.locator(".session-node").first().hover();
+    const moving = await page.evaluate(() => {
+      const found = document.getAnimations().map(() => "animation");
+      for (const node of document.querySelectorAll("*")) {
+        const style = getComputedStyle(node);
+        if (style.animationName !== "none" || style.transitionDuration.split(",").some((part) => parseFloat(part) > 0))
+          found.push(`${node.tagName.toLowerCase()}#${node.id}.${node.className}`);
+      }
+      return found;
+    });
+    expect(moving).toEqual([]);
+  });
+
+  it("TC-GUI-074: with a run going and no roadmap left to run, the banner offers Open its roadmap, which zooms to its frame", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    withRun(root, home);
+    const store = storeOf(root);
+    store.setStatus(5, "done");
+    store.close();
+    const { page } = await open({ root, home });
+    const banner = page.locator("#next-step");
+    expect(await banner.textContent()).toContain(`An AI run (${RUN_ID}) is going on roadmap "Payments".`);
+    await page.locator("#zoom-in").click();
+    await page.locator("#zoom-in").click();
+    await banner.locator("button", { hasText: "Open its roadmap" }).click();
+    const area = (await page.locator("#canvas-area").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+    const frame = (await page.locator('[data-frame="roadmap-1"]').boundingBox()) ?? {
+      x: -1,
+      y: 0,
+      width: 0,
+      height: 0,
+    };
+    expect(frame.x).toBeGreaterThanOrEqual(area.x);
+    expect(frame.x + frame.width).toBeLessThanOrEqual(area.x + area.width + 1);
+    expect(frame.y).toBeGreaterThanOrEqual(area.y);
+    expect(frame.y + frame.height).toBeLessThanOrEqual(area.y + area.height + 1);
+  });
+
+  it("FR-GUI-053: with every roadmap done and no run, the banner is hidden", async () => {
+    const root = project();
+    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    const store = storeOf(root);
+    for (const id of [2, 3, 4, 5]) store.setStatus(id, "done");
+    store.close();
+    const { page } = await open({ root });
+    expect(await page.locator("#next-step").isHidden()).toBe(true);
+  });
+
+  it("FR-GUI-053: Open its roadmap from the List shows the Canvas and zooms to the frame", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    withRun(root, home);
+    const store = storeOf(root);
+    store.setStatus(5, "done");
+    store.close();
+    const { page } = await open({ root, home });
+    await page.locator('[data-layout="list"]').click();
+    await page.locator("#next-step button", { hasText: "Open its roadmap" }).click();
+    expect(await page.locator("#canvas-area").isVisible()).toBe(true);
+    expect(await page.locator('[data-layout="canvas"]').getAttribute("aria-pressed")).toBe("true");
+    const area = (await page.locator("#canvas-area").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+    const frame = (await page.locator('[data-frame="roadmap-1"]').boundingBox()) ?? {
+      x: -1,
+      y: 0,
+      width: 0,
+      height: 0,
+    };
+    expect(frame.x).toBeGreaterThanOrEqual(area.x);
+    expect(frame.x + frame.width).toBeLessThanOrEqual(area.x + area.width + 1);
+  });
+});
+
+describe("QA C2b run 2: more sessions than fit, and dimmed nodes", () => {
+  /** `count` of your sessions on task `taskId`, each seen an hour ago, with ids unique to the task. */
+  async function manySessions(root: string, home: string, taskId: number, count: number): Promise<void> {
+    const folder = path.join(home, ".claude/projects/p");
+    mkdirSync(folder, { recursive: true });
+    const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    let state = beginChange(
+      { changeType: "feature", spec: "refunds", taskId },
+      { key: stateKey(taskId, "main"), approverMode: "user", now: hourAgo },
+    );
+    for (let index = 0; index < count; index += 1) {
+      const id = `5e550000-0000-4000-8000-00000${String(taskId).padStart(3, "0")}${String(index).padStart(4, "0")}`;
+      writeFileSync(
+        path.join(folder, `${id}.jsonl`),
+        `${JSON.stringify({ type: "user", message: { content: "q" } })}\n`,
+      );
+      state = linkSession(state, { sessionId: id, transcriptPath: path.join(folder, `${id}.jsonl`) }, hourAgo);
+    }
+    await openWorkflowStore(root).save(state);
+  }
+
+  const labelsOf = (page: Page, taskId: number) =>
+    page
+      .locator(`.session-node[data-task="${taskId}"]`)
+      .evaluateAll((items) => items.map((item) => item.textContent.trim()));
+
+  const collisions = (page: Page) =>
+    page.evaluate(() => {
+      const boxes = [...document.querySelectorAll("#frames .session-node, #frames .card")].map((node) => ({
+        name: (node as HTMLElement).dataset.key ?? `node ${(node as HTMLElement).textContent.trim()}`,
+        box: node.getBoundingClientRect(),
+      }));
+      const found: string[] = [];
+      for (const [index, a] of boxes.entries())
+        for (const b of boxes.slice(index + 1))
+          if (
+            a.box.left < b.box.right - 0.5 &&
+            b.box.left < a.box.right - 0.5 &&
+            a.box.top < b.box.bottom - 0.5 &&
+            b.box.top < a.box.bottom - 0.5
+          )
+            found.push(`${a.name} / ${b.name}`);
+      return found;
+    });
+
+  const outsideFrames = (page: Page) =>
+    page.evaluate(() =>
+      [...document.querySelectorAll("#frames .session-node")]
+        .filter((node) => {
+          const box = node.getBoundingClientRect();
+          const frame = node.closest("[data-frame]")?.getBoundingClientRect();
+          return (
+            frame === undefined ||
+            box.left < frame.left - 0.5 ||
+            box.right > frame.right + 0.5 ||
+            box.bottom > frame.bottom + 0.5
+          );
+        })
+        .map((node) => node.textContent.trim()),
+    );
+
+  it("TC-GUI-095: with 6 sessions a card shows 4 and +2 more; with 7, 4 and +3 more; nothing overlaps or leaves the frame", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    // Tasks 1 and 2 are stacked in the first column, task 4 is in the next one, task 5 alone in its frame.
+    await manySessions(root, home, 1, 6);
+    await manySessions(root, home, 2, 7);
+    await manySessions(root, home, 4, 5);
+    await manySessions(root, home, 5, 9);
+    const { page } = await open({ root, home });
+    await page.locator("#show-sessions").check();
+    const one = await labelsOf(page, 1);
+    expect(one).toHaveLength(5);
+    expect(one.slice(0, 4).every((label) => label === "You (ended)")).toBe(true);
+    expect(one[4]).toBe("+2 more");
+    const two = await labelsOf(page, 2);
+    expect(two).toHaveLength(5);
+    expect(two[4]).toBe("+3 more");
+    // Exactly 5 fit, so all 5 show and there's no "more" node.
+    expect(await labelsOf(page, 4)).toEqual(Array.from({ length: 5 }, () => "You (ended)"));
+    expect((await labelsOf(page, 5))[4]).toBe("+5 more");
+    expect(await page.locator('.session-node[data-task="1"]:not([data-session])').getAttribute("aria-label")).toBe(
+      "Task #1: 2 more sessions",
+    );
+    // One line to each node drawn, the "more" node included.
+    expect(await page.locator("path.session-link").count()).toBe(20);
+    expect(await collisions(page)).toEqual([]);
+    expect(await outsideFrames(page)).toEqual([]);
+  });
+
+  it("TC-GUI-095: the +N more node opens the task's panel with every session, by click and by keyboard", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    await manySessions(root, home, 2, 8);
+    const { page } = await open({ root, home });
+    await page.locator("#show-sessions").check();
+    const more = page.locator('.session-node[data-task="2"]:not([data-session])');
+    expect(await more.textContent()).toBe("+4 more");
+    await more.click();
+    expect(await page.locator("#panel").isVisible()).toBe(true);
+    expect(await page.locator("#panel-title").textContent()).toBe("Task #2");
+    await expect.poll(() => page.locator("#panel button.session").count()).toBe(8);
+    await page.keyboard.press("Escape");
+    expect(await page.locator("#panel").isHidden()).toBe(true);
+    await more.focus();
+    await page.keyboard.press("Enter");
+    expect(await page.locator("#panel-title").textContent()).toBe("Task #2");
+  });
+
+  it("TC-GUI-095: the +N more node moves with its card, in line under the others", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    await manySessions(root, home, 4, 6);
+    const { page, root: saved } = await open({ root, home });
+    await page.locator("#show-sessions").check();
+    const scale = await scaleOf(page);
+    await drag(page, '[data-key="task-4"]', 0, 120 * scale);
+    await vi.waitFor(() => {
+      expect(savedLayout(saved).cards["task-4"]).toBeDefined();
+    });
+    const card = await styleBox(page, '[data-key="task-4"]');
+    const tops = await page
+      .locator('.session-node[data-task="4"]')
+      .evaluateAll((items) => items.map((item) => parseFloat((item as HTMLElement).style.top)));
+    expect(tops).toEqual([0, 1, 2, 3, 4].map((index) => card.y + index * 28));
+    expect(await collisions(page)).toEqual([]);
+    expect(await outsideFrames(page)).toEqual([]);
+  });
+
+  it("TC-GUI-105: a filtered card's session nodes, the +N more node included, are dimmed, and undimmed when the filter clears", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    await manySessions(root, home, 4, 6);
+    await manySessions(root, home, 2, 1);
+    const { page } = await open({ root, home });
+    await page.locator("#show-sessions").check();
+    await page.locator("#filter-spec").selectOption("refunds");
+    const dimmed = (taskId: number) =>
+      page
+        .locator(`.session-node[data-task="${taskId}"]`)
+        .evaluateAll((items) => items.map((item) => item.classList.contains("is-filtered")));
+    expect(await page.locator('[data-key="task-4"]').getAttribute("class")).toContain("is-filtered");
+    expect(await dimmed(4)).toEqual([true, true, true, true, true]);
+    expect(await dimmed(2)).toEqual([false]);
+    await page.locator("#filter-spec").selectOption("");
+    expect(await dimmed(4)).toEqual([false, false, false, false, false]);
+  });
+
+  it("TC-GUI-106: an arrow can't push a card with sessions into the session room of its last column", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    await manySessions(root, home, 4, 6);
+    const { page } = await open({ root, home });
+    await page.locator("#show-sessions").check();
+    await page.locator('[data-key="task-4"]').focus();
+    for (let step = 0; step < 5; step += 1) await page.keyboard.press("ArrowRight");
+    expect((await styleBox(page, '[data-key="task-4"]')).x).toBeLessThanOrEqual(392);
+    expect(await collisions(page)).toEqual([]);
+    expect(await outsideFrames(page)).toEqual([]);
+  });
+  it("TC-GUI-106: focus on +N more stays on it when an update redraws the canvas", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    await manySessions(root, home, 2, 6);
+    const clock = manualClock();
+    const { page } = await open({ root, home, every: clock.every });
+    await countCanvasMessages(page);
+    await page.locator("#show-sessions").check();
+    const more = page.locator('.session-node[data-action="more-sessions"][data-task="2"]');
+    expect(await more.textContent()).toBe("+2 more");
+    await more.focus();
+    await updateFromTerminal(page, root, clock, (store) => store.setStatus(5, "done"));
+    expect(
+      await page.evaluate(() => {
+        const node = document.activeElement as HTMLElement | null;
+        return [node?.dataset.action, node?.dataset.task];
+      }),
+    ).toEqual(["more-sessions", "2"]);
+  });
+
+  it("TC-GUI-106: focus on a later task's +N more stays on that task's node, not on an earlier one in the same frame", async () => {
+    const root = project();
+    const home = makeTempFolder();
+    await manySessions(root, home, 2, 6);
+    await manySessions(root, home, 3, 6);
+    const clock = manualClock();
+    const { page } = await open({ root, home, every: clock.every });
+    await countCanvasMessages(page);
+    await page.locator("#show-sessions").check();
+    expect(
+      await page.locator('#frames [data-frame="roadmap-1"] .session-node[data-action="more-sessions"]').count(),
+    ).toBe(2);
+    await page.locator('.session-node[data-action="more-sessions"][data-task="3"]').focus();
+    await updateFromTerminal(page, root, clock, (store) => store.setStatus(5, "done"));
+    expect(
+      await page.evaluate(() => {
+        const node = document.activeElement as HTMLElement | null;
+        return [node?.dataset.action, node?.dataset.task];
+      }),
+    ).toEqual(["more-sessions", "3"]);
+  });
+
+  it("TC-GUI-105: when the only task with the chosen spec goes, the spec filter resets and no card stays dimmed", async () => {
+    const root = project();
+    const store = storeOf(root);
+    store.addTask({ title: "Solo", spec: "solo", dependsOn: [] });
+    store.close();
+    const clock = manualClock();
+    const { page } = await open({ root, every: clock.every });
+    await countCanvasMessages(page);
+    await page.locator("#filter-spec").selectOption("solo");
+    expect(await page.locator("#frames .card.is-filtered").count()).toBeGreaterThan(0);
+    await updateFromTerminal(page, root, clock, (tasks) => {
+      tasks.removeTask(7);
+    });
+    expect(await page.locator("#filter-spec").inputValue()).toBe("");
+    expect(await page.locator("#frames .card.is-filtered").count()).toBe(0);
   });
 });

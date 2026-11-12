@@ -25,7 +25,18 @@ export const GUI_CONTENT_SECURITY_POLICY =
 /** FR-GUI-010: the only static files the GUI serves. */
 export const GUI_ASSETS = {
   page: "index.html",
-  files: ["app.js", "api.js", "canvas.js", "panel.js", "list.js", "jobs.js", "icons.js", "styles.css"],
+  files: [
+    "app.js",
+    "api.js",
+    "canvas.js",
+    "panel.js",
+    "list.js",
+    "jobs.js",
+    "icons.js",
+    "filters.js",
+    "attention.js",
+    "styles.css",
+  ],
 } as const;
 export const GUI_MAX_BODY_BYTES = 1_048_576;
 /** The longest include or exclude pattern, and the most of each, the GUI passes on. */
@@ -71,7 +82,8 @@ export const LAYOUT_MAX_COORDINATE = 1_000_000;
 export const LAYOUT = {
   cardWidth: 220,
   cardHeight: 140,
-  columnGap: 32,
+  /** Room beside each card for its session nodes (FR-GUI-070), so they never cover the next column. */
+  columnGap: 148,
   rowGap: 20,
   framePadding: 24,
   frameHeader: 96,

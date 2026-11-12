@@ -27,6 +27,7 @@ const config = tseslint.config(
         EventSource: "readonly",
         Event: "readonly",
         CSS: "readonly",
+        navigator: "readonly",
         FormData: "readonly",
         localStorage: "readonly",
         setTimeout: "readonly",

@@ -8,7 +8,10 @@ import {
   resolveLayout,
   tidyFrame,
   tidyRequestSchema,
+  cardOrder,
   frameWidths,
+  nextStep,
+  type NextStep,
   type CanvasSources,
   type CanvasView,
   type Layout,
@@ -31,6 +34,8 @@ import { redact } from "../core/redaction.js";
 export interface CanvasPorts {
   readonly readSources: () => Promise<CanvasSources>;
   readonly readLayout: () => Promise<Layout | undefined>;
+  /** Whether `cclinic` has generated the project's documents yet (FR-GUI-053). */
+  readonly hasDocuments: () => boolean;
   /** Saves what `change` makes of the saved layout, one change at a time, so none is lost to another. */
   readonly updateLayout: (change: (saved: Layout | undefined) => Layout) => Promise<void>;
   /** FR-GUI-041: where a session's transcript may be read from, if anywhere. */
@@ -55,6 +60,10 @@ export interface CanvasPayload {
   readonly layout: Layout;
   /** Each frame's width, by frame key: the one rule the server lays frames out by (FR-GUI-074). */
   readonly frameWidths: Readonly<Record<string, number>>;
+  /** FR-GUI-080: the order keyboard focus goes through the cards. */
+  readonly cardOrder: readonly string[];
+  /** FR-GUI-053: the step the canvas suggests, if any. */
+  readonly nextStep: NextStep | null;
   /** The automatic layout's sizes, so the page draws frames and columns on the same grid (FR-GUI-074). */
   readonly sizes: typeof LAYOUT;
 }
@@ -66,6 +75,8 @@ export async function readCanvas(ports: CanvasPorts): Promise<CanvasPayload> {
     canvas,
     layout: resolveLayout(canvas, saved),
     frameWidths: frameWidths(canvas),
+    cardOrder: cardOrder(canvas),
+    nextStep: nextStep(canvas, ports.hasDocuments()),
     sizes: LAYOUT,
   };
 }

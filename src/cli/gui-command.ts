@@ -54,6 +54,11 @@ function every(ms: number, run: () => Promise<void>): () => void {
   };
 }
 
+/** Whether `cclinic` has generated the project's documents (FR-GUI-014, FR-GUI-053). */
+function documentsCheck(target: string): () => boolean {
+  return () => existsSync(projectPaths(target, undefined).out);
+}
+
 /** FR-GUI-019, FR-GUI-037, FR-GUI-039: what the canvas is built from, and where transcripts are read. */
 function canvasPorts(
   target: string,
@@ -89,6 +94,7 @@ function canvasPorts(
       return { overview, runs: runs.runs, workflows: workflows.states, problems };
     },
     readLayout: () => readLayout(target),
+    hasDocuments: documentsCheck(target),
     updateLayout: (change) => {
       // One change at a time: a drag saved during Tidy up isn't overwritten by Tidy's older copy.
       const next = layoutChanges.then(async () => saveLayout(target, change(await readLayout(target))));
@@ -158,7 +164,7 @@ export async function runGuiCommand(
       project: {
         name: path.basename(target),
         folder: target,
-        hasDocuments: () => existsSync(projectPaths(target, undefined).out),
+        hasDocuments: documentsCheck(target),
       },
       jobs,
       readAsset: createAssetReader(),
