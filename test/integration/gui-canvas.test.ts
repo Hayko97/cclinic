@@ -115,6 +115,7 @@ function agentSession(id: string, taskId: number, transcriptPath: string, ended:
     startedAt: new Date(Date.now() - 300_000).toISOString(),
     endedAt: ended ? new Date(Date.now() - 100_000).toISOString() : null,
     exitCode: ended ? 0 : null,
+    costUsd: null,
   };
 }
 

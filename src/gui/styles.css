@@ -900,11 +900,11 @@ textarea::placeholder {
   color: var(--text-2);
 }
 
-.step {
+.card-step {
   color: var(--text-2);
 }
 
-.step::before {
+.card-step::before {
   content: "▸ ";
   color: var(--accent);
 }
@@ -1820,4 +1820,186 @@ details > summary {
   #budget {
     display: none;
   }
+}
+
+/* FR-GUI-056, FR-GUI-057: a task's workflow steps, and its live run's time and budget. */
+.steps {
+  display: grid;
+  gap: var(--space-s);
+}
+
+.step {
+  padding: var(--space-s) var(--space-l);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 0 var(--radius-s) var(--radius-s) 0;
+  background: var(--surface-2);
+  min-width: 0;
+}
+
+.step-running,
+.step-waiting {
+  border-color: var(--progress);
+}
+
+.step-passed {
+  border-color: var(--done);
+}
+
+.step-sent-back,
+.step-failed {
+  border-color: var(--danger);
+}
+
+.step-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  align-items: center;
+}
+
+.step-name {
+  font-weight: 600;
+  margin-right: auto;
+}
+
+.step-time,
+.step-cost,
+.step-when {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.step-status.is-running,
+.step-status.is-waiting {
+  color: var(--progress);
+  background: var(--progress-soft);
+}
+
+.step-status.is-passed {
+  color: var(--done);
+  background: var(--done-soft);
+}
+
+.step-status.is-sent-back,
+.step-status.is-failed {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.step-status::before {
+  flex: none;
+  font-weight: 700;
+}
+
+.step-status.is-not-started::before {
+  content: "○";
+}
+
+.step-status.is-running::before {
+  content: "◐";
+}
+
+.step-status.is-waiting::before {
+  content: "?";
+}
+
+.step-status.is-passed::before {
+  content: "✓";
+}
+
+.step-status.is-sent-back::before {
+  content: "↩";
+}
+
+.step-status.is-failed::before {
+  content: "✕";
+}
+
+.step-status.is-skipped::before {
+  content: "»";
+}
+
+.step-tool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  margin-top: var(--space-xs);
+  font-size: var(--text-xs);
+  min-width: 0;
+}
+
+.step-tool .tool-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.step-tool code {
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+}
+
+.step-stalled {
+  margin-top: var(--space-xs);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--progress);
+}
+
+.step-stalled::before {
+  content: "⚠ ";
+}
+
+.run-progress {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  align-items: center;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.budget {
+  display: inline-flex;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.budget progress {
+  width: 72px;
+  height: 6px;
+  accent-color: var(--ai);
+}
+
+/* FR-GUI-058, FR-GUI-059: search, filter and "Jump to latest" over output and transcripts. */
+.view-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  align-items: center;
+  margin-top: var(--space-l);
+}
+
+.view-tools input[type="search"] {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.match-count {
+  font-size: var(--text-xs);
+}
+
+.jump-latest {
+  margin-left: auto;
+}
+
+.entry .fold {
+  margin-top: var(--space-xs);
+}
+
+mark {
+  background: var(--progress-soft);
+  color: inherit;
+  outline: 1px solid var(--progress);
+  border-radius: var(--radius-s);
 }

@@ -92,6 +92,7 @@ function agent(index: number, transcriptPath: string, ended: boolean): AgentSess
     startedAt: "2026-11-11T10:00:00.000Z",
     endedAt: ended ? "2026-11-11T10:05:00.000Z" : null,
     exitCode: ended ? 0 : null,
+    costUsd: null,
   };
 }
 

@@ -36,6 +36,7 @@ export const GUI_ASSETS = {
     "filters.js",
     "attention.js",
     "setup.js",
+    "follow.js",
     "styles.css",
   ],
 } as const;
@@ -69,6 +70,13 @@ export const CANVAS_POLL_MS = 1_000;
 export const TRANSCRIPT_POLL_MS = 1_000;
 /** FR-GUI-077: an interactive session seen within this long counts as working now. */
 export const SESSION_ACTIVITY_MS = 300_000;
+/** FR-GUI-057: a live session whose transcript wasn't written to for this long is marked as quiet. */
+export const SESSION_STALL_MS = 300_000;
+/** FR-GUI-057: how much of a live transcript's end is read for its newest tool call, and its input's shown length. */
+export const TRANSCRIPT_TAIL_BYTES = 65_536;
+export const TOOL_INPUT_SHORT_CHARS = 80;
+/** FR-GUI-059: a tool result longer than this many lines is folded. */
+export const TRANSCRIPT_FOLD_LINES = 20;
 /** A transcript shows at most its newest entries, and each entry's text is cut to this length. */
 export const TRANSCRIPT_MAX_ENTRIES = 2_000;
 export const TRANSCRIPT_MAX_TEXT_CHARS = 4_000;

@@ -48,6 +48,8 @@ export const agentSessionSchema = z.strictObject({
   endedAt: z.string().nullable(),
   /** Null while running, or when the process was stopped before it exited. */
   exitCode: z.number().int().nullable(),
+  /** What Claude Code reported the agent cost, once it ended. Older session files have none. */
+  costUsd: z.number().min(0).nullable().default(null),
 });
 export type AgentSession = z.infer<typeof agentSessionSchema>;
 

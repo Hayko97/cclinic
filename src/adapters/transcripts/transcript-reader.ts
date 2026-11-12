@@ -3,7 +3,7 @@ import { realpathSync, statSync } from "node:fs";
 import { open, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import type { TranscriptLines, TranscriptLocation, TranscriptPosition } from "../../core/canvas.js";
-import { SESSION_ID_PATTERN, TRANSCRIPT_MAX_READ_BYTES } from "../../core/constants/gui.js";
+import { SESSION_ID_PATTERN, TRANSCRIPT_MAX_READ_BYTES, TRANSCRIPT_TAIL_BYTES } from "../../core/constants/gui.js";
 
 const TRANSCRIPT_EXTENSION = ".jsonl";
 const SESSION_ID = new RegExp(`^${SESSION_ID_PATTERN}$`);
@@ -70,6 +70,37 @@ export async function locateTranscript(
 const START: TranscriptPosition = { offset: 0, fileId: "" };
 
 /**
+ * The whole lines from `start` to the end of a file of `size` bytes. Started mid-line, the first line is only part
+ * of one and is left out; a last line still being written is left for a later read. `end` is where the next read
+ * starts.
+ */
+async function readWholeLines(
+  file: string,
+  start: number,
+  size: number,
+  isMidLine: boolean,
+): Promise<{ readonly lines: string[]; readonly end: number }> {
+  if (size === start) return { lines: [], end: start };
+  const handle = await open(file, "r");
+  try {
+    const buffer = Buffer.alloc(size - start);
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, start);
+    const read = buffer.subarray(0, bytesRead);
+    const first = isMidLine ? read.indexOf("\n") + 1 : 0;
+    const last = read.lastIndexOf("\n");
+    if (last < first) return { lines: [], end: start + first };
+    const lines = read
+      .subarray(first, last)
+      .toString("utf8")
+      .split("\n")
+      .filter((line) => line.trim() !== "");
+    return { lines, end: start + last + 1 };
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
  * FR-GUI-042: the whole lines added since `from`. A last line still being written is left for the next read,
  * so it's never split, and at most the newest TRANSCRIPT_MAX_READ_BYTES are read at once.
  */
@@ -80,23 +111,17 @@ export async function readTranscriptLines(file: string, from: TranscriptPosition
   let start = isRestart ? 0 : from.offset;
   const isTruncated = info.size - start > TRANSCRIPT_MAX_READ_BYTES;
   if (isTruncated) start = info.size - TRANSCRIPT_MAX_READ_BYTES;
-  if (info.size === start) return { lines: [], next: { offset: start, fileId }, isRestart, isTruncated };
-  const handle = await open(file, "r");
-  try {
-    const buffer = Buffer.alloc(info.size - start);
-    const { bytesRead } = await handle.read(buffer, 0, buffer.length, start);
-    const read = buffer.subarray(0, bytesRead);
-    // After a jump to the newest part, the first line is only part of one.
-    const first = isTruncated ? read.indexOf("\n") + 1 : 0;
-    const end = read.lastIndexOf("\n");
-    if (end < first) return { lines: [], next: { offset: start + first, fileId }, isRestart, isTruncated };
-    const lines = read
-      .subarray(first, end)
-      .toString("utf8")
-      .split("\n")
-      .filter((line) => line.trim() !== "");
-    return { lines, next: { offset: start + end + 1, fileId }, isRestart, isTruncated };
-  } finally {
-    await handle.close();
-  }
+  // After a jump to the newest part, the first line is only part of one.
+  const { lines, end } = await readWholeLines(file, start, info.size, isTruncated);
+  return { lines, next: { offset: end, fileId }, isRestart, isTruncated };
+}
+
+/** FR-GUI-057: the whole lines in a transcript's newest part, and when it was last written to. */
+export async function readTranscriptTail(
+  file: string,
+): Promise<{ readonly lines: string[]; readonly modifiedAt: Date }> {
+  const info = await stat(file);
+  const start = Math.max(0, info.size - TRANSCRIPT_TAIL_BYTES);
+  const { lines } = await readWholeLines(file, start, info.size, start > 0);
+  return { lines, modifiedAt: info.mtime };
 }

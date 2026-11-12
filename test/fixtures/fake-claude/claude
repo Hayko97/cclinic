@@ -3,8 +3,8 @@
 // FAKE_CLAUDE_MODE: ok (default), fail-after-1, hang, slow, invalid-model, auth-error, invalid-output, usage-limit
 // FAKE_CLAUDE_SCRIPT: a JSON file of rules for agent calls. Each call uses the first rule whose `match`
 // (a regex on the prompt) fits and that has uses left (`times`, default 1, 0 for unlimited). A rule can
-// set `output` (structured output), `message`, `cost`, `exitCode`, `delayMs`, `hang` and `write`
-// (files to write, relative to the working folder).
+// set `output` (structured output), `message`, `cost`, `exitCode`, `delayMs`, `hang`, `silent` (exit with no
+// result line) and `write` (files to write, relative to the working folder).
 const fs = require("node:fs");
 
 const args = process.argv.slice(2);
@@ -82,6 +82,7 @@ if (scriptFile) {
       fs.writeFileSync(file, content);
     }
     const isError = (rule.exitCode ?? 0) !== 0;
+    if (rule.silent) process.exit(rule.exitCode ?? 1);
     emit({
       type: "result",
       is_error: isError,

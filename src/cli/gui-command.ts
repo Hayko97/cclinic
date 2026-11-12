@@ -12,7 +12,11 @@ import { acquireGuiLock, readLayout, readMcpConfig, saveLayout } from "../adapte
 import { createRunLister } from "../adapters/storage/run-store.js";
 import { openTaskStore } from "../adapters/storage/task-store.js";
 import { openWorkflowStore } from "../adapters/storage/workflow-store.js";
-import { locateTranscript, readTranscriptLines } from "../adapters/transcripts/transcript-reader.js";
+import {
+  locateTranscript,
+  readTranscriptLines,
+  readTranscriptTail,
+} from "../adapters/transcripts/transcript-reader.js";
 import { problemOf, type CanvasPorts } from "../application/gui-canvas.js";
 import { createJobs, type JobProcess } from "../application/gui-jobs.js";
 import { createGuiHandler } from "../application/gui-routes.js";
@@ -104,6 +108,7 @@ function canvasPorts(
     locateTranscript: (session) =>
       locateTranscript(session.transcriptPath, session.id, path.join(claudeConfigFolder(environment), "projects")),
     readTranscript: readTranscriptLines,
+    readTranscriptTail,
     now: () => new Date(),
     every: repeat,
   };

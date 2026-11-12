@@ -152,10 +152,11 @@ function agentRunner(settings: {
       startedAt: new Date().toISOString(),
       endedAt: null,
       exitCode: null,
+      costUsd: null,
     };
     await settings.saveSession(session);
-    const end = (exitCode: number | null) =>
-      settings.saveSession({ ...session, endedAt: new Date().toISOString(), exitCode });
+    const end = (exitCode: number | null, costUsd: number | null) =>
+      settings.saveSession({ ...session, endedAt: new Date().toISOString(), exitCode, costUsd });
     let result: Awaited<ReturnType<typeof runAgent>>;
     try {
       result = await runAgent({
@@ -175,11 +176,12 @@ function agentRunner(settings: {
       });
     } catch (error) {
       // The agent's failure is what the run must report, even if recording its end fails too.
-      await end(error instanceof AgentCallError ? error.exitCode : null).catch(() => undefined);
+      const failure = error instanceof AgentCallError ? error : undefined;
+      await end(failure?.exitCode ?? null, failure?.costUsd ?? null).catch(() => undefined);
       throw error;
     }
     // The agent's work and cost count even if recording its end fails.
-    await end(0).catch(() => undefined);
+    await end(0, result.costUsd).catch(() => undefined);
     return { costUsd: result.costUsd, finalMessage: result.finalMessage, output: result.structuredOutput };
   };
 }

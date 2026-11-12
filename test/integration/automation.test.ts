@@ -380,6 +380,28 @@ describe("cclinic auto on a real repository", () => {
     expect(crashed?.endedAt).not.toBeNull();
   });
 
+  it("TC-AUTO-060: a session file records the cost the agent reported, or null when it reported none", async () => {
+    const root = repository();
+    roadmap(root, planned("a"));
+    const priced: FakeClaudeRule = {
+      match: "reviewing a spec change",
+      times: 1,
+      cost: 0.12,
+      output: { verdict: "approve", feedback: "" },
+    };
+    const crash: FakeClaudeRule = { match: "QA agent", times: 1, exitCode: 3, silent: true };
+    const harness = agentHarness({ rules: happyRules([1], [priced, crash]) });
+    await auto(root, harness);
+    const folder = path.join(runFolderOf(root), "sessions");
+    const sessions = readdirSync(folder).map((name) =>
+      agentSessionSchema.parse(JSON.parse(readFileSync(path.join(folder, name), "utf8"))),
+    );
+    expect(sessions.find((session) => session.step === "spec-review-1")?.costUsd).toBe(0.12);
+    const crashed = sessions.find((session) => session.step === "qa-1");
+    expect(crashed).toMatchObject({ costUsd: null, exitCode: 3 });
+    expect(crashed?.endedAt).not.toBeNull();
+  });
+
   it("TC-AUTO-032, TC-AUTO-033: run.json, logs and the report are written, with secrets redacted", async () => {
     const root = repository();
     roadmap(root, planned("a"));

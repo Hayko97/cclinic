@@ -12,6 +12,7 @@ import {
   ROLE_LABELS,
   runJob,
   STATUS_LABELS,
+  timer,
 } from "./api.js";
 
 const ZOOM = { min: 0.25, max: 2, step: 1.2, wheelStep: 1.1 };
@@ -73,6 +74,16 @@ export function onCanvasChange(listener) {
 
 export function currentCanvas() {
   return state.canvas;
+}
+
+/** FR-GUI-059: tool results longer than this are folded. */
+export function foldLines() {
+  return state.foldLines;
+}
+
+/** The roadmap a task is in, if any. */
+export function roadmapById(id) {
+  return state.canvas?.roadmaps.find((roadmap) => roadmap.id === id);
 }
 
 export function taskById(id) {
@@ -173,7 +184,7 @@ function taskCard(task) {
       "div",
       { className: "card-meta" },
       task.spec === null ? null : element("span", { className: "spec" }, task.spec),
-      task.step === null ? null : element("span", { className: "step" }, task.step),
+      task.step === null ? null : element("span", { className: "card-step" }, task.step),
       task.waitingOn.length === 0
         ? null
         : element("span", { className: "waiting" }, `Waiting on ${task.waitingOn.map((id) => `#${id}`).join(", ")}`),
@@ -216,11 +227,30 @@ function changeCard(change) {
       change.pendingQuestion === null ? null : badge("Needs you", "needs-you"),
     ),
     element("div", { className: "card-title" }, change.spec),
-    element("div", { className: "card-meta" }, element("span", { className: "step" }, change.step)),
+    element("div", { className: "card-meta" }, element("span", { className: "card-step" }, change.step)),
   );
 }
 
 const ROADMAP_STATUS_LABELS = { planned: "Planned", "in-progress": "In progress", done: "Done" };
+
+/** FR-GUI-056: how long a roadmap's live run has been going, and its budget used as a bar with the amount. */
+export function runProgress(roadmap) {
+  if (roadmap.runStartedAt === null) return null;
+  const budget =
+    roadmap.budgetUsd === null
+      ? null
+      : element(
+          "span",
+          { className: "budget" },
+          element("progress", {
+            max: roadmap.budgetUsd,
+            value: Math.min(roadmap.spentUsd ?? 0, roadmap.budgetUsd),
+            "aria-label": "Budget used",
+          }),
+          `${money(roadmap.spentUsd ?? 0)} of ${money(roadmap.budgetUsd)}`,
+        );
+  return element("span", { className: "run-progress" }, timer(roadmap.runStartedAt, "Running for "), budget);
+}
 
 /** FR-GUI-067: the frame's title and actions, then its status, mode and progress, then its goal. */
 function frameHeader(frame) {
@@ -268,6 +298,7 @@ function frameHeader(frame) {
       badge(ROADMAP_STATUS_LABELS[roadmap.status] ?? roadmap.status, `status status-${roadmap.status}`),
       roadmap.mode === null ? null : badge(`${MODE_LABELS[roadmap.mode]} · ${roadmap.runId}`, "mode mode-ai"),
       element("span", { className: "progress" }, `${roadmap.done} / ${roadmap.total} done`),
+      runProgress(roadmap),
     ),
     roadmap.goal === null ? null : element("p", { className: "frame-goal", title: roadmap.goal }, roadmap.goal),
   );
@@ -560,6 +591,7 @@ function receive(payload) {
   state.order = new Map(payload.cardOrder.map((key, position) => [key, position]));
   state.layout = payload.layout;
   state.sizes = payload.sizes;
+  state.foldLines = payload.foldLines;
   state.frameWidths = payload.frameWidths;
   if (state.selected !== undefined && taskById(state.selected) === undefined) state.selected = undefined;
   draw();

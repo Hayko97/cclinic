@@ -1,12 +1,50 @@
 // The side panel over the canvas (FR-GUI-049): a task's details, actions, agents, sessions and the live
 // transcript of one of them (FR-GUI-039 to FR-GUI-044, FR-GUI-071, FR-GUI-077), or a change's state (FR-GUI-037).
-import { confirmAction, element, MODE_LABELS, money, ROLE_LABELS, STATUS_LABELS, when } from "./api.js";
-import { currentCanvas, runAndReport, selectTask, taskById } from "./canvas.js";
+import {
+  confirmAction,
+  duration,
+  element,
+  MODE_LABELS,
+  money,
+  ROLE_LABELS,
+  STATUS_LABELS,
+  timer,
+  when,
+} from "./api.js";
+import { currentCanvas, foldLines, roadmapById, runAndReport, runProgress, selectTask, taskById } from "./canvas.js";
+import { followView, viewTools } from "./follow.js";
 
-/** A transcript scrolled to within this of its end keeps following new entries. */
-const FOLLOW_TOLERANCE_PX = 8;
+const ENTRY_LABELS = { user: "User", assistant: "Assistant", "tool-call": "Tool call", "tool-result": "Tool result" };
+const ENTRY_FILTERS = {
+  user: "User",
+  assistant: "Assistant",
+  "tool-call": "Tool calls",
+  "tool-result": "Tool results",
+};
+const STEP_LABELS = {
+  spec: "Spec",
+  "spec-review": "Spec review",
+  implement: "Implement",
+  qa: "QA",
+  merge: "Merge",
+  preview: "Preview",
+  approval: "Approval",
+  commit: "Commit",
+};
+const STEP_STATUS_LABELS = {
+  "not-started": "Not started",
+  running: "Running",
+  waiting: "Waiting for you",
+  passed: "Passed",
+  "sent-back": "Sent back",
+  failed: "Failed",
+  skipped: "Skipped",
+};
 
-/** `pickedSessionId` is only a session the user clicked; otherwise the panel follows the task's first session. */
+/**
+ * `pickedSessionId` is only a session the user clicked; otherwise the panel follows the task's first session.
+ * `transcript` is the open transcript's event stream and its follow view.
+ */
 const state = { open: undefined, pickedSessionId: undefined, transcript: undefined, shown: "" };
 
 const panel = () => document.getElementById("panel");
@@ -19,7 +57,8 @@ function row(label, value) {
 }
 
 function stopTranscript() {
-  state.transcript?.close();
+  state.transcript?.events.close();
+  state.transcript?.follow.stop();
   state.transcript = undefined;
 }
 
@@ -305,16 +344,12 @@ function sessions(task) {
 }
 
 function entryNode(entry) {
-  const label = { user: "User", assistant: "Assistant", "tool-call": "Tool call", "tool-result": "Tool result" };
+  const label = ENTRY_LABELS[entry.kind];
   return element(
     "li",
-    { className: `entry entry-${entry.kind}` },
-    element(
-      "span",
-      { className: "entry-kind" },
-      entry.tool === null ? label[entry.kind] : `${label[entry.kind]} · ${entry.tool}`,
-    ),
-    element("pre", {}, entry.text),
+    { className: `entry entry-${entry.kind}`, "data-kind": entry.kind },
+    element("span", { className: "entry-kind" }, entry.tool === null ? label : `${label} · ${entry.tool}`),
+    element("pre", { className: "text" }, entry.text),
   );
 }
 
@@ -326,29 +361,33 @@ function transcriptBox(session) {
   let box = document.getElementById("transcript");
   if (state.transcript !== undefined && box !== null && box.dataset.session === session.id) return box;
   stopTranscript();
+  const list = element("ol", { className: "entries", "aria-label": "Transcript", tabindex: 0 });
+  const follow = followView(list);
+  const tools = viewTools(list, { kinds: ENTRY_FILTERS, foldLines: foldLines(), follow, label: "transcript" });
   box = element(
     "div",
     { id: "transcript", className: "transcript", "data-session": session.id },
     element("p", { className: "muted transcript-note", role: "status" }, "Loading the transcript…"),
-    element("ol", { className: "entries", "aria-label": "Transcript", tabindex: 0 }),
+    tools.bar,
+    list,
   );
   const note = box.querySelector(".transcript-note");
-  const list = box.querySelector(".entries");
   const addEntries = (part, isReplace) => {
-    const isAtEnd = list.scrollHeight - list.scrollTop - list.clientHeight < FOLLOW_TOLERANCE_PX;
     const nodes = part.entries.map(entryNode);
     if (isReplace) list.replaceChildren(...nodes);
     else list.append(...nodes);
+    tools.added(nodes);
     const notes = [];
     if (part.isTruncated) notes.push("Only the newest part of a large transcript is shown.");
     if (part.dropped > 0) notes.push(`${part.dropped} older entries are left out.`);
     if (part.skipped > 0) notes.push(`${part.skipped} lines couldn't be read and were skipped.`);
     if (isReplace || notes.length > 0) note.textContent = notes.join(" ");
     if (isReplace && part.entries.length === 0) note.textContent = "The transcript is empty so far.";
-    if (isAtEnd) list.scrollTop = list.scrollHeight;
+    if (isReplace) follow.reset();
+    follow.added(isReplace ? 0 : nodes.length);
   };
   const events = new EventSource(`/api/sessions/${encodeURIComponent(session.id)}/events`);
-  state.transcript = events;
+  state.transcript = { events, follow };
   events.addEventListener("transcript", (message) => addEntries(JSON.parse(message.data), true));
   events.addEventListener("entries", (message) => addEntries(JSON.parse(message.data), false));
   events.addEventListener("missing", () => {
@@ -361,6 +400,91 @@ function transcriptBox(session) {
     note.textContent = JSON.parse(message.data).message;
   });
   return box;
+}
+
+function stepName(row, source) {
+  const name =
+    row.step === "review" ? (source === "run" ? "PM review" : "Code review") : (STEP_LABELS[row.step] ?? row.step);
+  return row.round === null ? name : `${name} ${row.round}`;
+}
+
+/** FR-GUI-057: what a running step's session is doing now, and whether it has gone quiet. */
+function nowDoing(row, task) {
+  const session =
+    task.sessions.find((item) => item.id === row.sessionId) ??
+    (row.sessionId === null ? task.sessions.find((item) => item.isLive) : undefined);
+  if (session === undefined || !session.isLive) return [];
+  return [
+    session.currentTool === null
+      ? null
+      : element(
+          "div",
+          { className: "step-tool" },
+          element("span", { className: "tool-name" }, session.currentTool.name),
+          element("code", {}, session.currentTool.input),
+        ),
+    session.quietMinutes === null
+      ? null
+      : element("div", { className: "step-stalled", role: "status" }, `No activity for ${session.quietMinutes} min`),
+  ];
+}
+
+/** FR-GUI-056: the task's workflow steps in order, with each one's result, round, times and cost. */
+function steps(task) {
+  if (task.steps === null) return null;
+  const { source, rows } = task.steps;
+  return element(
+    "section",
+    {},
+    element("h3", {}, "Steps"),
+    element(
+      "ol",
+      { className: "plain steps", "aria-label": "Workflow steps" },
+      rows.map((row) => {
+        const taken =
+          row.startedAt === null
+            ? null
+            : row.endedAt === null
+              ? row.status === "running"
+                ? timer(row.startedAt)
+                : null
+              : duration(Date.parse(row.endedAt) - Date.parse(row.startedAt));
+        const times = [
+          row.startedAt === null ? null : `Started ${when(row.startedAt)}`,
+          row.startedAt === null && row.endedAt !== null ? when(row.endedAt) : null,
+        ].filter((part) => part !== null);
+        return element(
+          "li",
+          { className: `step step-${row.status}`, "data-step": `${row.step}-${row.round ?? 0}` },
+          element(
+            "div",
+            { className: "step-head" },
+            element("span", { className: "step-name" }, stepName(row, source)),
+            element("span", { className: `badge step-status is-${row.status}` }, STEP_STATUS_LABELS[row.status]),
+            taken === null ? null : element("span", { className: "step-time" }, taken),
+            row.costUsd === null ? null : element("span", { className: "step-cost" }, money(row.costUsd)),
+          ),
+          times.length === 0 ? null : element("div", { className: "muted step-when" }, times.join(" · ")),
+          row.status === "running" || row.status === "waiting" ? nowDoing(row, task) : null,
+        );
+      }),
+    ),
+    element("p", { className: "muted" }, `Total cost ${money(task.steps.costUsd)}`),
+  );
+}
+
+/** FR-GUI-056: the live run the task is in: done tasks against total, time since it started, and budget used. */
+function runSection(task) {
+  if (task.runId === null || task.roadmapId === null) return null;
+  const roadmap = roadmapById(task.roadmapId);
+  if (roadmap === undefined || roadmap.runId !== task.runId) return null;
+  return element(
+    "section",
+    { className: "run-section" },
+    element("h3", {}, `Run ${roadmap.runId}`),
+    element("p", {}, `${roadmap.done} / ${roadmap.total} tasks done in ${roadmap.title}`),
+    runProgress(roadmap),
+  );
 }
 
 function renderTask(task) {
@@ -386,6 +510,8 @@ function renderTask(task) {
       row("Waiting for you", task.change?.pendingQuestion ?? null),
     ),
     taskActions(task),
+    runSection(task),
+    steps(task),
     dependencies(task),
     agents(task),
     task.change === null ? null : element("section", {}, element("h3", {}, "Workflow"), changeDetails(task.change)),

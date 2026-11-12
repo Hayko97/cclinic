@@ -1,5 +1,5 @@
 // The GUI's page: a top bar, a rail with Canvas, Setup and Jobs, and a side panel (FR-GUI-049).
-import { api, money, notify, remember, remembered } from "./api.js";
+import { api, money, notify, remember, remembered, startClock } from "./api.js";
 import { addIcons } from "./icons.js";
 import { setTitleBase, showAttention, startAttention } from "./attention.js";
 import { onCanvasChange, onDraw, onOpenTask, refresh, selectTask, showCanvas, startCanvas } from "./canvas.js";
@@ -76,6 +76,7 @@ onCanvasChange((canvas, payload) => {
       : spent.map((roadmap) => `${money(roadmap.spentUsd)} of ${money(roadmap.budgetUsd)}`).join(" · ");
 });
 startPanel();
+startClock();
 startAddTask();
 startJobs();
 startCanvas();

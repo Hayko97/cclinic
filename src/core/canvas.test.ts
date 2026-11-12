@@ -90,6 +90,7 @@ function agent(taskId: number, role: AgentSession["role"], step: string, started
     startedAt: minutesAgo(started),
     endedAt: ended === null ? null : minutesAgo(ended),
     exitCode: ended === null ? null : 0,
+    costUsd: null,
   };
 }
 

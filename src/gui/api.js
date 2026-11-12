@@ -108,6 +108,35 @@ export function when(iso) {
   return new Date(iso).toLocaleString();
 }
 
+/** A length of time, such as `45s`, `4m 05s` or `1h 02m`. */
+export function duration(ms) {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  const pad = (value) => String(value).padStart(2, "0");
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${pad(seconds % 60)}s`;
+  return `${Math.floor(seconds / 3600)}h ${pad(Math.floor(seconds / 60) % 60)}m`;
+}
+
+/** How often live timers are redrawn. */
+const CLOCK_TICK_MS = 1000;
+
+/** FR-GUI-056, FR-GUI-057: a time that counts up from `since`, kept current by `startClock`. */
+export function timer(since, prefix = "") {
+  return element(
+    "span",
+    { className: "timer", "data-since": since, "data-prefix": prefix },
+    `${prefix}${duration(Date.now() - Date.parse(since))}`,
+  );
+}
+
+export function startClock() {
+  setInterval(() => {
+    for (const node of document.querySelectorAll("[data-since]")) {
+      node.textContent = `${node.dataset.prefix}${duration(Date.now() - Date.parse(node.dataset.since))}`;
+    }
+  }, CLOCK_TICK_MS);
+}
+
 /** What the browser remembers between visits (FR-GUI-054, FR-GUI-070); the page works without it. */
 export function remembered(key, fallback) {
   try {

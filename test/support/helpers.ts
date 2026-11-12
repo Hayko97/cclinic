@@ -250,6 +250,7 @@ export interface FakeClaudeRule {
   readonly exitCode?: number;
   readonly delayMs?: number;
   readonly hang?: boolean;
+  readonly silent?: boolean;
   readonly write?: Readonly<Record<string, string>>;
 }
 
@@ -315,6 +316,7 @@ export const EMPTY_CANVAS: CanvasPorts = {
   locateTranscript: () => Promise.resolve({ kind: "missing" }),
   readTranscript: () =>
     Promise.resolve({ lines: [], next: { offset: 0, fileId: "" }, isRestart: false, isTruncated: false }),
+  readTranscriptTail: () => Promise.resolve({ lines: [], modifiedAt: new Date(0) }),
   now: () => new Date(0),
   every: () => () => undefined,
 };

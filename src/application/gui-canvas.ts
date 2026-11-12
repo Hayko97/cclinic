@@ -5,6 +5,7 @@ import {
   layoutSchema,
   parseTranscriptLine,
   pruneLayout,
+  newestToolCall,
   resolveLayout,
   tidyFrame,
   tidyRequestSchema,
@@ -13,6 +14,7 @@ import {
   nextStep,
   type NextStep,
   type CanvasSources,
+  type SessionActivity,
   type CanvasView,
   type Layout,
   type SessionView,
@@ -25,6 +27,7 @@ import {
   CANVAS_POLL_MS,
   LAYOUT,
   LAYOUT_VERSION,
+  TRANSCRIPT_FOLD_LINES,
   TRANSCRIPT_MAX_ENTRIES,
   TRANSCRIPT_POLL_MS,
 } from "../core/constants/gui.js";
@@ -42,6 +45,8 @@ export interface CanvasPorts {
   readonly locateTranscript: (session: SessionView) => Promise<TranscriptLocation>;
   /** The whole lines added to a transcript since `from`, where `from` undefined means its start. */
   readonly readTranscript: (file: string, from: TranscriptPosition | undefined) => Promise<TranscriptLines>;
+  /** FR-GUI-057: the whole lines at a transcript's end, and when it was last written to. */
+  readonly readTranscriptTail: (file: string) => Promise<{ readonly lines: string[]; readonly modifiedAt: Date }>;
   readonly now: () => Date;
   /** Runs `run` every `ms`, and returns what stops it. `run` resolves once its check is done. */
   readonly every: (ms: number, run: () => Promise<void>) => () => void;
@@ -66,10 +71,35 @@ export interface CanvasPayload {
   readonly nextStep: NextStep | null;
   /** The automatic layout's sizes, so the page draws frames and columns on the same grid (FR-GUI-074). */
   readonly sizes: typeof LAYOUT;
+  /** FR-GUI-059: tool results longer than this many lines are folded. */
+  readonly foldLines: number;
+}
+
+/**
+ * FR-GUI-057: what each live session's transcript shows now. A transcript that can't be read just has no
+ * activity, since the session itself and its transcript view report that problem.
+ */
+async function liveActivity(ports: CanvasPorts, sources: CanvasSources): Promise<Map<string, SessionActivity>> {
+  const live = allSessions(sources, ports.now()).filter((session) => session.isLive);
+  const found = await Promise.all(
+    live.map(async (session): Promise<[string, SessionActivity] | undefined> => {
+      let tail: Awaited<ReturnType<CanvasPorts["readTranscriptTail"]>>;
+      try {
+        const location = await ports.locateTranscript(session);
+        if (location.kind !== "found") return undefined;
+        tail = await ports.readTranscriptTail(location.file);
+      } catch {
+        return undefined;
+      }
+      return [session.id, { modifiedAt: tail.modifiedAt.toISOString(), currentTool: newestToolCall(tail.lines) }];
+    }),
+  );
+  return new Map(found.filter((item) => item !== undefined));
 }
 
 export async function readCanvas(ports: CanvasPorts): Promise<CanvasPayload> {
-  const canvas = buildCanvas(await ports.readSources(), ports.now());
+  const sources = await ports.readSources();
+  const canvas = buildCanvas({ ...sources, activity: await liveActivity(ports, sources) }, ports.now());
   const saved = await ports.readLayout();
   return {
     canvas,
@@ -78,6 +108,7 @@ export async function readCanvas(ports: CanvasPorts): Promise<CanvasPayload> {
     cardOrder: cardOrder(canvas),
     nextStep: nextStep(canvas, ports.hasDocuments()),
     sizes: LAYOUT,
+    foldLines: TRANSCRIPT_FOLD_LINES,
   };
 }
 

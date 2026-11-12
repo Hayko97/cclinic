@@ -10,9 +10,13 @@ import {
   LAYOUT_MAX_ITEMS,
   LAYOUT_VERSION,
   SESSION_ACTIVITY_MS,
+  SESSION_STALL_MS,
+  TOOL_INPUT_SHORT_CHARS,
   TRANSCRIPT_MAX_TEXT_CHARS,
 } from "./constants/gui.js";
+import { MS_PER_MINUTE } from "./constants/limits.js";
 import { redact } from "./redaction.js";
+import { runSteps, workflowSteps, type StepsView } from "./task-steps.js";
 import type { RoadmapOverview, Task, TaskStatus } from "./tasks.js";
 import { isOpenChange, type WorkflowState } from "./workflow.js";
 
@@ -29,6 +33,20 @@ export interface CanvasSources {
   readonly workflows: readonly WorkflowState[];
   /** What couldn't be read, such as a damaged workflow state, shown instead of failing (FR-GUI-014). */
   readonly problems: readonly string[];
+  /** FR-GUI-057: what the transcripts of live sessions show, by session ID. */
+  readonly activity?: ReadonlyMap<string, SessionActivity>;
+}
+
+export interface ToolCall {
+  readonly name: string;
+  /** Cut to the short-input length. */
+  readonly input: string;
+}
+
+/** FR-GUI-057: when a live session's transcript was last written to, and its newest tool call. */
+export interface SessionActivity {
+  readonly modifiedAt: string;
+  readonly currentTool: ToolCall | null;
 }
 
 export type SessionRole = AgentSession["role"] | "you";
@@ -44,6 +62,10 @@ export interface SessionView {
   readonly lastActivityAt: string;
   readonly isLive: boolean;
   readonly transcriptPath: string;
+  /** FR-GUI-057: a live session's newest tool call. */
+  readonly currentTool: ToolCall | null;
+  /** FR-GUI-057: whole minutes since a live session's transcript was written to, once that's the stall time. */
+  readonly quietMinutes: number | null;
 }
 
 export type TaskMode = "ai" | "manual";
@@ -85,6 +107,8 @@ export interface TaskView {
   readonly costUsd: number;
   readonly needsYou: boolean;
   readonly change: ChangeView | null;
+  /** FR-GUI-056: its workflow steps, from its run or its workflow state. */
+  readonly steps: StepsView | null;
 }
 
 export interface RoadmapView {
@@ -98,6 +122,8 @@ export interface RoadmapView {
   readonly total: number;
   readonly spentUsd: number | null;
   readonly budgetUsd: number | null;
+  /** FR-GUI-056: when its live run started. */
+  readonly runStartedAt: string | null;
   readonly milestones: readonly {
     readonly id: number;
     readonly title: string;
@@ -143,7 +169,21 @@ function liveThenNewest(a: SessionView, b: SessionView): number {
   return Number(b.isLive) - Number(a.isLive) || b.lastActivityAt.localeCompare(a.lastActivityAt);
 }
 
-function agentSessionView(session: AgentSession, run: RunSource): SessionView {
+const NO_ACTIVITY = { currentTool: null, quietMinutes: null } as const;
+
+function activityView(
+  activity: SessionActivity | undefined,
+  now: Date,
+): Pick<SessionView, "currentTool" | "quietMinutes"> {
+  if (activity === undefined) return NO_ACTIVITY;
+  const quietMs = now.getTime() - Date.parse(activity.modifiedAt);
+  return {
+    currentTool: activity.currentTool,
+    quietMinutes: quietMs >= SESSION_STALL_MS ? Math.floor(quietMs / MS_PER_MINUTE) : null,
+  };
+}
+
+function agentSessionView(session: AgentSession, run: RunSource, activity: Activity, now: Date): SessionView {
   const isLive = run.isLive && session.endedAt === null;
   return {
     id: session.sessionId,
@@ -156,30 +196,59 @@ function agentSessionView(session: AgentSession, run: RunSource): SessionView {
     lastActivityAt: session.endedAt ?? session.startedAt,
     isLive,
     transcriptPath: session.transcriptPath,
+    ...(isLive ? activityView(activity?.get(session.sessionId), now) : NO_ACTIVITY),
   };
 }
 
-function interactiveSessionViews(state: WorkflowState, now: Date): SessionView[] {
-  return state.sessions.map((session) => ({
-    id: session.sessionId,
-    source: "interactive",
-    role: "you",
-    step: state.step,
-    runId: null,
-    taskId: state.taskId,
-    startedAt: session.firstSeenAt,
-    lastActivityAt: session.lastSeenAt,
-    isLive: now.getTime() - Date.parse(session.lastSeenAt) <= SESSION_ACTIVITY_MS,
-    transcriptPath: session.transcriptPath,
-  }));
+type Activity = CanvasSources["activity"];
+
+function interactiveSessionViews(state: WorkflowState, activity: Activity, now: Date): SessionView[] {
+  return state.sessions.map((session) => {
+    const isLive = now.getTime() - Date.parse(session.lastSeenAt) <= SESSION_ACTIVITY_MS;
+    return {
+      id: session.sessionId,
+      source: "interactive",
+      role: "you",
+      step: state.step,
+      runId: null,
+      taskId: state.taskId,
+      startedAt: session.firstSeenAt,
+      lastActivityAt: session.lastSeenAt,
+      isLive,
+      transcriptPath: session.transcriptPath,
+      ...(isLive ? activityView(activity?.get(session.sessionId), now) : NO_ACTIVITY),
+    };
+  });
 }
 
 /** Every session cclinic knows of: agents of runs (FR-AUTO-039) and the user's own (FR-MCP-045). */
-export function allSessions(sources: Pick<CanvasSources, "runs" | "workflows">, now: Date): SessionView[] {
+export function allSessions(sources: Pick<CanvasSources, "runs" | "workflows" | "activity">, now: Date): SessionView[] {
   return [
-    ...sources.runs.flatMap((run) => run.sessions.map((session) => agentSessionView(session, run))),
-    ...sources.workflows.flatMap((state) => interactiveSessionViews(state, now)),
+    ...sources.runs.flatMap((run) =>
+      run.sessions.map((session) => agentSessionView(session, run, sources.activity, now)),
+    ),
+    ...sources.workflows.flatMap((state) => interactiveSessionViews(state, sources.activity, now)),
   ].sort(liveThenNewest);
+}
+
+/**
+ * FR-GUI-056: the steps of the task's open change worked on by the user, else of the newest run it was in, else of
+ * its newest change.
+ */
+function stepsOf(taskId: number, runs: readonly RunSource[], change: WorkflowState | undefined): StepsView | null {
+  if (change !== undefined && isOpenChange(change) && change.approverMode === "user") return workflowSteps(change);
+  const run = runs
+    .filter((source) => source.state.tasks.some((item) => item.taskId === taskId && item.status !== "waiting"))
+    .sort((a, b) => b.state.startedAt.localeCompare(a.state.startedAt))[0];
+  const taskRun = run?.state.tasks.find((item) => item.taskId === taskId);
+  if (run !== undefined && taskRun !== undefined) {
+    return runSteps(
+      run.sessions.filter((session) => session.taskId === taskId),
+      taskRun,
+      run.isLive,
+    );
+  }
+  return change === undefined ? null : workflowSteps(change);
 }
 
 function openThenNewest(a: WorkflowState, b: WorkflowState): number {
@@ -229,6 +298,7 @@ export function buildCanvas(sources: CanvasSources, now: Date): CanvasView {
       costUsd: runCost + (change?.costUsd ?? 0),
       needsYou: change?.pending !== null && change?.pending !== undefined && change.pending.answer === null,
       change: change === undefined ? null : changeView(change),
+      steps: stepsOf(task.id, sources.runs, change),
     };
   });
 
@@ -246,6 +316,7 @@ export function buildCanvas(sources: CanvasSources, now: Date): CanvasView {
       total: own.length,
       spentUsd: isRunning ? liveRun.state.spentUsd : null,
       budgetUsd: isRunning ? liveRun.state.budgetUsd : null,
+      runStartedAt: isRunning ? liveRun.state.startedAt : null,
       milestones: roadmap.milestones.map((milestone) => ({
         id: milestone.id,
         title: shown(milestone.title),
@@ -367,6 +438,20 @@ export function parseTranscriptLine(line: string): {
     return [];
   });
   return { entries, isSkipped: false };
+}
+
+/** FR-GUI-057: the newest tool call in a transcript's lines, its input cut to the short-input length. */
+export function newestToolCall(lines: readonly string[]): ToolCall | null {
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const calls = parseTranscriptLine(lines[index] ?? "").entries.filter((entry) => entry.kind === "tool-call");
+    const call = calls.at(-1);
+    if (call !== undefined) {
+      const input =
+        call.text.length > TOOL_INPUT_SHORT_CHARS ? `${call.text.slice(0, TOOL_INPUT_SHORT_CHARS - 1)}…` : call.text;
+      return { name: call.tool ?? "tool", input };
+    }
+  }
+  return null;
 }
 
 const pointSchema = z.strictObject({

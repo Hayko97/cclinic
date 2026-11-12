@@ -214,7 +214,7 @@ describe("canvas page", () => {
     expect(await card.locator(".card-title").textContent()).toBe("Task b");
     expect(await card.locator(".status").textContent()).toBe("Open");
     expect(await card.locator(".spec").textContent()).toBe("refunds");
-    expect(await card.locator(".step").textContent()).toBe("spec");
+    expect(await card.locator(".card-step").textContent()).toBe("spec");
     expect(await card.locator(".mode").textContent()).toBe("Manual");
     expect(await card.locator(".agents").textContent()).toBe("You");
     expect(await card.locator(".sessions").textContent()).toBe("2 sessions");
@@ -786,7 +786,7 @@ describe("QA: live canvas, page side", () => {
     expect(await page.locator('[data-frame="roadmap-2"] .frame-meta .mode').count()).toBe(0);
     expect(await page.locator('[data-key="task-2"] .mode').textContent()).toBe("AI run");
     expect(await page.locator('[data-key="task-5"] .mode').textContent()).toBe("Manual");
-    expect(await page.locator('[data-key="task-5"] .step').textContent()).toBe("spec");
+    expect(await page.locator('[data-key="task-5"] .card-step').textContent()).toBe("spec");
     expect(await page.locator("#budget").textContent()).toBe("$3.40 of $10.00");
     await page.locator('[data-key="task-2"]').click();
     expect(await page.locator("#panel-body .details").textContent()).toContain(runId);
