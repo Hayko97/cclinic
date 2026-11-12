@@ -513,7 +513,12 @@ export function withPending(state: WorkflowState, pending: PendingQuestion, now:
   return touch({ ...state, pending }, now);
 }
 
-/** Records the user's answer to a waiting question, from `cclinic approve` (FR-MCP-029, FR-CLI-029). */
+/** Whether `question` is still the one waiting for an answer, so an answer to it may be recorded (FR-GUI-038). */
+export function isStillWaiting(state: WorkflowState | undefined, question: string): boolean {
+  return state?.pending?.question === question && state.pending.answer === null;
+}
+
+/** Records the user's answer to a waiting question, from `cclinic approve` or the GUI (FR-MCP-029, FR-GUI-038). */
 export function answerPending(state: WorkflowState, answer: string, notes: string | null, now: string): Outcome {
   if (state.pending === null) return { refusal: "No question is waiting." };
   if (!state.pending.answers.includes(answer)) return { refusal: `"${answer}" isn't one of the answers.` };

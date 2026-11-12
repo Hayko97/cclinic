@@ -13,6 +13,7 @@ import {
   HTTP_DEFAULT_PORT,
   HTTP_STATUS,
   SESSION_ID_PATTERN,
+  TRANSCRIPT_MAX_TEXT_CHARS,
 } from "./constants/gui.js";
 import { LIMITS } from "./constants/limits.js";
 import { PROVIDER_CHOICES } from "./constants/llm.js";
@@ -26,7 +27,7 @@ import {
   wholeNumberRule,
 } from "./option-rules.js";
 import { EXIT_CODES } from "./errors.js";
-import { idSchema, specNameSchema, textSchema, titleSchema } from "./tasks.js";
+import { idSchema, specNameSchema, TASK_LIMITS, textSchema, titleSchema } from "./tasks.js";
 
 export interface GuiRequest {
   readonly method: string;
@@ -139,11 +140,14 @@ export type Route =
   | { readonly name: "save-layout" }
   | { readonly name: "tidy-layout" }
   | { readonly name: "session"; readonly id: string }
-  | { readonly name: "session-events"; readonly id: string };
+  | { readonly name: "session-events"; readonly id: string }
+  | { readonly name: "answer"; readonly key: string };
 
 const ASSET_FILES: ReadonlySet<string> = new Set(GUI_ASSETS.files);
 const JOB_PATH = "/api/jobs/(job-[1-9][0-9]{0,5})";
 const SESSION_PATH = `/api/sessions/(${SESSION_ID_PATTERN})`;
+/** A change's key (FR-MCP-038). It's only looked up among the saved states, never used as a path. */
+const CHANGE_PATH = "/api/changes/([\\w.-]{1,300})";
 
 /** FR-GUI-010: every route, with each parameter's pattern. Anything else is not found. */
 const ROUTES: readonly {
@@ -170,6 +174,7 @@ const ROUTES: readonly {
   { method: "POST", pattern: /^\/api\/layout\/tidy$/, route: () => ({ name: "tidy-layout" }) },
   { method: "GET", pattern: new RegExp(`^${SESSION_PATH}$`), route: (id) => ({ name: "session", id }) },
   { method: "GET", pattern: new RegExp(`^${SESSION_PATH}/events$`), route: (id) => ({ name: "session-events", id }) },
+  { method: "POST", pattern: new RegExp(`^${CHANGE_PATH}/answer$`), route: (key) => ({ name: "answer", key }) },
 ];
 
 export function matchRoute(method: string, path: string): Route | undefined {
@@ -181,6 +186,21 @@ export function matchRoute(method: string, path: string): Route | undefined {
 }
 
 const patternSchema = z.string().min(1).max(GUI_MAX_PATTERN_LENGTH);
+
+/** FR-GUI-038: an answer to a change's waiting question, naming the question the user saw. */
+export const answerRequestSchema = z.strictObject({
+  // The question as the page shows it: cut to the shown-text length, plus its ellipsis.
+  question: z
+    .string()
+    .min(1)
+    .max(TRANSCRIPT_MAX_TEXT_CHARS + 1),
+  answer: z.string().min(1).max(TASK_LIMITS.title),
+  notes: z
+    .string()
+    .max(TASK_LIMITS.text, `Notes for the agent can be at most ${TASK_LIMITS.text} characters.`)
+    .nullable()
+    .optional(),
+});
 
 /** FR-GUI-015: each value is refused as the CLI refuses it, in the CLI's own words. */
 const limit = (flag: string, bounds: { readonly minimum: number; readonly maximum: number }) =>

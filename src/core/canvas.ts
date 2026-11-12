@@ -18,7 +18,7 @@ import { MS_PER_MINUTE } from "./constants/limits.js";
 import { redact } from "./redaction.js";
 import { runSteps, workflowSteps, type StepsView } from "./task-steps.js";
 import type { RoadmapOverview, Task, TaskStatus } from "./tasks.js";
-import { isOpenChange, type WorkflowState } from "./workflow.js";
+import { isNotesAnswer, isOpenChange, type WorkflowState } from "./workflow.js";
 
 export interface RunSource {
   readonly state: RunState;
@@ -83,6 +83,8 @@ export interface ChangeView {
   readonly decisions: number;
   readonly skips: number;
   readonly pendingQuestion: string | null;
+  /** FR-GUI-038: the answers the waiting question allows, and which of them carry notes for the agent. */
+  readonly pendingAnswers: readonly { readonly value: string; readonly needsNotes: boolean }[] | null;
   readonly sessions: number;
   readonly startedAt: string;
   readonly updatedAt: string;
@@ -141,7 +143,16 @@ export interface CanvasView {
   readonly problems: readonly string[];
 }
 
+/**
+ * FR-GUI-038: the question waiting for the user, as the page shows it: redacted and cut, like all shown text. An
+ * answer names this text, so it's compared with what the page saw.
+ */
+export function waitingQuestion(state: WorkflowState): string | null {
+  return state.pending !== null && state.pending.answer === null ? shown(state.pending.question) : null;
+}
+
 function changeView(state: WorkflowState): ChangeView {
+  const question = waitingQuestion(state);
   return {
     key: state.key,
     taskId: state.taskId,
@@ -154,7 +165,11 @@ function changeView(state: WorkflowState): ChangeView {
     reviews: state.reviews.length,
     decisions: state.decisions.length,
     skips: state.skips.length,
-    pendingQuestion: state.pending !== null && state.pending.answer === null ? shown(state.pending.question) : null,
+    pendingQuestion: question,
+    pendingAnswers:
+      question === null || state.pending === null
+        ? null
+        : state.pending.answers.map((value) => ({ value, needsNotes: isNotesAnswer(value) })),
     sessions: state.sessions.length,
     startedAt: state.startedAt,
     updatedAt: state.updatedAt,

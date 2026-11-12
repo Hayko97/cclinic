@@ -25,6 +25,7 @@ import { mcpInfo, type McpFile } from "../core/gui-setup.js";
 import { LIMITS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ENVIRONMENT_MAX_BUDGET_USD } from "../core/constants/environment.js";
+import { answerChange, type AnswerPorts } from "./gui-answers.js";
 import type { Jobs } from "./gui-jobs.js";
 import { askGenerate } from "./gui-setup.js";
 
@@ -44,6 +45,8 @@ export interface GuiPorts {
   /** One of the GUI's own bundled files, by name (FR-GUI-010). */
   readonly readAsset: (name: string) => Promise<string>;
   readonly canvas: CanvasPorts;
+  /** FR-GUI-038: the changes' saved states, to answer a waiting question. */
+  readonly answers: AnswerPorts;
 }
 
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
@@ -191,6 +194,26 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
           headers: SECURITY_HEADERS,
           open: (send) => streamTranscript(ports.canvas, session, send),
         };
+      }
+      case "answer": {
+        let result: Awaited<ReturnType<typeof answerChange>>;
+        try {
+          result = await answerChange(ports.answers, route.key, await request.readBody());
+        } catch (error) {
+          // A workflow state that can't be read is named, with how to fix it, as `cclinic approve` names it.
+          if (error instanceof UsageError) return json(HTTP_STATUS.conflict, { error: error.message });
+          throw error;
+        }
+        switch (result.status) {
+          case "answered":
+            return json(HTTP_STATUS.ok, { message: result.message });
+          case "unknown":
+            return json(HTTP_STATUS.notFound, NOT_FOUND);
+          case "invalid":
+            return json(HTTP_STATUS.badRequest, { error: result.message });
+          case "changed":
+            return json(HTTP_STATUS.conflict, { error: result.message });
+        }
       }
       case "cancel-job": {
         const outcome = ports.jobs.cancel(route.id);

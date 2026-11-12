@@ -2003,3 +2003,29 @@ mark {
   outline: 1px solid var(--progress);
   border-radius: var(--radius-s);
 }
+
+/* FR-GUI-038: a question waiting for the user, in the task or change panel. */
+.panel-body .waiting-question {
+  margin-top: 0;
+  padding: var(--space-xl) var(--space-2xl);
+  border: 1px solid var(--progress);
+  border-radius: var(--radius-l);
+  background: var(--progress-soft);
+}
+
+.waiting-question .question {
+  margin: var(--space-s) 0 var(--space-l);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.answer-notes {
+  display: grid;
+  gap: var(--space-s);
+  margin-top: var(--space-l);
+}
+
+.answer-notes textarea {
+  width: 100%;
+  min-width: 0;
+}

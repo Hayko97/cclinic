@@ -1,5 +1,6 @@
 /** Shared test helpers: temp projects, sample documents and a fake LLM provider. */
 import type { CanvasPorts } from "../../src/application/gui-canvas.js";
+import type { AnswerPorts } from "../../src/application/gui-answers.js";
 import {
   chmodSync,
   copyFileSync,
@@ -319,4 +320,10 @@ export const EMPTY_CANVAS: CanvasPorts = {
   readTranscriptTail: () => Promise.resolve({ lines: [], modifiedAt: new Date(0) }),
   now: () => new Date(0),
   every: () => () => undefined,
+};
+
+/** No changes to answer, for GUI tests that don't answer questions. */
+export const NO_ANSWERS: AnswerPorts = {
+  update: (_key, decide) => Promise.resolve(decide(undefined).value),
+  now: () => new Date(0),
 };

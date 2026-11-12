@@ -1,17 +1,28 @@
 // The side panel over the canvas (FR-GUI-049): a task's details, actions, agents, sessions and the live
 // transcript of one of them (FR-GUI-039 to FR-GUI-044, FR-GUI-071, FR-GUI-077), or a change's state (FR-GUI-037).
 import {
+  api,
   confirmAction,
   duration,
   element,
   MODE_LABELS,
   money,
+  notify,
   ROLE_LABELS,
   STATUS_LABELS,
   timer,
   when,
 } from "./api.js";
-import { currentCanvas, foldLines, roadmapById, runAndReport, runProgress, selectTask, taskById } from "./canvas.js";
+import {
+  currentCanvas,
+  foldLines,
+  refresh,
+  roadmapById,
+  runAndReport,
+  runProgress,
+  selectTask,
+  taskById,
+} from "./canvas.js";
 import { followView, viewTools } from "./follow.js";
 
 const ENTRY_LABELS = { user: "User", assistant: "Assistant", "tool-call": "Tool call", "tool-result": "Tool result" };
@@ -43,9 +54,10 @@ const STEP_STATUS_LABELS = {
 
 /**
  * `pickedSessionId` is only a session the user clicked; otherwise the panel follows the task's first session.
- * `transcript` is the open transcript's event stream and its follow view.
+ * `transcript` is the open transcript's event stream and its follow view. `answering` is an answer whose notes are
+ * being written, kept across redraws.
  */
-const state = { open: undefined, pickedSessionId: undefined, transcript: undefined, shown: "" };
+const state = { open: undefined, pickedSessionId: undefined, transcript: undefined, shown: "", answering: undefined };
 
 const panel = () => document.getElementById("panel");
 const body = () => document.getElementById("panel-body");
@@ -140,15 +152,119 @@ function changeDetails(change) {
     row("Decisions", String(change.decisions)),
     row("Skips", String(change.skips)),
     row("Reason", change.reason),
-    row("Waiting for you", change.pendingQuestion),
     row("Updated", when(change.updatedAt)),
+  );
+}
+
+/** FR-GUI-038: records an answer to the question the user saw, then shows the canvas as it is now. */
+async function sendAnswer(change, answer, notes) {
+  // One answer at a time: a second press would only be refused, as the question is answered by then.
+  for (const button of document.querySelectorAll("#panel-body .waiting-question button")) button.disabled = true;
+  try {
+    const { message } = await api(`/api/changes/${encodeURIComponent(change.key)}/answer`, {
+      method: "POST",
+      body: JSON.stringify({ question: change.pendingQuestion, answer, notes }),
+    });
+    state.answering = undefined;
+    notify(message);
+  } catch (error) {
+    notify(error.message, true);
+  }
+  await refresh().catch((error) => notify(error.message, true));
+}
+
+/**
+ * FR-GUI-038: a change's waiting question, with one button per allowed answer. An answer that carries notes for
+ * the agent asks for them first.
+ */
+function waiting(change) {
+  if (change === null || change.pendingAnswers === null) return null;
+  const draft =
+    state.answering?.key === change.key && state.answering.question === change.pendingQuestion
+      ? state.answering
+      : undefined;
+  const choose = (value, needsNotes) => {
+    if (!needsNotes) {
+      void sendAnswer(change, value, null);
+      return;
+    }
+    state.answering = { key: change.key, question: change.pendingQuestion, answer: value, notes: draft?.notes ?? "" };
+    render();
+    document.querySelector('#panel-body [data-focus="answer-notes"]')?.focus();
+  };
+  const answers = element(
+    "div",
+    { className: "actions" },
+    change.pendingAnswers.map(({ value, needsNotes }) =>
+      element(
+        "button",
+        {
+          type: "button",
+          className: value === draft?.answer ? "primary" : undefined,
+          "data-focus": `answer-${value}`,
+          "data-answer": value,
+          onClick: () => choose(value, needsNotes),
+        },
+        value,
+      ),
+    ),
+  );
+  let notes = null;
+  if (draft !== undefined) {
+    const text = element("textarea", { id: "answer-notes", "data-focus": "answer-notes", rows: 3 });
+    text.value = draft.notes;
+    text.addEventListener("input", () => {
+      draft.notes = text.value;
+    });
+    notes = element(
+      "form",
+      {
+        className: "answer-notes",
+        onSubmit: (event) => {
+          event.preventDefault();
+          void sendAnswer(change, draft.answer, draft.notes);
+        },
+      },
+      element("label", { for: "answer-notes" }, `Notes for the agent, for ${draft.answer} (optional)`),
+      text,
+      element(
+        "div",
+        { className: "actions" },
+        element(
+          "button",
+          { type: "submit", className: "primary", "data-focus": "send-answer" },
+          `Send ${draft.answer}`,
+        ),
+        element(
+          "button",
+          {
+            type: "button",
+            onClick: () => {
+              state.answering = undefined;
+              render();
+            },
+          },
+          "Cancel",
+        ),
+      ),
+    );
+  }
+  return element(
+    "section",
+    { className: "waiting-question", "aria-label": "Waiting for you" },
+    element("h3", {}, "Waiting for you"),
+    element("p", { className: "question" }, change.pendingQuestion),
+    answers,
+    notes,
   );
 }
 
 function renderChange(change) {
   document.getElementById("panel-title").textContent = change === undefined ? "Change" : `Change ${change.key}`;
   body().replaceChildren(
-    change === undefined ? element("p", { className: "muted" }, "This change is gone.") : changeDetails(change),
+    ...(change === undefined
+      ? [element("p", { className: "muted" }, "This change is gone.")]
+      : [waiting(change), changeDetails(change)].filter((node) => node !== null)),
   );
 }
 
@@ -507,8 +623,8 @@ function renderTask(task) {
       row("Step", task.step),
       row("Spec", task.spec),
       row("Cost so far", money(task.costUsd)),
-      row("Waiting for you", task.change?.pendingQuestion ?? null),
     ),
+    waiting(task.change),
     taskActions(task),
     runSection(task),
     steps(task),

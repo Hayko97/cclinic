@@ -22,18 +22,26 @@ export interface WorkflowStore {
   save(state: WorkflowState): Promise<void>;
   /** Re-reads the open change under the lock and saves what `change` makes of it (FR-MCP-045). */
   updateOpen(change: (state: WorkflowState) => WorkflowState, signal?: AbortSignal): Promise<void>;
+  /**
+   * Reads the change with `key` under the lock, and saves the state `decide` returns, if any, before the lock is
+   * released, so nothing is written between the read and the save (FR-GUI-038).
+   */
+  update<T>(
+    key: string,
+    decide: (state: WorkflowState | undefined) => { readonly save?: WorkflowState; readonly value: T },
+  ): Promise<T>;
 }
 
 /**
  * One writer at a time. A save merges in the sessions on disk, and `updateOpen` reads the state inside the
  * lock, so no session is lost; other fields are written as the caller read them.
  */
-async function withLock(folder: string, signal: AbortSignal, run: () => Promise<void>): Promise<void> {
+async function withLock<T>(folder: string, signal: AbortSignal, run: () => Promise<T>): Promise<T> {
   // The state and preview logs stay on this machine, so they're never listed or committed as changes.
   await ensureIgnoredFolder(folder);
   const lock = await takeLock(path.join(folder, STATE_LOCK_FILE), {}, { signal, staleAfterMs: STATE_LOCK_STALE_MS });
   try {
-    await run();
+    return await run();
   } finally {
     // A failed release mustn't hide the save's own error; a lock left behind is replaced later.
     await lock.release().catch(() => undefined);
@@ -135,6 +143,18 @@ export function openWorkflowStore(target: string): WorkflowStore {
       await withLock(folder, signal, async () => {
         const open = (await list()).find(isOpenChange);
         if (open !== undefined) await writeState(path.join(folder, `${open.key}${STATE_EXTENSION}`), change(open));
+      });
+    },
+    update: async (key, decide) => {
+      // A project with no workflow folder has no change to update, and gets no new files.
+      if (!existsSync(folder)) return decide(undefined).value;
+      return withLock(folder, AbortSignal.timeout(LOCK_WAIT_MS), async () => {
+        // Looked up among the saved states, so the key is never used to build a path.
+        const current = (await list()).find((state) => state.key === key);
+        const decision = decide(current);
+        if (current !== undefined && decision.save !== undefined)
+          await writeState(path.join(folder, `${current.key}${STATE_EXTENSION}`), decision.save);
+        return decision.value;
       });
     },
   };

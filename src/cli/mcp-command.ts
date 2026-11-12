@@ -19,6 +19,7 @@ import { UsageError } from "../core/errors.js";
 import { renderOverview } from "../core/tasks.js";
 import {
   answerPending,
+  isStillWaiting,
   APPROVERS,
   hookInputSchema,
   isNotesAnswer,
@@ -160,7 +161,7 @@ export async function runApproveCommand(given: string | undefined, context: Comm
   const notes = isNotesAnswer(answer) ? (await askText("Notes for the agent")).trim() : "";
   // The server may have saved this change while the user was choosing, so the answer goes on its latest state.
   const latest = (await store.list()).find((item) => item.key === state.key);
-  if (latest?.pending?.question !== pending.question || latest.pending.answer !== null)
+  if (latest === undefined || !isStillWaiting(latest, pending.question))
     throw new UsageError("That question changed while you were answering. Run cclinic approve again.");
   const outcome = answerPending(latest, answer, notes === "" ? null : notes, new Date().toISOString());
   if ("refusal" in outcome) throw new UsageError(outcome.refusal);

@@ -175,6 +175,7 @@ export async function runGuiCommand(
       jobs,
       readAsset: createAssetReader(),
       canvas: canvasPorts(target, context.environment, dependencies.every ?? every),
+      answers: { update: (key, decide) => openWorkflowStore(target).update(key, decide), now: () => new Date() },
     });
     const server = await startGuiServer({
       host: GUI_HOST,
