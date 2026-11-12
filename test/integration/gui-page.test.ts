@@ -3063,7 +3063,10 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
     mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
     const { page } = await open({ root, waitFor: "#next-step:not([hidden])" });
     expect(await banner(page).textContent()).toContain("There's no roadmap yet.");
-    expect(await banner(page).locator("code").textContent()).toBe("cclinic plan");
+    // D5: the banner's action is the GUI's own Plan, for a new roadmap.
+    await banner(page).locator("button", { hasText: "Plan a roadmap" }).click();
+    expect(await page.locator("#plan-target").textContent()).toBe("A new roadmap.");
+    await page.locator("#plan-dialog [data-plan-close]").click();
     expect(await page.locator("#canvas-empty").isVisible()).toBe(true);
     expect(await page.locator("#canvas-empty").textContent()).toContain("There are no roadmaps or tasks yet.");
   });
@@ -3079,7 +3082,7 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
     ]);
   });
 
-  it("TC-GUI-074: the banner suggests generating first, then running a roadmap with open tasks, and copies the command", async () => {
+  it("TC-GUI-074: the banner suggests generating first, then running a roadmap with open tasks with Run with AI", async () => {
     const root = project();
     const { page } = await open({ root, isSetUp: false, waitFor: "#view-setup:not([hidden])" });
     // FR-GUI-014: not set up, the GUI opens on Setup; the canvas's banner leads back to it.
@@ -3090,22 +3093,9 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
     await page.reload();
     await page.locator('[data-key="task-1"]').waitFor();
     expect(await banner(page).textContent()).toContain('Roadmap "Payments" has open tasks and no run.');
-    expect(await banner(page).locator("code").textContent()).toBe("cclinic auto --roadmap 1 --max-budget-usd AMOUNT");
-    await page.evaluate(() => {
-      (window as unknown as { copied: string[] }).copied = [];
-      Object.defineProperty(navigator, "clipboard", {
-        value: {
-          writeText: (text: string) => (
-            (window as unknown as { copied: string[] }).copied.push(text),
-            Promise.resolve()
-          ),
-        },
-      });
-    });
-    await banner(page).locator("button", { hasText: "Copy" }).click();
-    expect(await page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual([
-      "cclinic auto --roadmap 1 --max-budget-usd AMOUNT",
-    ]);
+    // D4: the banner's action is the GUI's own Run with AI, with that roadmap chosen.
+    await banner(page).locator("button", { hasText: "Run with AI" }).click();
+    expect(await page.locator("#auto-roadmap").textContent()).toBe("Roadmap #1: Payments");
   });
 });
 
@@ -3632,7 +3622,7 @@ describe("QA C2b run 1: sessions, search, keyboard, Needs you and the banner", (
     ];
     const seen = new Map<string, boolean>();
     let sawNeedsOpen = false;
-    let sawCopy = false;
+    let sawBanner = false;
     let sawSession = false;
     for (let step = 0; step < 60; step += 1) {
       const focus = await page.evaluate(() => {
@@ -3651,7 +3641,7 @@ describe("QA C2b run 1: sessions, search, keyboard, Needs you and the banner", (
       if (focus !== undefined) {
         if (focus.id !== "") seen.set(focus.id, focus.outlined);
         if (focus.inNeeds) sawNeedsOpen = focus.outlined;
-        if (focus.inBanner && focus.text === "Copy") sawCopy = focus.outlined;
+        if (focus.inBanner && focus.text === "Run with AI") sawBanner = focus.outlined;
         if (focus.session) sawSession = focus.outlined;
       }
       await page.keyboard.press("Tab");
@@ -3659,7 +3649,7 @@ describe("QA C2b run 1: sessions, search, keyboard, Needs you and the banner", (
     expect(Object.fromEntries(wanted.map((id) => [id, seen.get(id)]))).toEqual(
       Object.fromEntries(wanted.map((id) => [id, true])),
     );
-    expect({ sawNeedsOpen, sawCopy, sawSession }).toEqual({ sawNeedsOpen: true, sawCopy: true, sawSession: true });
+    expect({ sawNeedsOpen, sawBanner, sawSession }).toEqual({ sawNeedsOpen: true, sawBanner: true, sawSession: true });
   });
 
   it("TC-GUI-088: with reduced motion, the Needs you list, banner, filters and session nodes run no animation or transition", async () => {

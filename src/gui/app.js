@@ -2,8 +2,9 @@
 import { api, money, notify, remember, remembered, startClock } from "./api.js";
 import { addIcons } from "./icons.js";
 import { startAuto } from "./auto.js";
-import { setTitleBase, showAttention, startAttention } from "./attention.js";
-import { onCanvasChange, onDraw, onOpenTask, refresh, selectTask, showCanvas, startCanvas } from "./canvas.js";
+import { openPlan, startPlan } from "./plan.js";
+import { onOpenPlan, setTitleBase, showAttention, startAttention } from "./attention.js";
+import { onCanvasChange, onDraw, onOpenTask, onPlan, refresh, selectTask, showCanvas, startCanvas } from "./canvas.js";
 import { applyFilters, startFilters, updateFilterChoices } from "./filters.js";
 import { refreshJobs, show as showJob, startJobs } from "./jobs.js";
 import { refreshSetup, startSetup } from "./setup.js";
@@ -78,6 +79,9 @@ onCanvasChange((canvas, payload) => {
 });
 startPanel();
 startAuto();
+startPlan();
+onOpenPlan((target) => openPlan(target));
+onPlan((target) => void openPlan(target));
 startClock();
 startAddTask();
 startJobs();

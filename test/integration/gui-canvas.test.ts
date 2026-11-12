@@ -239,8 +239,11 @@ describe("canvas data", () => {
 
   it("TC-GUI-030: there's no route that creates a roadmap or milestone", async () => {
     const gui = await start(project());
-    for (const route of ["/api/roadmaps", "/api/roadmap", "/api/milestones", "/api/milestone", "/api/plan"])
+    for (const route of ["/api/roadmaps", "/api/roadmap", "/api/milestones", "/api/milestone"])
       expect((await sendTo(gui, "POST", route, { title: "x" })).status).toBe(404);
+    // Plan creates a roadmap only from a proposal the user approves, so a roadmap's fields start nothing.
+    expect((await sendTo(gui, "POST", "/api/plan", { title: "x" })).status).toBe(400);
+    expect(JSON.parse((await sendTo(gui, "GET", "/api/plan")).body)).toEqual({ plan: null });
     for (const command of ["roadmap-add", "milestone-add"])
       expect((await sendTo(gui, "POST", "/api/jobs", { command, title: "x" })).status).toBe(400);
   });

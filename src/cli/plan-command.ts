@@ -4,7 +4,12 @@ import { toJsonSchemaObject } from "../adapters/llm/retry.js";
 import { projectPaths } from "../adapters/storage/document-store.js";
 import { relativeDocsPath } from "../adapters/storage/skill-installer.js";
 import { openTaskStore } from "../adapters/storage/task-store.js";
-import { runPlanningSession, type PlanningOutcome, type ReviewChoice } from "../application/planning-session.js";
+import {
+  runPlanningSession,
+  type PlanningOutcome,
+  type PreparedSession,
+  type ReviewChoice,
+} from "../application/planning-session.js";
 import { AGENT_SKILLS } from "../core/agent-skills.js";
 import { AGENT_DENIED_TOOLS, READ_ONLY_TOOLS } from "../core/constants/agents.js";
 import { MS_PER_MINUTE } from "../core/constants/limits.js";
@@ -72,7 +77,12 @@ function readPlanningState(target: string): { overview: RoadmapOverview; tasks: 
 }
 
 /** Saves only after approval, in one transaction (FR-PLAN-013, FR-PLAN-020). */
-function save(target: string, planTarget: PlanTarget, outcome: PlanningOutcome, context: CommandContext): string {
+export function savePlanningOutcome(
+  target: string,
+  planTarget: PlanTarget,
+  outcome: PlanningOutcome,
+  context: CommandContext,
+): string {
   if (outcome.kind === "cancelled") return "Cancelled. Nothing was saved.";
   const store = openTaskStore(projectPaths(target, undefined).tool, "create");
   if (store === undefined) throw new UsageError("Couldn't open the task database.");
@@ -139,45 +149,77 @@ function pmCaller(settings: {
   };
 }
 
-export async function runPlanCommand(options: PlanOptions, context: CommandContext): Promise<void> {
-  const target = await projectFolder(options.dir);
-  const { out } = projectPaths(target, undefined);
+/** The checks `cclinic plan` makes before anything else: Claude Code and the documents (FR-PLAN-003). */
+export async function checkPlanning(target: string, context: CommandContext): Promise<void> {
   await requireClaudeCli("cclinic plan", context);
-  requireDocuments(out);
+  requireDocuments(projectPaths(target, undefined).out);
+}
+
+/**
+ * A planning session's input, its PM and its save, the same for `cclinic plan` and the GUI (FR-GUI-023), once the
+ * target, model and effort are chosen.
+ */
+export function preparePlanning(
+  settings: {
+    readonly target: string;
+    readonly planTarget: PlanTarget;
+    readonly model: ModelChoice;
+    readonly effort: Effort;
+    readonly maxBudgetUsd: number;
+    readonly timeoutMinutes: number;
+  },
+  context: CommandContext,
+): PreparedSession {
+  const { target, planTarget } = settings;
   const { overview, tasks } = readPlanningState(target);
-  if (!isInteractive()) {
-    throw new UsageError("cclinic plan asks you questions, so it needs an interactive terminal.");
+  const roadmapId = planTarget.kind === "new-roadmap" ? null : planTarget.roadmapId;
+  if (roadmapId !== null && !overview.roadmaps.some((roadmap) => roadmap.id === roadmapId)) {
+    throw new UsageError(`Roadmap ${roadmapId} doesn't exist. See your roadmaps with: cclinic tasks roadmaps`);
   }
-  const { model, effort } = await resolveModelAndEffort({ model: options.model, effort: options.effort }, context);
-  const planTarget = await chooseTarget(options, overview);
   const skill = (AGENT_SKILLS.find((item) => item.name === PM_SKILL)?.body ?? "").replaceAll(
     "{{DOCS}}",
-    relativeDocsPath(target, out),
+    relativeDocsPath(target, projectPaths(target, undefined).out),
   );
-  const roadmapId = planTarget.kind === "new-roadmap" ? null : planTarget.roadmapId;
   const milestones = overview.roadmaps.find((roadmap) => roadmap.id === roadmapId)?.milestones ?? [];
-  const outcome = await runPlanningSession(
-    {
+  return {
+    input: {
       target: planTarget,
       skill,
       overview,
       existingTasks: tasks,
       roadmapMilestoneIds: milestones.map((milestone) => milestone.id),
-      maxBudgetUsd: options.maxBudgetUsd,
+      maxBudgetUsd: settings.maxBudgetUsd,
     },
-    {
-      callPm: pmCaller({ target, planTarget, model, effort, timeoutMinutes: options.timeoutMinutes, context }),
-      answer: (question) => askText(question),
-      review: (text) => {
-        context.reporter.notice(`\n${text}\n`);
-        return chooseFrom<ReviewChoice>("What would you like to do?", [
-          { value: "approve", name: "approve: save it" },
-          { value: "refine", name: "refine: send the PM feedback" },
-          { value: "cancel", name: "cancel: save nothing" },
-        ]);
-      },
-      feedback: () => askText("Your feedback for the PM"),
-    },
+    callPm: pmCaller({ ...settings, context }),
+    save: (outcome) => savePlanningOutcome(target, planTarget, outcome, context),
+  };
+}
+
+export async function runPlanCommand(options: PlanOptions, context: CommandContext): Promise<void> {
+  const target = await projectFolder(options.dir);
+  await checkPlanning(target, context);
+  const { overview } = readPlanningState(target);
+  if (!isInteractive()) {
+    throw new UsageError("cclinic plan asks you questions, so it needs an interactive terminal.");
+  }
+  const { model, effort } = await resolveModelAndEffort({ model: options.model, effort: options.effort }, context);
+  const planTarget = await chooseTarget(options, overview);
+  const prepared = preparePlanning(
+    { target, planTarget, model, effort, maxBudgetUsd: options.maxBudgetUsd, timeoutMinutes: options.timeoutMinutes },
+    context,
   );
-  context.reporter.result(save(target, planTarget, outcome, context));
+  const outcome = await runPlanningSession(prepared.input, {
+    callPm: prepared.callPm,
+    answer: (question) => askText(question),
+    review: (text) => {
+      context.reporter.notice(`\n${text}\n`);
+      return chooseFrom<ReviewChoice>("What would you like to do?", [
+        { value: "approve", name: "approve: save it" },
+        { value: "refine", name: "refine: send the PM feedback" },
+        { value: "cancel", name: "cancel: save nothing" },
+      ]);
+    },
+    feedback: () => askText("Your feedback for the PM"),
+  });
+  context.reporter.result(prepared.save(outcome));
 }

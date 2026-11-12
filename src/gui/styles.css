@@ -2100,3 +2100,28 @@ mark {
   cursor: pointer;
   overflow-wrap: anywhere;
 }
+
+/* FR-GUI-023, FR-GUI-024: the Plan dialog, with the PM's question or proposal. */
+#plan-dialog {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.plan-question-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+
+.plan-question textarea,
+.plan-review textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.plan-proposal {
+  max-height: 50vh;
+}
+
+.plan-ended .error {
+  overflow-wrap: anywhere;
+}

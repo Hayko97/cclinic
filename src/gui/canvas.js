@@ -54,13 +54,18 @@ const state = {
   hasFitted: false,
 };
 
-const listeners = { open: () => undefined, change: () => undefined, drawn: () => undefined };
+const listeners = { open: () => undefined, change: () => undefined, drawn: () => undefined, plan: () => undefined };
 
 const area = () => document.getElementById("canvas-area");
 const board = () => document.getElementById("board");
 
 export function onOpenTask(listener) {
   listeners.open = listener;
+}
+
+/** FR-GUI-078: what Plan a task on a roadmap's frame opens. */
+export function onPlan(listener) {
+  listeners.plan = listener;
 }
 
 /** Called after each redraw, so filters and markers are applied to the new cards. */
@@ -261,6 +266,18 @@ function frameHeader(frame) {
     { className: "frame-actions" },
     // FR-GUI-078: a roadmap's run, and its panel.
     roadmap === undefined ? null : runButtons(roadmap),
+    roadmap === undefined
+      ? null
+      : element(
+          "button",
+          {
+            type: "button",
+            className: "small",
+            "data-action": "plan-task",
+            "aria-label": `Plan a task into ${roadmap.title}`,
+          },
+          "Plan a task",
+        ),
     roadmap === undefined
       ? null
       : element(
@@ -902,6 +919,10 @@ async function frameAction(button) {
     } catch (error) {
       notify(error.message, true);
     }
+    return;
+  }
+  if (action === "plan-task") {
+    listeners.plan({ kind: "task", roadmapId: frame.roadmap.id });
     return;
   }
   if (action === "open-roadmap") {

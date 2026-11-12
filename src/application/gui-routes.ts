@@ -5,6 +5,9 @@ import {
   checkAccess,
   jobRequestSchema,
   matchRoute,
+  planAnswerSchema,
+  planRequestSchema,
+  planReviewSchema,
   SECURITY_HEADERS,
   tokenCookie,
   type GuiRequest,
@@ -22,12 +25,13 @@ import {
 } from "./gui-canvas.js";
 import { ENVIRONMENT_CONSENT_MESSAGE } from "../core/environment.js";
 import { mcpInfo, type McpFile } from "../core/gui-setup.js";
-import { AUTO_LIMITS } from "../core/constants/agents.js";
+import { AUTO_LIMITS, PLAN_LIMITS } from "../core/constants/agents.js";
 import { LIMITS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ENVIRONMENT_MAX_BUDGET_USD } from "../core/constants/environment.js";
 import type { RunFiles } from "../core/automation.js";
 import { answerChange, type AnswerPorts } from "./gui-answers.js";
+import type { Planner } from "./gui-planning.js";
 import type { Jobs } from "./gui-jobs.js";
 import { askAuto } from "./gui-auto.js";
 import { askGenerate } from "./gui-setup.js";
@@ -50,6 +54,8 @@ export interface GuiPorts {
   readonly canvas: CanvasPorts;
   /** FR-GUI-038: the changes' saved states, to answer a waiting question. */
   readonly answers: AnswerPorts;
+  /** FR-GUI-023: the one planning session with the PM. */
+  readonly planner: Planner;
   /** FR-GUI-032: a run's report and logs, or undefined when there's no such run. */
   readonly readRunFiles: (runId: string) => Promise<RunFiles | undefined>;
 }
@@ -85,6 +91,25 @@ async function file(
 }
 
 const NOT_FOUND = { error: "Not found." };
+
+/** The first issue's own message, such as a value the CLI would refuse, in its words (FR-GUI-015). */
+function firstMessage(issues: readonly { readonly message: string }[]): string {
+  return issues[0]?.message ?? "That request isn't valid.";
+}
+
+/** Runs `answer`, replying with what the CLI or the session refused, in its words, as a conflict. */
+async function refusedAsConflict(
+  answer: () =>
+    { readonly status: number; readonly data: unknown } | Promise<{ readonly status: number; readonly data: unknown }>,
+): Promise<GuiResponse> {
+  try {
+    const { status, data } = await answer();
+    return json(status, data);
+  } catch (error) {
+    if (error instanceof UsageError) return json(HTTP_STATUS.conflict, { error: error.message });
+    throw error;
+  }
+}
 
 /**
  * FR-GUI-031: stops the auto run the GUI started, as Ctrl+C does. A run started elsewhere is left alone, and the
@@ -144,6 +169,8 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
             environmentBudgetUsd: ENVIRONMENT_MAX_BUDGET_USD,
             // FR-GUI-027: Run with AI's developers default.
             autoDevelopers: AUTO_LIMITS.developers.default,
+            // FR-GUI-023: Plan's budget default.
+            planBudgetUsd: PLAN_LIMITS.maxBudgetUsd,
             providers: PROVIDER_CHOICES,
           },
         });
@@ -254,6 +281,46 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
       }
       case "stop-run":
         return stopRun(ports);
+      case "plan":
+        return json(HTTP_STATUS.ok, { plan: ports.planner.current() });
+      case "plan-events":
+        return {
+          kind: "events",
+          headers: SECURITY_HEADERS,
+          open: (send) => {
+            send("plan", { plan: ports.planner.current() });
+            return ports.planner.subscribe((plan) => {
+              send("plan", { plan });
+            });
+          },
+        };
+      case "plan-start": {
+        // FR-GUI-023: a value `cclinic plan` would refuse is named in its own words.
+        const parsed = planRequestSchema.safeParse(await request.readBody());
+        if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
+        const plan = parsed.data;
+        return refusedAsConflict(async () => ({
+          status: HTTP_STATUS.created,
+          data: { plan: await ports.planner.start(plan) },
+        }));
+      }
+      case "plan-answer": {
+        const parsed = planAnswerSchema.safeParse(await request.readBody());
+        if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
+        const { text } = parsed.data;
+        return refusedAsConflict(() => ({ status: HTTP_STATUS.ok, data: { plan: ports.planner.answer(text) } }));
+      }
+      case "plan-review": {
+        const parsed = planReviewSchema.safeParse(await request.readBody());
+        if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
+        const { choice, feedback } = parsed.data;
+        return refusedAsConflict(() => ({
+          status: HTTP_STATUS.ok,
+          data: { plan: ports.planner.review(choice, feedback) },
+        }));
+      }
+      case "plan-cancel":
+        return refusedAsConflict(() => ({ status: HTTP_STATUS.ok, data: { plan: ports.planner.cancel() } }));
       case "cancel-job": {
         const outcome = ports.jobs.cancel(route.id);
         if (outcome === "unknown") return json(HTTP_STATUS.notFound, NOT_FOUND);

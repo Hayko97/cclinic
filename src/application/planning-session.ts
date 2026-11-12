@@ -39,6 +39,14 @@ export interface PlanningInput {
   readonly maxTurns?: number;
 }
 
+/** A session ready to run: its input, its PM and its save, the same for `cclinic plan` and the GUI (FR-GUI-023). */
+export interface PreparedSession {
+  readonly input: PlanningInput;
+  readonly callPm: PlanningPorts["callPm"];
+  /** Saves an approved plan, or nothing for a cancelled one, and says what happened. */
+  readonly save: (outcome: PlanningOutcome) => string;
+}
+
 export type PlanningOutcome =
   | { readonly kind: "roadmap"; readonly proposal: RoadmapProposal; readonly text: string; readonly costUsd: number }
   | { readonly kind: "task"; readonly proposal: TaskProposal; readonly text: string; readonly costUsd: number }

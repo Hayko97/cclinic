@@ -1,8 +1,13 @@
 // FR-GUI-052 and FR-GUI-053: what's waiting for the user, and the one step the canvas suggests next.
-import { element, notify } from "./api.js";
+import { element } from "./api.js";
+import { openAutoDialog } from "./auto.js";
 import { zoomToFrame } from "./canvas.js";
 
 const state = {
+  /** The last canvas and planning session, so either can redraw the Needs you list. */
+  canvas: undefined,
+  plan: null,
+  openPlan: () => undefined,
   titleBase: "cclinic",
   count: 0,
   open: () => undefined,
@@ -45,8 +50,21 @@ function closeList() {
   document.getElementById("needs-you").setAttribute("aria-expanded", "false");
 }
 
+/** FR-GUI-052: the PM's question or proposal, while it waits for the user. */
+function planItem(plan) {
+  if (plan === null || (plan.step !== "question" && plan.step !== "review")) return [];
+  return [
+    {
+      title: "The PM",
+      detail: plan.step === "question" ? plan.question : "A proposal is waiting for your review.",
+      target: { kind: "plan" },
+    },
+  ];
+}
+
 function drawNeeds(canvas) {
-  const items = itemsOf(canvas);
+  state.canvas = canvas;
+  const items = [...planItem(state.plan), ...itemsOf(canvas)];
   const text = JSON.stringify(items);
   if (text === state.items) return;
   state.items = text;
@@ -78,7 +96,8 @@ function drawNeeds(canvas) {
                   className: "small",
                   onClick: () => {
                     closeList();
-                    state.open(item.target);
+                    if (item.target.kind === "plan") void state.openPlan();
+                    else state.open(item.target);
                   },
                 },
                 "Open",
@@ -89,16 +108,7 @@ function drawNeeds(canvas) {
   );
 }
 
-async function copy(command) {
-  try {
-    await navigator.clipboard.writeText(command);
-    notify(`Copied: ${command}`);
-  } catch {
-    notify("The browser didn't allow copying. Select the command and copy it yourself.", true);
-  }
-}
-
-/** FR-GUI-053: the banner's words, and its one action. Until the GUI's own forms exist, the action is a command. */
+/** FR-GUI-053: the banner's words, and its one action. */
 function bannerOf(step, canvas) {
   const roadmap = step.roadmapId === undefined ? undefined : canvas.roadmaps.find((item) => item.id === step.roadmapId);
   if (step.kind === "generate")
@@ -107,11 +117,14 @@ function bannerOf(step, canvas) {
       button: { label: "Open Setup", run: () => state.showSetup() },
     };
   if (step.kind === "plan")
-    return { text: "There's no roadmap yet. Plan one with the PM agent:", command: "cclinic plan" };
-  if (step.kind === "run")
     return {
-      text: `Roadmap "${roadmap?.title ?? step.roadmapId}" has open tasks and no run. Run it with AI, with AMOUNT as your budget in US dollars:`,
-      command: `cclinic auto --roadmap ${step.roadmapId} --max-budget-usd AMOUNT`,
+      text: "There's no roadmap yet. Plan one with the PM agent.",
+      button: { label: "Plan a roadmap", run: () => void state.openPlan({ kind: "new-roadmap" }) },
+    };
+  if (step.kind === "run" && roadmap !== undefined)
+    return {
+      text: `Roadmap "${roadmap.title}" has open tasks and no run.`,
+      button: { label: "Run with AI", run: () => void openAutoDialog(roadmap) },
     };
   return {
     text: `An AI run (${step.runId}) is going on roadmap "${roadmap?.title ?? step.roadmapId}".`,
@@ -137,24 +150,21 @@ function drawBanner(step, canvas) {
     return;
   }
   const shown = bannerOf(step, canvas);
-  const action =
-    shown.command === undefined
-      ? [
-          element(
-            "button",
-            { type: "button", className: "small primary", onClick: shown.button.run },
-            shown.button.label,
-          ),
-        ]
-      : [
-          element("code", {}, shown.command),
-          element("button", { type: "button", className: "small", onClick: () => void copy(shown.command) }, "Copy"),
-        ];
   banner.replaceChildren(
     element("span", { className: "next-step-label" }, "Next step"),
     element("span", { className: "next-step-text" }, shown.text),
-    ...action,
+    element("button", { type: "button", className: "small primary", onClick: shown.button.run }, shown.button.label),
   );
+}
+
+/** Called with each planning session update (FR-GUI-052), and once with what opens the Plan dialog. */
+export function setPlan(plan) {
+  state.plan = plan;
+  if (state.canvas !== undefined) drawNeeds(state.canvas);
+}
+
+export function onOpenPlan(open) {
+  state.openPlan = open;
 }
 
 /** Called with each canvas: the Needs you count and list, the tab title, and the banner. */

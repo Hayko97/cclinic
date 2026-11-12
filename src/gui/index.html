@@ -38,6 +38,7 @@
             <button type="button" data-layout="canvas" aria-pressed="true">Canvas</button>
             <button type="button" data-layout="list" aria-pressed="false">List</button>
           </div>
+          <button id="plan-open" type="button">New roadmap</button>
           <button id="add-task-open" type="button" class="primary">Add task</button>
           <div id="canvas-tools" class="zoom" role="group" aria-label="Zoom">
             <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
@@ -87,7 +88,7 @@
             <div id="frames" class="frames"></div>
           </div>
           <p id="canvas-empty" class="canvas-empty muted" hidden>
-            There are no roadmaps or tasks yet. Add a task, or plan a roadmap with <code>cclinic plan</code>.
+            There are no roadmaps or tasks yet. Add a task, or plan a roadmap with the PM: New roadmap.
           </p>
         </div>
         <div id="list" class="list" hidden></div>
@@ -321,6 +322,38 @@
           <button id="auto-start" type="button" class="primary" hidden>Start the run</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="plan-dialog" aria-labelledby="plan-title">
+      <h2 id="plan-title">Plan with the PM</h2>
+      <p id="plan-target" class="muted"></p>
+      <form id="plan-form" novalidate>
+        <div>
+          <label id="plan-what"
+            >What to plan
+            <select name="what">
+              <option value="new-roadmap">A new roadmap</option>
+              <option value="task">One standalone task, in no roadmap</option>
+            </select></label
+          >
+          <label
+            >Model
+            <select name="model" data-models data-optional></select
+          ></label>
+          <label
+            >Reasoning
+            <select name="effort" data-efforts></select
+          ></label>
+          <label>Budget, US dollars <input name="maxBudgetUsd" inputmode="decimal" /></label>
+          <label>Time limit per PM turn, minutes <input name="timeoutMinutes" inputmode="numeric" /></label>
+        </div>
+        <div class="actions">
+          <button type="button" data-plan-close>Close</button>
+          <button id="plan-start" type="submit" class="primary">Start planning</button>
+        </div>
+      </form>
+      <div id="plan-session" hidden></div>
+      <p id="plan-error" class="error" role="alert"></p>
     </dialog>
 
     <dialog id="add-task" aria-labelledby="add-task-title">

@@ -1,5 +1,5 @@
 /** The GUI's real HTTP server, with its handler told it's on port 80 (spec: gui, FR-GUI-009). */
-import { EMPTY_CANVAS, NO_ANSWERS } from "../support/helpers.js";
+import { EMPTY_CANVAS, NO_ANSWERS, NO_PLANNER } from "../support/helpers.js";
 import { request as httpRequest } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { startGuiServer, type GuiServer } from "../../src/adapters/http/gui-server.js";
@@ -52,6 +52,7 @@ describe("GUI on port 80", () => {
       jobs,
       canvas: EMPTY_CANVAS,
       answers: NO_ANSWERS,
+      planner: NO_PLANNER,
       readRunFiles: () => Promise.resolve(undefined),
       readAsset: () => Promise.resolve("<html></html>"),
     });

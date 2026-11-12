@@ -19,9 +19,17 @@ import {
 } from "../adapters/transcripts/transcript-reader.js";
 import { problemOf, type CanvasPorts } from "../application/gui-canvas.js";
 import { createJobs, type JobProcess } from "../application/gui-jobs.js";
+import { createPlanner } from "../application/gui-planning.js";
+import type { PreparedSession } from "../application/planning-session.js";
 import { createGuiHandler } from "../application/gui-routes.js";
 import { GUI_DEFAULT_PORT, GUI_HOST, GUI_TOKEN_BYTES, GUI_TOKEN_QUERY } from "../core/constants/gui.js";
 import { UsageError } from "../core/errors.js";
+import type { PlanRequest } from "../core/gui.js";
+import type { PlanTarget } from "../core/planning.js";
+import { PLAN_LIMITS } from "../core/constants/agents.js";
+import { LIMITS } from "../core/constants/limits.js";
+import { resolveModelAndEffort } from "./generate-command.js";
+import { checkPlanning, preparePlanning } from "./plan-command.js";
 import type { CommandContext } from "./command-context.js";
 import { projectFolder, readOverview } from "./tasks-command.js";
 
@@ -128,6 +136,33 @@ function waitForStop(signal: AbortSignal): Promise<void> {
   });
 }
 
+/**
+ * FR-GUI-023: the same checks, options and defaults as `cclinic plan`, with the session's PM calls stopped by
+ * `signal` (a cancel) as well as by the GUI stopping.
+ */
+async function preparePlan(
+  target: string,
+  options: PlanRequest,
+  signal: AbortSignal,
+  context: CommandContext,
+): Promise<{ readonly target: PlanTarget } & PreparedSession> {
+  const session: CommandContext = { ...context, signal: AbortSignal.any([context.signal, signal]) };
+  await checkPlanning(target, session);
+  const { model, effort } = await resolveModelAndEffort({ model: options.model, effort: options.effort }, session);
+  const prepared = preparePlanning(
+    {
+      target,
+      planTarget: options.target,
+      model,
+      effort,
+      maxBudgetUsd: options.maxBudgetUsd ?? PLAN_LIMITS.maxBudgetUsd,
+      timeoutMinutes: options.timeoutMinutes ?? LIMITS.timeoutMinutes.default,
+    },
+    session,
+  );
+  return { target: options.target, ...prepared };
+}
+
 /** FR-GUI-001 to FR-GUI-007: serves the GUI on this machine until Ctrl+C or SIGTERM. */
 export async function runGuiCommand(
   given: string | undefined,
@@ -161,6 +196,7 @@ export async function runGuiCommand(
     // FR-GUI-003: a new token each time the GUI starts, never saved anywhere.
     const token = randomBytes(GUI_TOKEN_BYTES).toString("base64url");
     let port = 0;
+    const planner = createPlanner({ prepare: (request, signal) => preparePlan(target, request, signal, context) });
     const handle = createGuiHandler({
       get port() {
         return port;
@@ -177,6 +213,7 @@ export async function runGuiCommand(
       canvas: canvasPorts(target, context.environment, dependencies.every ?? every),
       answers: { update: (key, decide) => openWorkflowStore(target).update(key, decide), now: () => new Date() },
       readRunFiles: (runId) => readRunFiles(target, runId),
+      planner,
     });
     const server = await startGuiServer({
       host: GUI_HOST,
@@ -198,8 +235,9 @@ export async function runGuiCommand(
       }
       await waitForStop(context.signal);
     } finally {
-      // FR-GUI-005: the jobs are stopped first, so none is left running without the GUI.
-      await jobs.stopAll();
+      // FR-GUI-005: the jobs are stopped first, so none is left running without the GUI. A planning session
+      // still going saves nothing (FR-GUI-025).
+      await Promise.all([jobs.stopAll(), planner.stop()]);
       await server.close();
     }
   } finally {

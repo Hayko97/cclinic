@@ -1,6 +1,8 @@
 /** Shared test helpers: temp projects, sample documents and a fake LLM provider. */
 import type { CanvasPorts } from "../../src/application/gui-canvas.js";
 import type { AnswerPorts } from "../../src/application/gui-answers.js";
+import { createPlanner, type Planner } from "../../src/application/gui-planning.js";
+import { UsageError } from "../../src/core/errors.js";
 import {
   chmodSync,
   copyFileSync,
@@ -327,3 +329,8 @@ export const NO_ANSWERS: AnswerPorts = {
   update: (_key, decide) => Promise.resolve(decide(undefined).value),
   now: () => new Date(0),
 };
+
+/** A planner for GUI tests that don't plan: every start is refused. */
+export const NO_PLANNER: Planner = createPlanner({
+  prepare: () => Promise.reject(new UsageError("Planning isn't part of this test.")),
+});

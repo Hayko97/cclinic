@@ -38,6 +38,7 @@ export const GUI_ASSETS = {
     "setup.js",
     "follow.js",
     "auto.js",
+    "plan.js",
     "styles.css",
   ],
 } as const;

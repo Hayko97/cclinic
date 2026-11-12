@@ -144,7 +144,13 @@ export type Route =
   | { readonly name: "session-events"; readonly id: string }
   | { readonly name: "answer"; readonly key: string }
   | { readonly name: "run-files"; readonly id: string }
-  | { readonly name: "stop-run" };
+  | { readonly name: "stop-run" }
+  | { readonly name: "plan" }
+  | { readonly name: "plan-events" }
+  | { readonly name: "plan-start" }
+  | { readonly name: "plan-answer" }
+  | { readonly name: "plan-review" }
+  | { readonly name: "plan-cancel" };
 
 const ASSET_FILES: ReadonlySet<string> = new Set(GUI_ASSETS.files);
 const JOB_PATH = "/api/jobs/(job-[1-9][0-9]{0,5})";
@@ -180,6 +186,13 @@ const ROUTES: readonly {
   { method: "POST", pattern: new RegExp(`^${CHANGE_PATH}/answer$`), route: (key) => ({ name: "answer", key }) },
   // FR-GUI-032: a run's report and logs, by run ID only.
   { method: "GET", pattern: new RegExp(`^/api/runs/(${RUN_ID_SOURCE})$`), route: (id) => ({ name: "run-files", id }) },
+  // FR-GUI-023 to FR-GUI-026: the one planning session.
+  { method: "GET", pattern: /^\/api\/plan$/, route: () => ({ name: "plan" }) },
+  { method: "GET", pattern: /^\/api\/plan\/events$/, route: () => ({ name: "plan-events" }) },
+  { method: "POST", pattern: /^\/api\/plan$/, route: () => ({ name: "plan-start" }) },
+  { method: "POST", pattern: /^\/api\/plan\/answer$/, route: () => ({ name: "plan-answer" }) },
+  { method: "POST", pattern: /^\/api\/plan\/review$/, route: () => ({ name: "plan-review" }) },
+  { method: "POST", pattern: /^\/api\/plan\/cancel$/, route: () => ({ name: "plan-cancel" }) },
   // FR-GUI-031: stops the run the GUI started.
   { method: "POST", pattern: /^\/api\/run\/stop$/, route: () => ({ name: "stop-run" }) },
 ];
@@ -268,6 +281,36 @@ export const environmentOptionsSchema = z.strictObject({
   force: z.boolean().default(false),
   allowBroadTarget: z.boolean().default(false),
 });
+
+/** FR-GUI-023: what `cclinic plan` plans, and its options, checked with the CLI's own limits. */
+export const planRequestSchema = z.strictObject({
+  target: z.discriminatedUnion("kind", [
+    z.strictObject({ kind: z.literal("new-roadmap") }),
+    z.strictObject({ kind: z.literal("extend-roadmap"), roadmapId: idSchema }),
+    z.strictObject({ kind: z.literal("task"), roadmapId: idSchema.nullable() }),
+  ]),
+  model: modelValueSchema.optional(),
+  effort: effortValueSchema.optional(),
+  maxBudgetUsd: budgetSchema.optional(),
+  timeoutMinutes: limit("--timeout-minutes <n>", LIMITS.timeoutMinutes),
+});
+export type PlanRequest = z.output<typeof planRequestSchema>;
+
+/** FR-GUI-024: an answer to the PM's question. */
+export const planAnswerSchema = z.strictObject({
+  text: z.string().trim().min(1, "Type an answer for the PM.").max(TASK_LIMITS.text),
+});
+
+/** FR-GUI-024: the user's choice on a proposal; refine carries feedback for the PM. */
+export const planReviewSchema = z
+  .strictObject({
+    choice: z.enum(["approve", "refine", "cancel"]),
+    feedback: z.string().trim().max(TASK_LIMITS.text).default(""),
+  })
+  .refine((review) => review.choice !== "refine" || review.feedback !== "", {
+    message: "Type your feedback for the PM.",
+    path: ["feedback"],
+  });
 
 /** FR-GUI-027: `cclinic auto`'s options, checked with the CLI's own limits. */
 export const autoOptionsSchema = z.strictObject({

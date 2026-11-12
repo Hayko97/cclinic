@@ -25,6 +25,7 @@ import {
 } from "./canvas.js";
 import { runButtons } from "./auto.js";
 import { followView, viewTools } from "./follow.js";
+import { openPlan } from "./plan.js";
 
 const ENTRY_LABELS = { user: "User", assistant: "Assistant", "tool-call": "Tool call", "tool-result": "Tool result" };
 const ENTRY_FILTERS = {
@@ -794,7 +795,22 @@ function renderRoadmap(roadmap) {
       row("Status", roadmap.status),
       row("Done", `${roadmap.done} / ${roadmap.total} tasks`),
     ),
-    element("div", { className: "actions" }, runButtons(roadmap, "")),
+    element(
+      "div",
+      { className: "actions" },
+      runButtons(roadmap, ""),
+      // FR-GUI-023: plan more into this roadmap with the PM.
+      element(
+        "button",
+        { type: "button", onClick: () => void openPlan({ kind: "task", roadmapId: roadmap.id }) },
+        "Plan a task",
+      ),
+      element(
+        "button",
+        { type: "button", onClick: () => void openPlan({ kind: "extend-roadmap", roadmapId: roadmap.id }) },
+        "Extend with the PM",
+      ),
+    ),
     liveRun(roadmap),
     milestones(roadmap),
     pastRuns(roadmap),
