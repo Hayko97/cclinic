@@ -2,22 +2,27 @@
 import { InvalidArgumentError } from "commander";
 import { COMMANDS, MAX_TYPO_DISTANCE } from "../core/constants/terminal.js";
 import { UsageError } from "../core/errors.js";
-import { parseEffort, parseModel, validOptionsText, type Effort, type ModelChoice } from "../core/models.js";
+import { parseEffort, parseModel, type Effort, type ModelChoice } from "../core/models.js";
+import {
+  oneOfRule,
+  POSITIVE_NUMBER_RULE,
+  unknownEffortMessage,
+  unknownModelMessage,
+  wholeNumberRule,
+} from "../core/option-rules.js";
 
 export function integerInRange(minimum: number, maximum: number) {
   return (value: string): number => {
     const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
-      const range = maximum === Number.MAX_SAFE_INTEGER ? `${minimum} or more` : `${minimum} to ${maximum}`;
-      throw new InvalidArgumentError(`It must be a whole number from ${range}.`);
-    }
+    if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum)
+      throw new InvalidArgumentError(wholeNumberRule(minimum, maximum));
     return parsed;
   };
 }
 
 export function positiveNumber(value: string): number {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) throw new InvalidArgumentError("It must be a number above 0.");
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new InvalidArgumentError(POSITIVE_NUMBER_RULE);
   return parsed;
 }
 
@@ -30,7 +35,7 @@ export function positiveId(value: string): number {
 export function oneOf<T extends string>(allowed: readonly T[]) {
   return (value: string): T => {
     const match = allowed.find((item) => item === value);
-    if (match === undefined) throw new InvalidArgumentError(`It must be one of: ${allowed.join(", ")}.`);
+    if (match === undefined) throw new InvalidArgumentError(oneOfRule(allowed));
     return match;
   };
 }
@@ -41,16 +46,13 @@ export function collect(value: string, previous: readonly string[]): readonly st
 
 export function requireModel(value: string, source: string): ModelChoice {
   const model = parseModel(value);
-  if (model === undefined)
-    throw new UsageError(`"${value}" from ${source} isn't a known model.\n\n${validOptionsText()}`);
+  if (model === undefined) throw new UsageError(unknownModelMessage(value, source));
   return model;
 }
 
 export function requireEffort(value: string, source: string): Effort {
   const effort = parseEffort(value);
-  if (effort === undefined) {
-    throw new UsageError(`"${value}" from ${source} isn't a known reasoning level.\n\n${validOptionsText()}`);
-  }
+  if (effort === undefined) throw new UsageError(unknownEffortMessage(value, source));
   return effort;
 }
 

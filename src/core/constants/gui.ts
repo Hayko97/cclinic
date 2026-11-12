@@ -35,6 +35,7 @@ export const GUI_ASSETS = {
     "icons.js",
     "filters.js",
     "attention.js",
+    "setup.js",
     "styles.css",
   ],
 } as const;

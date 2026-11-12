@@ -20,12 +20,20 @@ import {
   tidyCanvasFrame,
   type CanvasPorts,
 } from "./gui-canvas.js";
+import { ENVIRONMENT_CONSENT_MESSAGE } from "../core/environment.js";
+import { mcpInfo, type McpFile } from "../core/gui-setup.js";
+import { LIMITS } from "../core/constants/limits.js";
+import { PROVIDER_CHOICES } from "../core/constants/llm.js";
+import { ENVIRONMENT_MAX_BUDGET_USD } from "../core/constants/environment.js";
 import type { Jobs } from "./gui-jobs.js";
+import { askGenerate } from "./gui-setup.js";
 
 export interface GuiProject {
   readonly name: string;
   readonly folder: string;
   readonly hasDocuments: () => boolean;
+  /** FR-GUI-018: the project's `.mcp.json`, if any. */
+  readonly readMcpConfig: () => Promise<McpFile>;
 }
 
 export interface GuiPorts {
@@ -98,14 +106,33 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
         });
       case "jobs":
         return json(HTTP_STATUS.ok, { jobs: ports.jobs.list() });
+      case "setup":
+        // FR-GUI-014, FR-GUI-017, FR-GUI-018: what Setup shows besides its jobs.
+        return json(HTTP_STATUS.ok, {
+          hasDocuments: ports.project.hasDocuments(),
+          environmentConsent: ENVIRONMENT_CONSENT_MESSAGE,
+          mcp: mcpInfo(await ports.project.readMcpConfig()),
+          // The CLI's own defaults and choices, so the page never keeps a copy that goes stale.
+          defaults: {
+            limits: Object.fromEntries(Object.entries(LIMITS).map(([name, limit]) => [name, limit.default])),
+            environmentBudgetUsd: ENVIRONMENT_MAX_BUDGET_USD,
+            providers: PROVIDER_CHOICES,
+          },
+        });
       case "start-job": {
         const parsed = jobRequestSchema.safeParse(await request.readBody());
-        if (!parsed.success)
+        if (!parsed.success) {
+          // FR-GUI-015: an option value the CLI would refuse is named in the CLI's own words.
+          const refused = parsed.error.issues.find((issue) => issue.code === "custom");
           return json(HTTP_STATUS.badRequest, {
-            error: "That isn't a command the GUI can run.",
+            error: refused?.message ?? "That isn't a command the GUI can run.",
             issues: parsed.error.issues,
           });
+        }
         try {
+          // FR-GUI-016: unanswered, generate gets the CLI's questions back, and no generate job starts.
+          if (parsed.data.command === "generate" && !parsed.data.confirmed)
+            return json(HTTP_STATUS.ok, await askGenerate(ports.jobs, parsed.data.options));
           return json(HTTP_STATUS.created, { job: ports.jobs.start(parsed.data) });
         } catch (error) {
           if (error instanceof UsageError) return json(HTTP_STATUS.conflict, { error: error.message });

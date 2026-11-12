@@ -8,6 +8,7 @@ import { openTaskStore } from "../../src/adapters/storage/task-store.js";
 import { openWorkflowStore } from "../../src/adapters/storage/workflow-store.js";
 import type { JobProcess } from "../../src/application/gui-jobs.js";
 import type { Layout } from "../../src/core/canvas.js";
+import { ENVIRONMENT_CONSENT_MESSAGE } from "../../src/core/environment.js";
 import { beginChange, linkSession, stateKey, withPending } from "../../src/core/workflow.js";
 import { makeTempFolder } from "../support/helpers.js";
 import { startTestGui, type TestGui } from "../support/gui.js";
@@ -142,9 +143,12 @@ async function open(
     every?: (ms: number, run: () => Promise<void>) => () => void;
     startJob?: (args: readonly string[]) => JobProcess;
     waitFor?: string;
+    isSetUp?: boolean;
   } = {},
 ): Promise<Opened> {
   const root = options.root ?? project();
+  // A set-up project opens on the canvas; one with no documents opens on Setup (FR-GUI-014).
+  if (options.isSetUp !== false) mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
   const home = options.home ?? makeTempFolder();
   if (options.withSessions === true) await withSessions(root, home);
   const jobs = fakeJobs();
@@ -424,7 +428,8 @@ describe("canvas page", () => {
     await vi.waitFor(() => {
       expect(Object.keys(savedLayout(root).cards)).toEqual(["task-5"]);
     });
-    expect(await page.locator('[data-key="task-4"]').evaluate((node) => node.style.top)).toBe("96px");
+    // The layout file is saved before the page draws the tidied frame, so the position is waited for.
+    await expect.poll(() => page.locator('[data-key="task-4"]').evaluate((node) => node.style.top)).toBe("96px");
   });
 });
 
@@ -2165,9 +2170,16 @@ async function openWatched(
     reducedMotion?: "reduce" | "no-preference";
     viewport?: { width: number; height: number };
   },
-  options: { root?: string; withSessions?: boolean; startJob?: (args: readonly string[]) => JobProcess } = {},
+  options: {
+    root?: string;
+    withSessions?: boolean;
+    startJob?: (args: readonly string[]) => JobProcess;
+    isSetUp?: boolean;
+  } = {},
 ) {
   const root = options.root ?? project();
+  // A set-up project opens on the canvas; one with no documents opens on Setup (FR-GUI-014).
+  if (options.isSetUp !== false) mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
   const home = makeTempFolder();
   if (options.withSessions === true) await withSessions(root, home);
   const jobs = fakeJobs();
@@ -2389,7 +2401,8 @@ describe("QA C2a run 4: the restyle", () => {
     const { page } = await openWatched({});
     await page.locator('[data-view="setup"]').click();
     await page.locator("#run-doctor").click();
-    const job = page.locator("#job-list button").first();
+    // Setup also lists the models as a job of its own, so the doctor's job is found by its command.
+    const job = page.locator("#job-list button", { hasText: "cclinic doctor" }).first();
     await expect.poll(() => job.textContent()).toMatch(/^cclinic doctor --json · /);
     const hasIcon = await job.evaluate(
       (node) =>
@@ -3055,10 +3068,24 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
     expect(await page.locator("#canvas-empty").textContent()).toContain("There are no roadmaps or tasks yet.");
   });
 
+  it("TC-GUI-020 (QA D1): the generate banner shows its text and the Open Setup button, and nothing else", async () => {
+    const { page } = await open({ root: project(), isSetUp: false, waitFor: "#view-setup:not([hidden])" });
+    await page.locator('[data-view="canvas"]').click();
+    await banner(page).locator("button", { hasText: "Open Setup" }).waitFor();
+    expect(await banner(page).evaluate((node) => [...node.childNodes].map((child) => child.textContent))).toEqual([
+      "Next step",
+      "This project has no spec-driven documents yet. Generating them is the first step.",
+      "Open Setup",
+    ]);
+  });
+
   it("TC-GUI-074: the banner suggests generating first, then running a roadmap with open tasks, and copies the command", async () => {
     const root = project();
-    const { page } = await open({ root });
-    expect(await banner(page).locator("code").textContent()).toBe("cclinic");
+    const { page } = await open({ root, isSetUp: false, waitFor: "#view-setup:not([hidden])" });
+    // FR-GUI-014: not set up, the GUI opens on Setup; the canvas's banner leads back to it.
+    await page.locator('[data-view="canvas"]').click();
+    await banner(page).locator("button", { hasText: "Open Setup" }).click();
+    expect(await page.locator("#view-setup").isVisible()).toBe(true);
     mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
     await page.reload();
     await page.locator('[data-key="task-1"]').waitFor();
@@ -3934,5 +3961,409 @@ describe("QA C2b run 2: more sessions than fit, and dimmed nodes", () => {
     });
     expect(await page.locator("#filter-spec").inputValue()).toBe("");
     expect(await page.locator("#frames .card.is-filtered").count()).toBe(0);
+  });
+});
+
+describe("Setup (FR-GUI-014 to FR-GUI-018)", () => {
+  const MODEL_LIST = {
+    current: { model: "sonnet", effort: "medium" },
+    models: [
+      { value: "sonnet", label: "Sonnet 5.5 (default)" },
+      { value: "opus", label: "Opus 5.5" },
+    ],
+    efforts: [
+      { value: "medium", label: "Medium (default)" },
+      { value: "high", label: "High" },
+    ],
+  };
+  const DRY_RUN = {
+    status: "dry-run",
+    provider: "anthropic-api",
+    model: "sonnet",
+    effort: "medium",
+    estimatedTokens: 1_500,
+    estimatedCostUsd: 0.03,
+    included: [{ path: "a.ts", kind: "code" }],
+    skipped: [],
+    git: { status: "no-repository", commitsUsed: 0 },
+  };
+
+  /** Jobs that answer like the CLI would: the dry run's summary, the model list, and success for the rest. */
+  function setupJobs() {
+    const started: string[][] = [];
+    const startJob = (args: readonly string[]): JobProcess => {
+      started.push([...args]);
+      const result = args.includes("--dry-run")
+        ? DRY_RUN
+        : args.includes("--list")
+          ? MODEL_LIST
+          : { status: "success" };
+      let print: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+      return {
+        onOutput: (listener) => {
+          print = listener;
+        },
+        onExit: (listener) => {
+          void Promise.resolve().then(() => {
+            print?.("stdout", `${JSON.stringify(result)}\n`);
+            listener(0);
+          });
+        },
+        signal: () => undefined,
+      };
+    };
+    return { started, startJob };
+  }
+
+  async function openSetup(isSetUp = false) {
+    const jobs = setupJobs();
+    const opened = await open({
+      isSetUp,
+      startJob: jobs.startJob,
+      waitFor: isSetUp ? '[data-key="task-1"]' : "#view-setup:not([hidden])",
+    });
+    if (isSetUp) await opened.page.locator('[data-view="setup"]').click();
+    // The model list arrives as its own job.
+    await expect.poll(() => opened.page.locator('#model-form select[name="model"] option').count()).toBeGreaterThan(0);
+    return { ...opened, jobs };
+  }
+
+  const ran = (jobs: { started: string[][] }) => jobs.started.filter((args) => !args.includes("--list"));
+
+  it("TC-GUI-020: a project that isn't set up opens on Setup, which says generating is the first step", async () => {
+    const { page } = await openSetup();
+    expect(await page.locator("#view-setup").isVisible()).toBe(true);
+    expect(await page.locator('[data-view="setup"]').getAttribute("aria-current")).toBe("true");
+    expect(await page.locator("#setup-status").textContent()).toBe(
+      "This project isn't set up yet. Generating its documents is the first step.",
+    );
+  });
+
+  it("TC-GUI-023, TC-GUI-117: Generate asks the CLI's questions first, then runs once with the answers", async () => {
+    const { page, jobs } = await openSetup();
+    await page.locator("#generate-start").click();
+    const dialog = page.locator("#generate-questions");
+    await dialog.waitFor();
+    expect(await dialog.locator("fieldset").evaluateAll((nodes) => nodes.map((node) => node.dataset.question))).toEqual(
+      ["cost", "git", "environment"],
+    );
+    expect(await dialog.locator('[data-question="cost"] legend').textContent()).toContain(
+      "about 1,500 input tokens, with Sonnet 5.5 at Medium reasoning. Estimated cost: $0.03.",
+    );
+    expect(ran(jobs)).toEqual([["--dry-run", "--json"]]);
+    await dialog.locator('input[name="git"][value="no-git"]').check();
+    await dialog.locator('input[name="environment"][value="no"]').check();
+    await page.locator("#generate-confirm").click();
+    await expect.poll(() => ran(jobs).length).toBe(2);
+    expect(ran(jobs)[1]).toEqual(["--json", "--yes", "--no-git", "--no-environment"]);
+    expect(await page.locator("#view-jobs").isVisible()).toBe(true);
+  });
+
+  it("TC-GUI-117: cancelling the questions, or answering Cancel to the cost, runs nothing", async () => {
+    const { page, jobs } = await openSetup();
+    await page.locator("#generate-start").click();
+    await page.locator("#generate-questions").waitFor();
+    await page.keyboard.press("Escape");
+    await expect.poll(() => page.locator("#notice").textContent()).toBe("Nothing was sent.");
+    await page.locator("#generate-start").click();
+    await page.locator("#generate-questions").waitFor();
+    await page.locator('#generate-questions input[name="cost"][value="cancel"]').check();
+    await page.locator("#generate-confirm").click();
+    await expect.poll(() => page.locator("#generate-questions").isVisible()).toBe(false);
+    expect(ran(jobs)).toEqual([
+      ["--dry-run", "--json"],
+      ["--dry-run", "--json"],
+    ]);
+  });
+
+  it("TC-GUI-022: a value the CLI would refuse is shown in its words, and nothing runs", async () => {
+    const { page, jobs } = await openSetup();
+    await page.locator("#generate-form details summary").click();
+    await page.locator('#generate-form input[name="maxFiles"]').fill("0");
+    await page.locator("#generate-start").click();
+    await expect
+      .poll(() => page.locator("#generate-error").textContent())
+      .toBe("option '--max-files <n>' argument '0' is invalid. It must be a whole number from 1 or more.");
+    expect(ran(jobs)).toEqual([]);
+  });
+
+  it("TC-GUI-021: the generate form offers every generate option", async () => {
+    const { page } = await openSetup();
+    const names = await page
+      .locator("#generate-form [name]")
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("name")));
+    expect([...names].sort()).toEqual(
+      [
+        "allowBroadTarget",
+        "concurrency",
+        "dryRun",
+        "effort",
+        "environment",
+        "exclude",
+        "force",
+        "include",
+        "maxBudgetUsd",
+        "maxFileSizeMib",
+        "maxFiles",
+        "maxInputTokens",
+        "maxRetries",
+        "model",
+        "noCache",
+        "noGit",
+        "noSkills",
+        "provider",
+        "timeoutMinutes",
+      ].sort(),
+    );
+  });
+
+  it("TC-GUI-118: the default model is chosen and saved, then reset", async () => {
+    const { page, jobs } = await openSetup();
+    expect(await page.locator("#model-current").textContent()).toBe(
+      "Now: Sonnet 5.5 (default) at Medium (default) reasoning.",
+    );
+    await page.locator('#model-form select[name="model"]').selectOption("opus");
+    await page.locator('#model-form select[name="effort"]').selectOption("high");
+    await page.locator("#model-save").click();
+    await expect.poll(() => page.locator("#notice").textContent()).toBe("Saved the default model.");
+    await page.locator("#model-reset").click();
+    await expect.poll(() => page.locator("#notice").textContent()).toBe("Reset to the built-in default.");
+    expect(ran(jobs)).toEqual([
+      ["model", "--model=opus", "--effort=high", "--json"],
+      ["model", "--reset", "--json"],
+    ]);
+  });
+
+  it("TC-GUI-025: skills, the environment and clean run with the CLI's options, after the CLI's confirmations", async () => {
+    const { page, jobs } = await openSetup(true);
+    await page.locator("#skills-force").check();
+    await page.locator("#skills-run").click();
+    await expect.poll(() => page.locator("#view-jobs").isVisible()).toBe(true);
+    await page.locator('[data-view="setup"]').click();
+    await page.locator('#environment-form input[name="maxBudgetUsd"]').fill("1.5");
+    await page.locator("#environment-run").click();
+    expect(await page.locator("#confirm-message").textContent()).toContain("Set up a local environment");
+    await page.locator('#confirm button[value="cancel"]').click();
+    await page.locator("#environment-run").click();
+    await page.locator("#confirm-ok").click();
+    await expect.poll(() => page.locator("#view-jobs").isVisible()).toBe(true);
+    await page.locator('[data-view="setup"]').click();
+    await page.locator("#clean-run").click();
+    await page.locator('#confirm button[value="cancel"]').click();
+    await page.locator("#clean-run").click();
+    await page.locator("#confirm-ok").click();
+    await expect.poll(() => page.locator("#notice").textContent()).toBe("Cleaned the cache and failed drafts.");
+    expect(ran(jobs)).toEqual([
+      ["skills", "--force", "--json"],
+      ["environment", "--yes", "--max-budget-usd=1.5", "--json"],
+      ["clean", "--yes"],
+    ]);
+  });
+
+  it("TC-GUI-026: Setup shows whether .mcp.json connects the coding agent, and the entry to add", async () => {
+    const { page, root } = await openSetup(true);
+    expect(await page.locator("#mcp-status").textContent()).toBe(
+      "Not installed. Add this entry to .mcp.json, or install the skills.",
+    );
+    const entry = (await page.locator("#mcp-entry").textContent()) ?? "";
+    expect(JSON.parse(entry)).toEqual({ mcpServers: { cclinic: { command: "npx", args: ["cclinic", "mcp"] } } });
+    writeFileSync(path.join(root, ".mcp.json"), entry);
+    await page.locator('[data-view="canvas"]').click();
+    await page.locator('[data-view="setup"]').click();
+    await expect
+      .poll(() => page.locator("#mcp-status").textContent())
+      .toBe("Installed: your coding agent can start cclinic mcp.");
+  });
+
+  it("TC-GUI-026: Setup says when .mcp.json can't be read, rather than that it's missing", async () => {
+    const root = project();
+    writeFileSync(path.join(root, ".mcp.json"), "{ not json");
+    const opened = await open({ root, waitFor: '[data-key="task-1"]' });
+    await opened.page.locator('[data-view="setup"]').click();
+    await expect
+      .poll(() => opened.page.locator("#mcp-status").textContent())
+      .toBe(".mcp.json can't be read, or isn't valid JSON, so cclinic can't tell whether it's connected.");
+    expect(await opened.page.locator("#mcp-status").getAttribute("class")).toBe("muted");
+  });
+
+  it("TC-GUI-015: Setup shows the last doctor result, check by check", async () => {
+    const { page } = await openSetup(true);
+    expect(await page.locator("#doctor-result").textContent()).toBe("Run doctor to check this project.");
+    await page.locator("#run-doctor").click();
+    await expect.poll(() => page.locator("#view-jobs").isVisible()).toBe(true);
+    await page.locator('[data-view="setup"]').click();
+    // The fake doctor printed no checks, which Setup says rather than showing nothing.
+    await expect.poll(() => page.locator("#doctor-result").textContent()).toContain("Doctor didn't finish");
+  });
+
+  it("TC-GUI-015: after two doctor runs, Setup shows the newer one", async () => {
+    let run = 0;
+    const startJob = (args: readonly string[]): JobProcess => {
+      const isDoctor = args[0] === "doctor";
+      if (isDoctor) run += 1;
+      const state = run === 1 ? "failed" : "passed";
+      const result = isDoctor
+        ? { ready: state === "passed", checks: [{ name: "Claude CLI", state, detail: `run ${run}` }] }
+        : args.includes("--list")
+          ? MODEL_LIST
+          : { status: "success" };
+      let print: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+      return {
+        onOutput: (listener) => {
+          print = listener;
+        },
+        onExit: (listener) => {
+          void Promise.resolve().then(() => {
+            print?.("stdout", `${JSON.stringify(result)}\n`);
+            listener(0);
+          });
+        },
+        signal: () => undefined,
+      };
+    };
+    const { page } = await open({ startJob });
+    for (let index = 0; index < 2; index += 1) {
+      await page.locator('[data-view="setup"]').click();
+      await page.locator("#run-doctor").click();
+      await expect.poll(() => page.locator("#view-jobs").isVisible()).toBe(true);
+    }
+    await page.locator('[data-view="setup"]').click();
+    await expect.poll(() => page.locator("#doctor-result").textContent()).toBe("Claude CLI Passed: run 2");
+  });
+
+  it("TC-GUI-022: a budget the CLI reads as a number, such as .5, is sent as one", async () => {
+    const { page, jobs } = await openSetup();
+    await page.locator('#generate-form input[name="maxBudgetUsd"]').fill(".5");
+    await page.locator("#generate-start").click();
+    await page.locator("#generate-questions").waitFor();
+    expect(ran(jobs)).toEqual([["--dry-run", "--json", "--max-budget-usd=0.5"]]);
+  });
+
+  it("TC-GUI-021: the form's placeholders and providers are the CLI's own defaults", async () => {
+    const { page } = await openSetup();
+    expect(await page.locator('#generate-form input[name="maxFiles"]').getAttribute("placeholder")).toBe("10000");
+    expect(await page.locator('#generate-form input[name="maxRetries"]').getAttribute("placeholder")).toBe("2");
+    expect(await page.locator('#environment-form input[name="maxBudgetUsd"]').getAttribute("placeholder")).toBe(
+      "Default: 2",
+    );
+    expect(
+      await page
+        .locator('#generate-form select[name="provider"] option')
+        .evaluateAll((nodes) => nodes.map((node) => (node as HTMLOptionElement).value)),
+    ).toEqual(["", "auto", "claude-cli", "anthropic-api"]);
+  });
+
+  it("FR-GUI-017: without the CLI's consent text, Set up environment can't be used and nothing runs", async () => {
+    const jobs = setupJobs();
+    const { gui } = await open({ startJob: jobs.startJob });
+    const page = await (await browser.newContext({ viewport: WIDE })).newPage();
+    // Setup's own data never arrives, so the consent text the terminal shows isn't known.
+    await page.route("**/api/setup", (route) => route.abort());
+    await page.goto(`http://127.0.0.1:${gui.port}/?token=${gui.token}`);
+    await page.locator('[data-key="task-1"]').waitFor();
+    await page.locator('[data-view="setup"]').click();
+    expect(await page.locator("#environment-run").isDisabled()).toBe(true);
+    expect(ran(jobs).filter((args) => args[0] === "environment")).toEqual([]);
+  });
+
+  it("FR-GUI-017 (QA D1 run 3): even if the button is enabled by hand, no consent text means an inline error, no dialog and no job", async () => {
+    const jobs = setupJobs();
+    const { gui } = await open({ startJob: jobs.startJob });
+    const page = await (await browser.newContext({ viewport: WIDE })).newPage();
+    await page.route("**/api/setup", (route) => route.abort());
+    await page.goto(`http://127.0.0.1:${gui.port}/?token=${gui.token}`);
+    await page.locator('[data-key="task-1"]').waitFor();
+    await page.locator('[data-view="setup"]').click();
+    await page.evaluate(() => document.querySelector("#environment-run")?.removeAttribute("disabled"));
+    await page.locator("#environment-run").click();
+    await expect.poll(() => page.locator("#environment-error").textContent()).not.toBe("");
+    expect(await page.locator("#confirm").isVisible()).toBe(false);
+    expect(ran(jobs).filter((args) => args[0] === "environment")).toEqual([]);
+  });
+
+  it("FR-GUI-017 (QA D1 run 3): once Setup loads after a failed load, the environment asks the CLI's exact consent and runs", async () => {
+    const jobs = setupJobs();
+    const { gui } = await open({ startJob: jobs.startJob });
+    const page = await (await browser.newContext({ viewport: WIDE })).newPage();
+    let failures = 1;
+    await page.route("**/api/setup", (route) => (failures-- > 0 ? route.abort() : route.continue()));
+    await page.goto(`http://127.0.0.1:${gui.port}/?token=${gui.token}`);
+    await page.locator('[data-key="task-1"]').waitFor();
+    await page.locator('[data-view="setup"]').click();
+    expect(await page.locator("#environment-run").isDisabled()).toBe(true);
+    await page.locator('[data-view="canvas"]').click();
+    await page.locator('[data-view="setup"]').click();
+    await expect.poll(() => page.locator("#environment-run").isEnabled()).toBe(true);
+    await page.locator("#environment-run").click();
+    expect(await page.locator("#confirm-message").textContent()).toBe(ENVIRONMENT_CONSENT_MESSAGE);
+    await page.locator("#confirm-ok").click();
+    await expect
+      .poll(() => ran(jobs).filter((args) => args[0] === "environment"))
+      .toEqual([["environment", "--yes", "--json"]]);
+  });
+
+  it("FR-GUI-064: closing generate's questions with Escape puts focus back on Generate", async () => {
+    const { page } = await openSetup();
+    await page.locator("#generate-start").focus();
+    await page.keyboard.press("Enter");
+    await page.locator("#generate-questions").waitFor();
+    await page.keyboard.press("Escape");
+    await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("generate-start");
+  });
+
+  it("TC-GUI-025: the environment card offers the CLI's model, reasoning, budget, --force and --allow-broad-target", async () => {
+    const { page, jobs } = await openSetup(true);
+    await page.locator('#environment-form select[name="model"]').selectOption("opus");
+    await page.locator('#environment-form select[name="effort"]').selectOption("high");
+    await page.locator("#environment-force").check();
+    await page.locator("#environment-broad").check();
+    await page.locator("#environment-run").click();
+    await page.locator("#confirm-ok").click();
+    await expect.poll(() => ran(jobs).length).toBe(1);
+    expect(ran(jobs)[0]).toEqual([
+      "environment",
+      "--yes",
+      "--model=opus",
+      "--effort=high",
+      "--force",
+      "--allow-broad-target",
+      "--json",
+    ]);
+  });
+
+  it("TC-GUI-116 (QA D1 run 2): at phone width every question, the --force warning too, wraps inside its box", async () => {
+    const jobs = setupJobs();
+    const { page } = await open({
+      startJob: jobs.startJob,
+      isSetUp: false,
+      waitFor: "#view-setup:not([hidden])",
+      viewport: { width: 375, height: 800 },
+    });
+    await expect.poll(() => page.locator('#model-form select[name="model"] option').count()).toBeGreaterThan(0);
+    await page.locator("#generate-form details summary").click();
+    await page.locator('#generate-form input[name="force"]').check();
+    await page.locator("#generate-start").click();
+    await page.locator('#generate-questions fieldset[data-question="force"]').waitFor();
+    const overflows = await page.locator("#generate-questions fieldset").evaluateAll((boxes) =>
+      boxes.flatMap((box) => {
+        const outer = box.getBoundingClientRect();
+        const legend = box.querySelector("legend")?.getBoundingClientRect();
+        return legend === undefined ||
+          (legend.left >= outer.left && legend.right <= outer.right && legend.top >= outer.top)
+          ? []
+          : [box.dataset.question];
+      }),
+    );
+    expect(overflows).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
+  it("FR-GUI-064 (QA D1 run 2): cancelling generate's questions with the Cancel button puts focus back on Generate", async () => {
+    const { page, jobs } = await openSetup();
+    await page.locator("#generate-start").click();
+    await page.locator("#generate-questions").waitFor();
+    await page.locator('#generate-questions button[value="cancel"]').click();
+    await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe("generate-start");
+    expect(ran(jobs)).toEqual([["--dry-run", "--json"]]);
   });
 });

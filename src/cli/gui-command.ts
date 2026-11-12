@@ -8,7 +8,7 @@ import { claudeConfigFolder } from "../adapters/llm/agent-process.js";
 import { createAssetReader, startGuiServer } from "../adapters/http/gui-server.js";
 import { startProcess } from "../adapters/process/job-process.js";
 import { projectPaths } from "../adapters/storage/document-store.js";
-import { acquireGuiLock, readLayout, saveLayout } from "../adapters/storage/gui-store.js";
+import { acquireGuiLock, readLayout, readMcpConfig, saveLayout } from "../adapters/storage/gui-store.js";
 import { createRunLister } from "../adapters/storage/run-store.js";
 import { openTaskStore } from "../adapters/storage/task-store.js";
 import { openWorkflowStore } from "../adapters/storage/workflow-store.js";
@@ -165,6 +165,7 @@ export async function runGuiCommand(
         name: path.basename(target),
         folder: target,
         hasDocuments: documentsCheck(target),
+        readMcpConfig: () => readMcpConfig(target),
       },
       jobs,
       readAsset: createAssetReader(),

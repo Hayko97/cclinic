@@ -43,7 +43,12 @@ describe("GUI on port 80", () => {
     const handle = createGuiHandler({
       port: 80,
       token: TOKEN,
-      project: { name: "p", folder: "/nowhere", hasDocuments: () => false },
+      project: {
+        name: "p",
+        folder: "/nowhere",
+        hasDocuments: () => false,
+        readMcpConfig: () => Promise.resolve({ kind: "missing" as const }),
+      },
       jobs,
       canvas: EMPTY_CANVAS,
       readAsset: () => Promise.resolve("<html></html>"),

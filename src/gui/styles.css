@@ -1695,3 +1695,129 @@ svg.icon {
   stroke-width: 1.25;
   stroke-dasharray: 2 3;
 }
+
+/* Setup (FR-GUI-014 to FR-GUI-018): a card for each step. */
+#setup-status.is-first-step {
+  padding: var(--space-m) var(--space-xl);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-3xl);
+  margin-top: var(--space-3xl);
+}
+
+.setup-card {
+  min-width: 0;
+  padding: var(--space-3xl) var(--space-4xl);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-1);
+  overflow-wrap: anywhere;
+}
+
+.setup-card h2 {
+  font-size: var(--text-l);
+}
+
+.setup-card > p {
+  margin: var(--space-xs) 0 var(--space-xl);
+}
+
+.setup-wide {
+  grid-column: 1 / -1;
+}
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xl);
+  margin-top: var(--space-xl);
+}
+
+.field-row label {
+  display: grid;
+  flex: 1 1 160px;
+  gap: var(--space-s);
+  min-width: 0;
+  font-size: var(--text-s);
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-m) var(--space-3xl);
+  margin-top: var(--space-xl);
+}
+
+.switches .switch {
+  white-space: normal;
+}
+
+details {
+  margin-top: var(--space-xl);
+}
+
+details > summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--accent-text);
+}
+
+.checks {
+  gap: var(--space-s);
+  margin-bottom: var(--space-m);
+}
+
+.check {
+  display: flex;
+  gap: var(--space-m);
+  align-items: baseline;
+  font-size: var(--text-m);
+}
+
+#mcp-status.ok {
+  color: var(--done);
+}
+
+/* FR-GUI-016: generate's questions. */
+.question {
+  margin: var(--space-xl) 0 0;
+  padding: var(--space-xl);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* A floated legend sits inside the box, so a long question wraps without crossing its border. */
+.question legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: var(--space-xs);
+  font-size: var(--text-m);
+}
+
+.question legend + * {
+  clear: both;
+}
+
+.question .switch {
+  margin-top: var(--space-m);
+  margin-right: var(--space-3xl);
+}
+
+/* On a phone, the top bar keeps the project, Needs you and the theme; the job count is on the Jobs screen. */
+@media (max-width: 560px) {
+  #job-count,
+  #budget {
+    display: none;
+  }
+}

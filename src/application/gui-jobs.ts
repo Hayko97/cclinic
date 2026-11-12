@@ -65,6 +65,8 @@ export interface Jobs {
   ): { readonly job: JobView; readonly stop: () => void } | undefined;
   /** FR-GUI-033: SIGINT, then SIGTERM if it's still running after the grace period. Sent once per job. */
   cancel(id: string): "cancelling" | "ended" | "unknown";
+  /** The job once it has ended, or undefined for a job the GUI doesn't have. */
+  whenEnded(id: string): Promise<JobView> | undefined;
   /** FR-GUI-005: cancels every running job, and resolves once all have ended. */
   stopAll(): Promise<void>;
 }
@@ -103,6 +105,9 @@ export function createJobs(ports: JobPorts): Jobs {
 
   return {
     start: (request) => {
+      // FR-GUI-016: generate starts only once the user has answered its questions.
+      if (request.command === "generate" && !request.confirmed)
+        throw new UsageError("Answer generate's questions before it starts.");
       const blocker = blockingJob(
         request.command,
         running().map((record) => record.summary),
@@ -167,6 +172,10 @@ export function createJobs(ports: JobPorts): Jobs {
       return record.summary;
     },
     list: () => [...records.values()].map((record) => record.summary),
+    whenEnded: (id) => {
+      const record = records.get(id);
+      return record === undefined ? undefined : record.ended.then(() => view(record));
+    },
     get: (id) => {
       const record = records.get(id);
       return record === undefined ? undefined : view(record);

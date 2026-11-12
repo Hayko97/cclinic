@@ -158,6 +158,32 @@ describe("GUI jobs", () => {
     await expect(jobs.stopAll()).resolves.toBeUndefined();
   });
 
+  it("TC-GUI-023 (QA D1 run 3): whenEnded resolves with the job once it has ended, and is undefined for an unknown job", async () => {
+    const child = fakeProcess();
+    const { jobs } = setup([child]);
+    const { id } = jobs.start({ command: "doctor" });
+    let settled = false;
+    const waiting = jobs.whenEnded(id)?.then((job) => {
+      settled = true;
+      return job;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    child.write("stdout", '{"ok":true}\n');
+    child.exit(0);
+    await expect(waiting).resolves.toMatchObject({ id, isRunning: false, exitCode: 0 });
+    expect(jobs.whenEnded("job-9")).toBeUndefined();
+  });
+
+  it("TC-GUI-016 (QA D1 run 3): generate that isn't confirmed is refused, and nothing starts", () => {
+    const { jobs, started } = setup([fakeProcess()]);
+    expect(() =>
+      jobs.start({ command: "generate", confirmed: false, options: { include: [], exclude: [] } as never }),
+    ).toThrow("Answer generate's questions before it starts.");
+    expect(started).toEqual([]);
+    expect(jobs.list()).toEqual([]);
+  });
+
   it("TC-GUI-009: stopping the GUI cancels every running job and waits for them to end", async () => {
     const first = fakeProcess();
     const second = fakeProcess();

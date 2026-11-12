@@ -16,6 +16,15 @@ import {
 } from "./constants/gui.js";
 import { LIMITS } from "./constants/limits.js";
 import { PROVIDER_CHOICES } from "./constants/llm.js";
+import { parseEffort, parseModel } from "./models.js";
+import {
+  invalidOptionMessage,
+  oneOfRule,
+  POSITIVE_NUMBER_RULE,
+  unknownEffortMessage,
+  unknownModelMessage,
+  wholeNumberRule,
+} from "./option-rules.js";
 import { EXIT_CODES } from "./errors.js";
 import { idSchema, specNameSchema, textSchema, titleSchema } from "./tasks.js";
 
@@ -120,6 +129,7 @@ export type Route =
   | { readonly name: "asset"; readonly file: string }
   | { readonly name: "project" }
   | { readonly name: "jobs" }
+  | { readonly name: "setup" }
   | { readonly name: "start-job" }
   | { readonly name: "job"; readonly id: string }
   | { readonly name: "job-events"; readonly id: string }
@@ -149,6 +159,7 @@ const ROUTES: readonly {
   },
   { method: "GET", pattern: /^\/api\/project$/, route: () => ({ name: "project" }) },
   { method: "GET", pattern: /^\/api\/jobs$/, route: () => ({ name: "jobs" }) },
+  { method: "GET", pattern: /^\/api\/setup$/, route: () => ({ name: "setup" }) },
   { method: "POST", pattern: /^\/api\/jobs$/, route: () => ({ name: "start-job" }) },
   { method: "GET", pattern: new RegExp(`^${JOB_PATH}$`), route: (id) => ({ name: "job", id }) },
   { method: "GET", pattern: new RegExp(`^${JOB_PATH}/events$`), route: (id) => ({ name: "job-events", id }) },
@@ -170,15 +181,39 @@ export function matchRoute(method: string, path: string): Route | undefined {
 }
 
 const patternSchema = z.string().min(1).max(GUI_MAX_PATTERN_LENGTH);
-const modelValueSchema = z.string().regex(/^[a-z0-9][a-z0-9.-]{0,63}$/);
-const limit = (bounds: { readonly minimum: number; readonly maximum: number }) =>
-  z.number().int().min(bounds.minimum).max(bounds.maximum).optional();
+
+/** FR-GUI-015: each value is refused as the CLI refuses it, in the CLI's own words. */
+const limit = (flag: string, bounds: { readonly minimum: number; readonly maximum: number }) =>
+  z
+    .unknown()
+    .refine((value) => Number.isInteger(value) && Number(value) >= bounds.minimum && Number(value) <= bounds.maximum, {
+      error: (issue) => invalidOptionMessage(flag, issue.input, wholeNumberRule(bounds.minimum, bounds.maximum)),
+    })
+    .transform(Number)
+    .optional();
+const budgetSchema = z
+  .unknown()
+  .refine((value) => typeof value === "number" && Number.isFinite(value) && value > 0, {
+    error: (issue) => invalidOptionMessage("--max-budget-usd <n>", issue.input, POSITIVE_NUMBER_RULE),
+  })
+  .transform(Number);
+const modelValueSchema = z.string().refine((value) => parseModel(value) !== undefined, {
+  error: (issue) => unknownModelMessage(String(issue.input), "--model"),
+});
+const effortValueSchema = z.string().refine((value) => parseEffort(value) !== undefined, {
+  error: (issue) => unknownEffortMessage(String(issue.input), "--effort"),
+});
 
 /** FR-GUI-015: generate's options, checked with the CLI's own limits. */
 export const generateOptionsSchema = z.strictObject({
-  provider: z.enum(PROVIDER_CHOICES).optional(),
+  provider: z
+    .string()
+    .refine((value) => PROVIDER_CHOICES.some((choice) => choice === value), {
+      error: (issue) => invalidOptionMessage("--provider <name>", issue.input, oneOfRule(PROVIDER_CHOICES)),
+    })
+    .optional(),
   model: modelValueSchema.optional(),
-  effort: modelValueSchema.optional(),
+  effort: effortValueSchema.optional(),
   include: z.array(patternSchema).max(GUI_MAX_PATTERNS).default([]),
   exclude: z.array(patternSchema).max(GUI_MAX_PATTERNS).default([]),
   dryRun: z.boolean().default(false),
@@ -189,14 +224,33 @@ export const generateOptionsSchema = z.strictObject({
   allowBroadTarget: z.boolean().default(false),
   /** True sets up the environment, false never offers it. */
   environment: z.boolean().optional(),
-  maxFiles: limit(LIMITS.maxFiles),
-  maxInputTokens: limit(LIMITS.maxInputTokens),
-  maxFileSizeMib: limit(LIMITS.maxFileSizeMib),
-  maxBudgetUsd: z.number().positive().optional(),
-  concurrency: limit(LIMITS.concurrency),
-  timeoutMinutes: limit(LIMITS.timeoutMinutes),
-  maxRetries: limit(LIMITS.maxRetries),
+  maxFiles: limit("--max-files <n>", LIMITS.maxFiles),
+  maxInputTokens: limit("--max-input-tokens <n>", LIMITS.maxInputTokens),
+  maxFileSizeMib: limit("--max-file-size-mib <n>", LIMITS.maxFileSizeMib),
+  maxBudgetUsd: budgetSchema.optional(),
+  concurrency: limit("--concurrency <n>", LIMITS.concurrency),
+  timeoutMinutes: limit("--timeout-minutes <n>", LIMITS.timeoutMinutes),
+  maxRetries: limit("--max-retries <n>", LIMITS.maxRetries),
 });
+
+/** FR-GUI-017: `cclinic environment`'s options. */
+export const environmentOptionsSchema = z.strictObject({
+  model: modelValueSchema.optional(),
+  effort: effortValueSchema.optional(),
+  maxBudgetUsd: budgetSchema.optional(),
+  force: z.boolean().default(false),
+  allowBroadTarget: z.boolean().default(false),
+});
+
+function environmentArgs(options: z.output<typeof environmentOptionsSchema>): string[] {
+  return [
+    ...(options.model === undefined ? [] : [`--model=${options.model}`]),
+    ...(options.effort === undefined ? [] : [`--effort=${options.effort}`]),
+    ...(options.maxBudgetUsd === undefined ? [] : [`--max-budget-usd=${options.maxBudgetUsd}`]),
+    ...(options.force ? ["--force"] : []),
+    ...(options.allowBroadTarget ? ["--allow-broad-target"] : []),
+  ];
+}
 
 /** The commands the GUI can run. Text from the browser is only ever an option's value (FR-GUI-013). */
 export const jobRequestSchema = z.discriminatedUnion("command", [
@@ -205,8 +259,18 @@ export const jobRequestSchema = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("clean") }),
   z.strictObject({ command: z.literal("model-list") }),
   z.strictObject({ command: z.literal("model-reset") }),
-  // The user answered the CLI's confirmation in the GUI, so the run is started with --yes.
-  z.strictObject({ command: z.literal("generate"), confirmed: z.literal(true), options: generateOptionsSchema }),
+  // FR-MODEL-015: saved without the menus.
+  z.strictObject({ command: z.literal("model-set"), model: modelValueSchema, effort: effortValueSchema }),
+  // FR-GUI-017: the user agreed in the GUI's dialog, so it runs with --yes.
+  z.strictObject({ command: z.literal("environment"), confirmed: z.literal(true), options: environmentOptionsSchema }),
+  // FR-GUI-016: unconfirmed, the GUI answers with the CLI's questions; confirmed, it runs with --yes.
+  z.strictObject({
+    command: z.literal("generate"),
+    confirmed: z.boolean().default(false),
+    options: generateOptionsSchema,
+  }),
+  // The dry run whose summary the questions are asked from (FR-GUI-016).
+  z.strictObject({ command: z.literal("generate-preview"), options: generateOptionsSchema }),
   // FR-GUI-020: every `cclinic tasks` change. Creating a roadmap or milestone isn't one (FR-GUI-021).
   z.strictObject({
     command: z.literal("tasks-add"),
@@ -224,7 +288,7 @@ export const jobRequestSchema = z.discriminatedUnion("command", [
 export type JobRequest = z.output<typeof jobRequestSchema>;
 export type JobKind = JobRequest["command"];
 
-type GenerateOptions = z.output<typeof generateOptionsSchema>;
+export type GenerateOptions = z.output<typeof generateOptionsSchema>;
 
 function generateArgs(options: GenerateOptions): string[] {
   const valued: [string, string | number | undefined][] = [
@@ -273,8 +337,14 @@ export function jobArgs(request: JobRequest): string[] {
       return ["model", "--list", "--json"];
     case "model-reset":
       return ["model", "--reset", "--json"];
+    case "model-set":
+      return ["model", `--model=${request.model}`, `--effort=${request.effort}`, "--json"];
+    case "environment":
+      return ["environment", "--yes", ...environmentArgs(request.options), "--json"];
     case "generate":
       return ["--json", "--yes", ...generateArgs(request.options)];
+    case "generate-preview":
+      return ["--dry-run", "--json", ...generateArgs(request.options)];
     case "tasks-add":
       return [
         "tasks",
@@ -305,7 +375,7 @@ export function describeJob(args: readonly string[]): string {
 }
 
 /** FR-GUI-035: commands that change the same files, of which only one may run. Others, such as doctor, may run side by side. */
-const CONFLICTING: ReadonlySet<JobKind> = new Set<JobKind>(["generate", "clean", "skills"]);
+const CONFLICTING: ReadonlySet<JobKind> = new Set<JobKind>(["generate", "clean", "skills", "environment"]);
 
 /** The running job that stops this one from starting, if any (FR-GUI-035). */
 export function blockingJob<T extends { readonly kind: JobKind }>(kind: JobKind, running: readonly T[]): T | undefined {

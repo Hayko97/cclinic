@@ -39,3 +39,6 @@ Test cases for automation testers. Start each automated test's name with its `TC
 | TC-MODEL-022 | FR-MODEL-013 | integration | config.json containing invalid JSON | Run a dry run | A warning is shown, the run succeeds with sonnet/medium. |
 | TC-MODEL-023 | FR-MODEL-013 | integration | config.json {"model":"retired-model","effort":"high"} | Run a dry run | Warning about the model; model is sonnet; effort remains high. |
 | TC-MODEL-024 | FR-MODEL-014 | integration | Menu mocked to choose opus; effort option high | Run `cclinic <project> --model --effort high --dry-run` | The model menu opens even in dry-run, and the summary shows opus and high; nothing scanned for sending or written. |
+| TC-MODEL-025 | FR-MODEL-015 | integration | No TTY; no saved default | Run `cclinic model --model opus --effort high --json` | Exit 0; JSON gives model opus (claude-opus-5-5) and effort high; config.json holds them; no menu opened. |
+| TC-MODEL-026 | FR-MODEL-015 | integration | No TTY; config.json {"model":"opus","effort":"high"} | Run `cclinic model --effort low` | Exit 0; config.json holds model opus and effort low. |
+| TC-MODEL-027 | FR-MODEL-015 | integration | No TTY; config.json {"model":"opus","effort":"high"} | Run `cclinic model --model gpt --effort low` | Exit 2 with the valid options; config.json is unchanged. |

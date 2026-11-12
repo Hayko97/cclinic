@@ -223,6 +223,40 @@ describe("model selection", () => {
     expect(test.stdout()).toContain("removed");
   });
 
+  it("TC-MODEL-025: --model and --effort save the default without a menu or a terminal, and --json prints it", async () => {
+    process.stdin.isTTY = false;
+    const test = harness();
+    await runModelCommand({ model: "opus", effort: "high", json: true }, test.context);
+    expect(JSON.parse(test.stdout())).toMatchObject({
+      status: "saved",
+      model: "opus",
+      modelId: "claude-opus-5-5",
+      effort: "high",
+    });
+    expect(savedConfig(test)).toEqual({ model: "opus", effort: "high" });
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+
+  it("TC-MODEL-026: a reasoning level given alone keeps the saved model", async () => {
+    process.stdin.isTTY = false;
+    const test = harness();
+    await runModelCommand({ model: "opus", effort: "high" }, test.context);
+    await runModelCommand({ effort: "low" }, test.context);
+    expect(savedConfig(test)).toEqual({ model: "opus", effort: "low" });
+    expect(test.stdout()).toContain("Saved: Opus 5.5 at Low reasoning");
+  });
+
+  it("TC-MODEL-027: a wrong value is refused with the valid options, and nothing is saved", async () => {
+    process.stdin.isTTY = false;
+    const test = harness();
+    await runModelCommand({ model: "opus", effort: "high" }, test.context);
+    await expect(runModelCommand({ model: "gpt", effort: "low" }, test.context)).rejects.toThrow(
+      /"gpt" from --model isn't a known model[\s\S]*Reasoning levels/,
+    );
+    await expect(runModelCommand({ model: "haiku", effort: "huge" }, test.context)).rejects.toBeInstanceOf(UsageError);
+    expect(savedConfig(test)).toEqual({ model: "opus", effort: "high" });
+  });
+
   it("TC-MODEL-012: no terminal means no menu", async () => {
     process.stdin.isTTY = false;
     await expect(runModelCommand({}, harness().context)).rejects.toBeInstanceOf(UsageError);

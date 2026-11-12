@@ -7,6 +7,7 @@ const state = {
   count: 0,
   open: () => undefined,
   showCanvas: () => undefined,
+  showSetup: () => undefined,
   banner: "",
   items: "",
 };
@@ -101,7 +102,10 @@ async function copy(command) {
 function bannerOf(step, canvas) {
   const roadmap = step.roadmapId === undefined ? undefined : canvas.roadmaps.find((item) => item.id === step.roadmapId);
   if (step.kind === "generate")
-    return { text: "This project has no spec-driven documents yet. Generate them first:", command: "cclinic" };
+    return {
+      text: "This project has no spec-driven documents yet. Generating them is the first step.",
+      button: { label: "Open Setup", run: () => state.showSetup() },
+    };
   if (step.kind === "plan")
     return { text: "There's no roadmap yet. Plan one with the PM agent:", command: "cclinic plan" };
   if (step.kind === "run")
@@ -133,13 +137,23 @@ function drawBanner(step, canvas) {
     return;
   }
   const shown = bannerOf(step, canvas);
+  const action =
+    shown.command === undefined
+      ? [
+          element(
+            "button",
+            { type: "button", className: "small primary", onClick: shown.button.run },
+            shown.button.label,
+          ),
+        ]
+      : [
+          element("code", {}, shown.command),
+          element("button", { type: "button", className: "small", onClick: () => void copy(shown.command) }, "Copy"),
+        ];
   banner.replaceChildren(
     element("span", { className: "next-step-label" }, "Next step"),
     element("span", { className: "next-step-text" }, shown.text),
-    shown.command === undefined ? null : element("code", {}, shown.command),
-    shown.command === undefined
-      ? element("button", { type: "button", className: "small primary", onClick: shown.button.run }, shown.button.label)
-      : element("button", { type: "button", className: "small", onClick: () => void copy(shown.command) }, "Copy"),
+    ...action,
   );
 }
 
@@ -149,10 +163,14 @@ export function showAttention(canvas, step) {
   drawBanner(step ?? null, canvas);
 }
 
-/** `open` shows an item where it lives, the task or change panel; `showCanvas` switches to the Canvas layout. */
-export function startAttention(open, showCanvas) {
+/**
+ * `open` shows an item where it lives, the task or change panel; `showCanvas` switches to the Canvas layout, and
+ * `showSetup` to Setup.
+ */
+export function startAttention(open, showCanvas, showSetup) {
   state.open = open;
   state.showCanvas = showCanvas;
+  state.showSetup = showSetup;
   const button = document.getElementById("needs-you");
   const list = document.getElementById("needs-list");
   button.addEventListener("click", () => {

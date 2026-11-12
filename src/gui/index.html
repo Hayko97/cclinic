@@ -95,8 +95,161 @@
 
       <section id="view-setup" aria-labelledby="setup-title" hidden>
         <h1 id="setup-title">Setup</h1>
-        <p class="muted">Check that cclinic can run in this project.</p>
-        <button id="run-doctor" type="button" class="primary">Run doctor</button>
+        <p id="setup-status" class="muted">Check that cclinic can run in this project.</p>
+        <div class="setup-grid">
+          <article class="setup-card setup-wide" aria-labelledby="generate-title">
+            <h2 id="generate-title">Generate documents</h2>
+            <p class="muted">Analyse the project with Claude and write the specs and documents in .cclinic/sdd.</p>
+            <form id="generate-form" novalidate>
+              <div class="field-row">
+                <label
+                  >Model
+                  <select name="model" data-models></select
+                ></label>
+                <label
+                  >Reasoning
+                  <select name="effort" data-efforts></select
+                ></label>
+                <label
+                  >Budget, US dollars <input name="maxBudgetUsd" inputmode="decimal" placeholder="No limit"
+                /></label>
+              </div>
+              <details>
+                <summary>Advanced options</summary>
+                <div class="field-row">
+                  <label>
+                    Provider
+                    <select name="provider">
+                      <option value="">Default</option>
+                    </select>
+                  </label>
+                  <label>
+                    Local environment
+                    <select name="environment">
+                      <option value="">Ask me</option>
+                      <option value="yes">Set it up</option>
+                      <option value="no">Don't offer it</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label
+                    >Include, one pattern a line <textarea name="include" rows="2" placeholder="src/**"></textarea>
+                  </label>
+                  <label
+                    >Exclude, one pattern a line <textarea name="exclude" rows="2" placeholder="vendor/**"></textarea>
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label>Max files <input name="maxFiles" inputmode="numeric" /></label>
+                  <label>Max input tokens <input name="maxInputTokens" inputmode="numeric" /></label>
+                  <label>Max file size, MiB <input name="maxFileSizeMib" inputmode="numeric" /></label>
+                  <label>Concurrency <input name="concurrency" inputmode="numeric" /></label>
+                  <label>Timeout, minutes <input name="timeoutMinutes" inputmode="numeric" /></label>
+                  <label>Retries <input name="maxRetries" inputmode="numeric" /></label>
+                </div>
+                <div class="switches">
+                  <label class="switch"><input type="checkbox" name="dryRun" /> Dry run only (--dry-run)</label>
+                  <label class="switch"
+                    ><input type="checkbox" name="noSkills" /> Don't install skills (--no-skills)</label
+                  >
+                  <label class="switch"><input type="checkbox" name="noCache" /> Ignore the cache (--no-cache)</label>
+                  <label class="switch"><input type="checkbox" name="noGit" /> No Git (--no-git)</label>
+                  <label class="switch">
+                    <input type="checkbox" name="allowBroadTarget" /> Allow a home or root folder (--allow-broad-target)
+                  </label>
+                  <label class="switch">
+                    <input type="checkbox" name="force" /> Replace edited documents (--force)
+                  </label>
+                </div>
+              </details>
+              <p id="generate-error" class="error" role="alert"></p>
+              <div class="actions">
+                <button id="generate-start" type="submit" class="primary">Generate…</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="setup-card" aria-labelledby="check-title">
+            <h2 id="check-title">Check</h2>
+            <p class="muted">cclinic doctor checks Node.js, Claude, Git and the output folder, with no Claude usage.</p>
+            <ul id="doctor-result" class="plain checks"></ul>
+            <div class="actions">
+              <button id="run-doctor" type="button" class="primary">Run doctor</button>
+            </div>
+          </article>
+
+          <article class="setup-card" aria-labelledby="model-title">
+            <h2 id="model-title">Default model</h2>
+            <p id="model-current" class="muted">Used when a command doesn't choose one.</p>
+            <form id="model-form" class="field-row">
+              <label
+                >Model
+                <select name="model" data-models></select
+              ></label>
+              <label
+                >Reasoning
+                <select name="effort" data-efforts></select
+              ></label>
+            </form>
+            <div class="actions">
+              <button id="model-save" type="button" class="primary">Save as default</button>
+              <button id="model-reset" type="button">Reset to built-in</button>
+            </div>
+          </article>
+
+          <article class="setup-card" aria-labelledby="skills-title">
+            <h2 id="skills-title">Coding agent skills</h2>
+            <p class="muted">
+              Install the skills and AGENTS.md section your coding agent works from, with no Claude usage.
+            </p>
+            <label class="switch"
+              ><input id="skills-force" type="checkbox" /> Replace edited cclinic skills (--force)</label
+            >
+            <div class="actions"><button id="skills-run" type="button">Install skills</button></div>
+          </article>
+
+          <article class="setup-card" aria-labelledby="environment-title">
+            <h2 id="environment-title">Local environment</h2>
+            <p class="muted">Let Claude set up a way to preview each change, such as Docker Compose.</p>
+            <form id="environment-form" class="field-row" novalidate>
+              <label
+                >Model
+                <select name="model" data-models data-optional></select
+              ></label>
+              <label
+                >Reasoning
+                <select name="effort" data-efforts></select
+              ></label>
+              <label>Budget, US dollars <input name="maxBudgetUsd" inputmode="decimal" /></label>
+            </form>
+            <div class="switches">
+              <label class="switch"><input id="environment-force" type="checkbox" /> Set it up again (--force)</label>
+              <label class="switch">
+                <input id="environment-broad" type="checkbox" /> Allow a home or root folder (--allow-broad-target)
+              </label>
+            </div>
+            <p id="environment-error" class="error" role="alert"></p>
+            <div class="actions"><button id="environment-run" type="button" disabled>Set up environment…</button></div>
+          </article>
+
+          <article class="setup-card" aria-labelledby="mcp-title">
+            <h2 id="mcp-title">Connect your coding agent</h2>
+            <p class="muted">
+              Host agents such as Claude Code start <code>cclinic mcp</code> themselves from <code>.mcp.json</code>.
+              Installing the skills adds it.
+            </p>
+            <p id="mcp-status"></p>
+            <pre id="mcp-entry"></pre>
+            <div class="actions"><button id="mcp-copy" type="button">Copy entry</button></div>
+          </article>
+
+          <article class="setup-card" aria-labelledby="clean-title">
+            <h2 id="clean-title">Clean</h2>
+            <p class="muted">Delete the cache and failed drafts. Generated documents aren't touched.</p>
+            <div class="actions"><button id="clean-run" type="button" class="danger">Clean…</button></div>
+          </article>
+        </div>
       </section>
 
       <section id="view-jobs" aria-labelledby="jobs-title" hidden>
@@ -128,6 +281,17 @@
         <div class="actions">
           <button type="submit" value="cancel">Cancel</button>
           <button id="confirm-ok" type="submit" value="confirm" class="danger"></button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="generate-questions" aria-labelledby="generate-questions-title">
+      <form method="dialog">
+        <h2 id="generate-questions-title">Before generating</h2>
+        <div id="generate-question-list"></div>
+        <div class="actions">
+          <button type="submit" value="cancel">Cancel</button>
+          <button id="generate-confirm" type="submit" value="confirm" class="primary">Generate</button>
         </div>
       </form>
     </dialog>

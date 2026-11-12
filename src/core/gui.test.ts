@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { unknownModelMessage } from "./option-rules.js";
 import { GUI_CONTENT_SECURITY_POLICY, HTTP_STATUS } from "./constants/gui.js";
 import {
   appendOutput,
@@ -126,7 +127,29 @@ describe("jobs", () => {
     expect(parse({ maxFiles: 0 })).toBe(false);
     expect(parse({ provider: "other" })).toBe(false);
     expect(parse({ concurrency: 4, maxBudgetUsd: 2.5 })).toBe(true);
-    expect(jobRequestSchema.safeParse({ command: "generate", options: {} }).success).toBe(false);
+    // FR-GUI-016: unanswered, generate is a request for its questions, never a run.
+    expect(jobRequestSchema.parse({ command: "generate", options: {} })).toMatchObject({ confirmed: false });
+  });
+
+  it("TC-GUI-022: a refused value gets the CLI's own message", () => {
+    const message = (options: Record<string, unknown>) => {
+      const result = jobRequestSchema.safeParse({ command: "generate", confirmed: true, options });
+      return result.success ? undefined : result.error.issues[0]?.message;
+    };
+    expect(message({ maxFiles: 0 })).toBe(
+      "option '--max-files <n>' argument '0' is invalid. It must be a whole number from 1 or more.",
+    );
+    expect(message({ provider: "nope" })).toBe(
+      "option '--provider <name>' argument 'nope' is invalid. It must be one of: auto, claude-cli, anthropic-api.",
+    );
+    expect(message({ concurrency: 20 })).toBe(
+      "option '--concurrency <n>' argument '20' is invalid. It must be a whole number from 1 to 16.",
+    );
+    expect(message({ maxBudgetUsd: 0 })).toBe(
+      "option '--max-budget-usd <n>' argument '0' is invalid. It must be a number above 0.",
+    );
+    expect(message({ model: "gpt" })).toBe(unknownModelMessage("gpt", "--model"));
+    expect(message({ model: "gpt" })).toMatch(/^"gpt" from --model isn't a known model\.\n\nModels \(--model\):/);
   });
 
   it("TC-GUI-045: each command runs with --json where the CLI has it, and is shown as typed", () => {
@@ -135,6 +158,26 @@ describe("jobs", () => {
     expect(jobArgs({ command: "clean" })).toEqual(["clean", "--yes"]);
     expect(jobArgs({ command: "model-list" })).toEqual(["model", "--list", "--json"]);
     expect(jobArgs({ command: "model-reset" })).toEqual(["model", "--reset", "--json"]);
+    expect(jobArgs({ command: "model-set", model: "opus", effort: "high" })).toEqual([
+      "model",
+      "--model=opus",
+      "--effort=high",
+      "--json",
+    ]);
+    expect(
+      jobArgs(
+        jobRequestSchema.parse({
+          command: "environment",
+          confirmed: true,
+          options: { model: "haiku", maxBudgetUsd: 1 },
+        }),
+      ),
+    ).toEqual(["environment", "--yes", "--model=haiku", "--max-budget-usd=1", "--json"]);
+    expect(jobArgs(jobRequestSchema.parse({ command: "generate-preview", options: { noGit: true } }))).toEqual([
+      "--dry-run",
+      "--json",
+      "--no-git",
+    ]);
     expect(describeJob(["--include=a b", "doctor"])).toBe('cclinic "--include=a b" doctor');
     expect(exitMeaning(0)).toBe("Finished");
     expect(exitMeaning(130)).toBe("Stopped");

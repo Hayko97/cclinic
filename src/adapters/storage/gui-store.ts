@@ -5,6 +5,8 @@ import path from "node:path";
 import { layoutSchema, type Layout } from "../../core/canvas.js";
 import { GUI_FOLDER, GUI_HOST, GUI_LAYOUT_FILE, GUI_LOCK_FILE } from "../../core/constants/gui.js";
 import { LOCK_WAIT_MS } from "../../core/constants/limits.js";
+import { MCP_CONFIG_FILE } from "../../core/constants/workflow.js";
+import type { McpFile } from "../../core/gui-setup.js";
 import { UsageError } from "../../core/errors.js";
 import { ensureIgnoredFolder } from "./document-store.js";
 import { takeLock, type LockHolder } from "./file-lock.js";
@@ -65,5 +67,14 @@ export async function saveLayout(target: string, layout: Layout): Promise<void> 
     // Only the lock and the layout belong in the GUI's folder (FR-GUI-047).
     await rm(temporary, { force: true });
     throw error;
+  }
+}
+
+/** FR-GUI-018: the project's `.mcp.json`. One that can't be read is said so, rather than failing Setup. */
+export async function readMcpConfig(target: string): Promise<McpFile> {
+  try {
+    return { kind: "read", content: await readFile(path.join(target, MCP_CONFIG_FILE), "utf8") };
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT" ? { kind: "missing" } : { kind: "unreadable" };
   }
 }

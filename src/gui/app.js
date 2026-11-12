@@ -4,7 +4,8 @@ import { addIcons } from "./icons.js";
 import { setTitleBase, showAttention, startAttention } from "./attention.js";
 import { onCanvasChange, onDraw, onOpenTask, refresh, selectTask, showCanvas, startCanvas } from "./canvas.js";
 import { applyFilters, startFilters, updateFilterChoices } from "./filters.js";
-import { refreshJobs, startJobs } from "./jobs.js";
+import { refreshJobs, show as showJob, startJobs } from "./jobs.js";
+import { refreshSetup, startSetup } from "./setup.js";
 import { drawList } from "./list.js";
 import { openPanel, refreshPanel, startAddTask, startPanel } from "./panel.js";
 
@@ -18,6 +19,7 @@ function showView(name) {
   }
   if (name === "canvas") showCanvas();
   if (name === "jobs") refreshJobs().catch((error) => notify(error.message, true));
+  if (name === "setup") refreshSetup().catch((error) => notify(error.message, true));
 }
 
 /** FR-GUI-054: Canvas or List, remembered in the browser. */
@@ -89,7 +91,12 @@ startAttention(
     showView("canvas");
     showLayout("canvas");
   },
+  () => showView("setup"),
 );
+startSetup((id) => {
+  showView("jobs");
+  showJob(id);
+});
 // An unknown remembered layout falls back to the Canvas, as an unknown theme falls back to Auto.
 const LAYOUTS = ["canvas", "list"];
 showLayout(LAYOUTS.includes(remembered("layout", "canvas")) ? remembered("layout", "canvas") : "canvas");
@@ -99,6 +106,8 @@ try {
   document.getElementById("project-name").textContent = project.name;
   document.getElementById("project-folder").textContent = project.folder;
   setTitleBase(`cclinic · ${project.name}`);
+  // FR-GUI-014: a project that isn't set up opens on Setup, where generating is the first step.
+  if (!project.hasDocuments) showView("setup");
   await refresh();
   await refreshJobs();
 } catch (error) {

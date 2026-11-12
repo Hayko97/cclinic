@@ -21,7 +21,14 @@ import { runEnvironmentCommand, type EnvironmentCommandOptions } from "./environ
 import { runGenerate, type CommandContext, type GenerateOptions } from "./generate-command.js";
 import { commandHelp, GUIDE_TEXT, HELP_HOW_IT_WORKS } from "./guide.js";
 import { collect, integerInRange, oneOf, positiveId, positiveNumber } from "./options.js";
-import { runClean, runDoctor, runModelCommand, runSkillsCommand, type SkillsCommandOptions } from "./other-commands.js";
+import {
+  runClean,
+  runDoctor,
+  runModelCommand,
+  runSkillsCommand,
+  type ModelCommandOptions,
+  type SkillsCommandOptions,
+} from "./other-commands.js";
 import { createReporter, type ColorMode, type Reporter } from "./reporter.js";
 import { runAutoCommand, type AutoOptions } from "./auto-command.js";
 import { runPlanCommand, type PlanOptions } from "./plan-command.js";
@@ -160,9 +167,11 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .description("Choose, list or reset the default model and reasoning level")
     .option("--list", "print the options and the current choice")
     .option("--reset", "remove the saved default")
-    .option("--json", "with --list, print JSON")
-    .addHelpText("after", commandHelp("cclinic model", "cclinic model --list --json"))
-    .action(async (options: { list?: boolean; reset?: boolean; json?: boolean }) => {
+    .option("-m, --model <value>", "save this model as the default, without the menus")
+    .option("--effort <value>", "save this reasoning level as the default, without the menus")
+    .option("--json", "with --list or a value to save, print JSON")
+    .addHelpText("after", commandHelp("cclinic model", "cclinic model --model opus --effort high"))
+    .action(async (options: ModelCommandOptions) => {
       await runModelCommand(options, context);
     });
 

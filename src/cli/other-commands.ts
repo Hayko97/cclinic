@@ -12,6 +12,7 @@ import { GIT_INSTALL_LINK } from "../core/constants/git.js";
 import { EXIT_CODES, UsageError } from "../core/errors.js";
 import type { GitStatus } from "../core/git-history.js";
 import {
+  apiIdFor,
   DEFAULT_EFFORT,
   DEFAULT_MODEL,
   EFFORT_OPTIONS,
@@ -22,11 +23,15 @@ import {
 import { isClaudeVersionUntested, isSupportedNode, TESTED_CLAUDE_VERSION_TEXT } from "../core/node-version.js";
 import type { CommandContext } from "./generate-command.js";
 import { askToConfirm, chooseEffort, chooseModel, isInteractive, requireTerminal } from "./menus.js";
+import { requireEffort, requireModel } from "./options.js";
 
 export interface ModelCommandOptions {
   readonly list?: boolean;
   readonly reset?: boolean;
   readonly json?: boolean;
+  /** FR-MODEL-015: values to save without the menus. */
+  readonly model?: string;
+  readonly effort?: string;
 }
 
 export async function runModelCommand(options: ModelCommandOptions, context: CommandContext): Promise<void> {
@@ -60,6 +65,21 @@ export async function runModelCommand(options: ModelCommandOptions, context: Com
         "",
         "* is the current choice.",
       ].join("\n"),
+    );
+    return;
+  }
+
+  if (options.model !== undefined || options.effort !== undefined) {
+    // FR-MODEL-015: both are checked before anything is saved, so a wrong value changes nothing.
+    const toSave = {
+      model: options.model === undefined ? model : requireModel(options.model, "--model"),
+      effort: options.effort === undefined ? effort : requireEffort(options.effort, "--effort"),
+    };
+    await saveSettings(environment, toSave);
+    reporter.result(
+      options.json === true
+        ? JSON.stringify({ status: "saved", ...toSave, modelId: apiIdFor(toSave.model), file: configFile(environment) })
+        : `Saved: ${labelForModel(toSave.model)} at ${labelForEffort(toSave.effort)} reasoning (${configFile(environment)}).`,
     );
     return;
   }

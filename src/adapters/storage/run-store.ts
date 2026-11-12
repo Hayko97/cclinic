@@ -18,6 +18,7 @@ import { JSON_INDENT } from "../../core/constants/terminal.js";
 import { UsageError } from "../../core/errors.js";
 import { redact } from "../../core/redaction.js";
 import { readLiveHolder, takeLock, type LockHolder } from "./file-lock.js";
+import { listFolder } from "./folder-listing.js";
 
 export function autoFolder(target: string): string {
   return path.join(target, AUTO_FOLDER);
@@ -102,7 +103,10 @@ async function readRunSessions(
   runId: string,
 ): Promise<{ readonly sessions: AgentSession[]; readonly problems: string[] }> {
   const folder = path.join(runFolder(target, runId), RUN_SESSIONS_FOLDER);
-  const names = (await readdir(folder).catch(() => [])).filter((name) => name.endsWith(".json"));
+  // A sessions folder that can't be read is reported, not taken for a run with no sessions.
+  const listing = await listFolder(folder);
+  if (listing.kind === "unreadable") return { sessions: [], problems: [listing.problem] };
+  const names = listing.names.filter((name) => name.endsWith(".json"));
   const sessions: AgentSession[] = [];
   const problems: string[] = [];
   for (const name of names) {

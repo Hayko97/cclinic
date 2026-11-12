@@ -7,6 +7,7 @@ import { JSON_INDENT } from "../../core/constants/terminal.js";
 import { STATE_LOCK_FILE, STATE_LOCK_STALE_MS, WORKFLOW_FOLDER } from "../../core/constants/workflow.js";
 import { UsageError } from "../../core/errors.js";
 import { redact } from "../../core/redaction.js";
+import { listFolder } from "./folder-listing.js";
 import { isOpenChange, workflowStateSchema, type WorkflowState } from "../../core/workflow.js";
 import { ensureIgnoredFolder } from "./document-store.js";
 import { takeLock } from "./file-lock.js";
@@ -106,7 +107,10 @@ export function openWorkflowStore(target: string): WorkflowStore {
   return {
     list,
     listReadable: async () => {
-      const names = (await readdir(folder).catch(() => [])).filter((name) => name.endsWith(STATE_EXTENSION));
+      // A folder that can't be read is a problem to show, not an empty list (FR-GUI-014).
+      const listing = await listFolder(folder);
+      if (listing.kind === "unreadable") return { states: [], problems: [listing.problem] };
+      const names = listing.names.filter((name) => name.endsWith(STATE_EXTENSION));
       const results = await Promise.allSettled(names.map((name) => readState(path.join(folder, name))));
       return {
         states: results.flatMap((result) =>
