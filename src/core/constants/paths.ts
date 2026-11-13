@@ -31,6 +31,8 @@ export const SKILL_FOLDERS = [".agents/skills", ".claude/skills"] as const;
 export const USER_CONFIG_BASE_FOLDER = ".config";
 export const USER_CONFIG_FOLDER = "cclinic";
 export const USER_CONFIG_FILE = "config.json";
+/** FR-AUTO-041: the newest Claude plan limits, next to the saved model. */
+export const LIMITS_FILE = "limits.json";
 
 /** The generated project documents. */
 export const DOCUMENT_FILES = {

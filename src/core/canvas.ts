@@ -108,7 +108,6 @@ export interface TaskView {
   readonly step: string | null;
   /** FR-GUI-077: the sessions working on it now, and those that did before, newest first (FR-GUI-039). */
   readonly sessions: readonly SessionView[];
-  readonly costUsd: number;
   readonly needsYou: boolean;
   readonly change: ChangeView | null;
   /** FR-GUI-056: its workflow steps, from its run or its workflow state. */
@@ -124,14 +123,17 @@ export interface RoadmapView {
   readonly runId: string | null;
   readonly done: number;
   readonly total: number;
-  readonly spentUsd: number | null;
-  readonly budgetUsd: number | null;
   /** FR-GUI-056: when its live run started. */
   readonly runStartedAt: string | null;
   /** FR-GUI-029: its live run, as `run.json` has it now. */
   readonly run: LiveRunView | null;
   /** FR-GUI-032: its finished runs, newest first. */
   readonly pastRuns: readonly PastRunView[];
+  /**
+   * FR-GUI-084: the settings to continue with, when its newest run was stopped or reached a plan limit and it still
+   * has tasks to do; otherwise null.
+   */
+  readonly continueWith: ContinueSettings | null;
   readonly milestones: readonly {
     readonly id: number;
     readonly title: string;
@@ -140,11 +142,17 @@ export interface RoadmapView {
   }[];
 }
 
+/** FR-GUI-084: what a stopped run ran with; older runs saved only their developers. */
+export interface ContinueSettings {
+  readonly developers: number;
+  readonly model?: string;
+  readonly effort?: string;
+  readonly timeoutMinutes?: number;
+}
+
 export interface LiveRunView {
   readonly runId: string;
   readonly startedAt: string;
-  readonly spentUsd: number;
-  readonly budgetUsd: number;
   readonly developers: number;
   readonly runBranch: string;
   /** FR-GUI-031: the process to stop, for a run the GUI didn't start. */
@@ -155,7 +163,6 @@ export interface LiveRunView {
     readonly status: string;
     readonly branch: string | null;
     readonly rounds: RunState["tasks"][number]["rounds"];
-    readonly costUsd: number;
     readonly reason: string | null;
   }[];
 }
@@ -165,8 +172,22 @@ export interface PastRunView {
   readonly startedAt: string;
   readonly finishedAt: string | null;
   readonly outcome: string | null;
-  readonly spentUsd: number;
-  readonly budgetUsd: number;
+  /** FR-AUTO-025: when the plan limit that stopped it resets, if Claude Code said. */
+  readonly limitResetsAt: string | null;
+}
+
+/** Statuses of a run that a user may continue with a new run (FR-GUI-084). */
+const CONTINUABLE_OUTCOMES: ReadonlySet<string> = new Set(["interrupted", "limit-reached"]);
+
+function continueSettings(state: RunState): ContinueSettings {
+  // Read loosely, since runs saved before these fields existed have only their developers.
+  const saved = state as Partial<RunState> & Pick<RunState, "developers">;
+  return {
+    developers: saved.developers,
+    ...(typeof saved.model === "string" ? { model: saved.model } : {}),
+    ...(typeof saved.effort === "string" ? { effort: saved.effort } : {}),
+    ...(typeof saved.timeoutMinutes === "number" ? { timeoutMinutes: saved.timeoutMinutes } : {}),
+  };
 }
 
 function liveRunView(run: RunSource): LiveRunView {
@@ -174,8 +195,6 @@ function liveRunView(run: RunSource): LiveRunView {
   return {
     runId: state.runId,
     startedAt: state.startedAt,
-    spentUsd: state.spentUsd,
-    budgetUsd: state.budgetUsd,
     developers: state.developers,
     runBranch: state.runBranch,
     pid: run.pid,
@@ -185,7 +204,6 @@ function liveRunView(run: RunSource): LiveRunView {
       status: task.status,
       branch: task.branch,
       rounds: task.rounds,
-      costUsd: task.costUsd,
       reason: task.reason === null ? null : shown(task.reason),
     })),
   };
@@ -349,10 +367,6 @@ export function buildCanvas(sources: CanvasSources, now: Date): CanvasView {
     const isManual = change !== undefined && isOpenChange(change) && change.approverMode === "user";
     const own = sessions.filter((session) => session.taskId === task.id);
     const liveAgent = own.find((session) => session.source === "agent" && session.runId === liveRun?.state.runId);
-    const runCost = sources.runs.reduce(
-      (total, run) => total + (run.state.tasks.find((item) => item.taskId === task.id)?.costUsd ?? 0),
-      0,
-    );
     return {
       id: task.id,
       title: shown(task.title),
@@ -367,7 +381,6 @@ export function buildCanvas(sources: CanvasSources, now: Date): CanvasView {
       runId: isInRun ? liveRun.state.runId : null,
       step: isInRun ? (liveAgent?.step ?? null) : isManual ? change.step : null,
       sessions: own,
-      costUsd: runCost + (change?.costUsd ?? 0),
       needsYou: change?.pending !== null && change?.pending !== undefined && change.pending.answer === null,
       change: change === undefined ? null : changeView(change),
       steps: stepsOf(task.id, sources.runs, change),
@@ -377,6 +390,9 @@ export function buildCanvas(sources: CanvasSources, now: Date): CanvasView {
   const roadmaps = overview.roadmaps.map((roadmap): RoadmapView => {
     const isRunning = liveRun?.state.roadmapId === roadmap.id;
     const own = roadmap.milestones.flatMap((milestone) => milestone.tasks);
+    // Listed newest first already (FR-GUI-032).
+    const past = sources.runs.filter((run) => !run.isLive && run.state.roadmapId === roadmap.id);
+    const newest = sources.runs.find((run) => run.state.roadmapId === roadmap.id);
     return {
       id: roadmap.id,
       title: shown(roadmap.title),
@@ -386,21 +402,23 @@ export function buildCanvas(sources: CanvasSources, now: Date): CanvasView {
       runId: isRunning ? liveRun.state.runId : null,
       done: own.filter((task) => task.status === "done").length,
       total: own.length,
-      spentUsd: isRunning ? liveRun.state.spentUsd : null,
-      budgetUsd: isRunning ? liveRun.state.budgetUsd : null,
       runStartedAt: isRunning ? liveRun.state.startedAt : null,
       run: isRunning ? liveRunView(liveRun) : null,
-      // Listed newest first already (FR-GUI-032).
-      pastRuns: sources.runs
-        .filter((run) => !run.isLive && run.state.roadmapId === roadmap.id)
-        .map(({ state }) => ({
-          runId: state.runId,
-          startedAt: state.startedAt,
-          finishedAt: state.finishedAt,
-          outcome: state.outcome,
-          spentUsd: state.spentUsd,
-          budgetUsd: state.budgetUsd,
-        })),
+      pastRuns: past.map(({ state }) => ({
+        runId: state.runId,
+        startedAt: state.startedAt,
+        finishedAt: state.finishedAt,
+        outcome: state.outcome,
+        limitResetsAt: state.limitResetsAt ?? null,
+      })),
+      continueWith:
+        !isRunning &&
+        newest !== undefined &&
+        CONTINUABLE_OUTCOMES.has(newest.state.outcome ?? "") &&
+        // Tasks a new run takes; one in progress is left alone, as `cclinic auto` leaves it.
+        own.some((task) => task.status === "open" || task.status === "blocked")
+          ? continueSettings(newest.state)
+          : null,
       milestones: roadmap.milestones.map((milestone) => ({
         id: milestone.id,
         title: shown(milestone.title),

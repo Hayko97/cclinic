@@ -181,7 +181,6 @@ export async function openPlan(target) {
   try {
     const [{ defaults }] = await Promise.all([api("/api/setup"), ensureModels()]);
     const form = byId("plan-form");
-    form.elements.namedItem("maxBudgetUsd").placeholder = `Default: ${defaults.planBudgetUsd}`;
     form.elements.namedItem("timeoutMinutes").placeholder = `Default: ${defaults.limits.timeoutMinutes}`;
   } catch (error) {
     showError(error.message);
@@ -196,7 +195,6 @@ async function start() {
     target: state.target,
     model: chosen("model"),
     effort: chosen("effort"),
-    maxBudgetUsd: numberOrText(value("maxBudgetUsd")),
     timeoutMinutes: numberOrText(value("timeoutMinutes")),
   });
   if (started) {

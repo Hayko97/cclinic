@@ -8,7 +8,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { openTaskStore } from "../../src/adapters/storage/task-store.js";
 import type { PlanView } from "../../src/application/gui-planning.js";
 import { runPlanCommand } from "../../src/cli/plan-command.js";
-import { PLAN_LIMITS } from "../../src/core/constants/agents.js";
 import type { RoadmapProposal, TaskProposal } from "../../src/core/planning.js";
 import { agentHarness, makeTempFolder, writeProject, type FakeClaudeRule } from "../support/helpers.js";
 import { openStream, sendTo, startTestGui, type TestGui } from "../support/gui.js";
@@ -123,15 +122,13 @@ const isAlive = (pid: number) => {
 const pidsIn = (file: string) =>
   existsSync(file) ? readFileSync(file, "utf8").split("\n").filter(Boolean).map(Number) : [];
 
-const NEW_ROADMAP = { target: { kind: "new-roadmap" }, model: "sonnet", effort: "low", maxBudgetUsd: 1 };
+const NEW_ROADMAP = { target: { kind: "new-roadmap" }, model: "sonnet", effort: "low" };
 
 describe("QA D5: targets and the CLI's defaults", () => {
   it("FR-GUI-023: extending roadmap 1 saves its new milestone into roadmap 1, and nothing new is a roadmap", async () => {
     const root = project();
     const { gui } = await startGui(root, pmRules(proposing(extension)));
-    expect(
-      (await post(gui, "/api/plan", { target: { kind: "extend-roadmap", roadmapId: 1 }, maxBudgetUsd: 1 })).status,
-    ).toBe(201);
+    expect((await post(gui, "/api/plan", { target: { kind: "extend-roadmap", roadmapId: 1 } })).status).toBe(201);
     const review = await waitForStep(gui, "review");
     expect(review.target).toEqual({ kind: "extend-roadmap", roadmapId: 1 });
     expect(snapshot(root).tasks).toHaveLength(2);
@@ -167,15 +164,12 @@ describe("QA D5: targets and the CLI's defaults", () => {
     const cli = agentHarness({ rules: pmRules(asking("Who pays?")) });
     vi.mocked(input).mockRejectedValueOnce(new Error("stop here"));
     // Commander's defaults for `cclinic plan --task --roadmap 1`.
-    await runPlanCommand(
-      { dir: root, task: true, roadmap: 1, maxBudgetUsd: PLAN_LIMITS.maxBudgetUsd, timeoutMinutes: 30 },
-      cli.context,
-    ).catch(() => undefined);
+    await runPlanCommand({ dir: root, task: true, roadmap: 1, timeoutMinutes: 30 }, cli.context).catch(() => undefined);
     const withoutIds = (args: readonly string[]) =>
       args.map((arg) => arg.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "ID"));
     const guiArgs = withoutIds(harness.calls()[0]?.args ?? []);
     expect(guiArgs).toEqual(withoutIds(cli.calls()[0]?.args ?? []));
-    expect(guiArgs.join(" ")).toContain(`--max-budget-usd ${PLAN_LIMITS.maxBudgetUsd}`);
+    expect(guiArgs).not.toContain("--max-budget-usd");
     expect(harness.calls()[0]?.prompt).toBe(cli.calls()[0]?.prompt);
     expect(vi.mocked(select)).not.toHaveBeenCalled();
   }, 60_000);
@@ -258,7 +252,7 @@ describe("QA D5: refusals and out-of-turn requests", () => {
     const { gui, harness } = await startGui(root, pmRules(asking("Who pays?")));
     await post(gui, "/api/plan", NEW_ROADMAP);
     await waitForStep(gui, "question");
-    expect((await post(gui, "/api/plan", { target: { kind: "new-roadmap" }, maxBudgetUsd: 0 })).status).toBe(400);
+    expect((await post(gui, "/api/plan", { target: { kind: "new-roadmap" }, maxBudgetUsd: 1 })).status).toBe(400);
     const valid = await post(gui, "/api/plan", NEW_ROADMAP);
     expect(valid.status).toBe(409);
     expect(await planOf(gui)).toMatchObject({ step: "question", question: "Who pays?" });
@@ -568,7 +562,7 @@ describe("QA D5: Plan in the browser", () => {
       expect(now).toMatchObject({ inside: true, outlined: true });
       seen.push(now.name);
     }
-    expect(seen).toEqual(expect.arrayContaining(["input#[maxBudgetUsd]", "button#plan-start[]"]));
+    expect(seen).toEqual(expect.arrayContaining(["input#[timeoutMinutes]", "button#plan-start[]"]));
     // Start by keyboard: focus the start button and press Enter.
     await page.locator("#plan-start").focus();
     await page.keyboard.press("Enter");

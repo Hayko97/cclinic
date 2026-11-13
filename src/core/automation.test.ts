@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  decideOutcome,
   buildDeveloperPrompt,
   buildImplementationReviewPrompt,
   buildQaPrompt,
@@ -215,7 +216,10 @@ describe("commits, report and notification", () => {
     startedAt: TIME,
     finishedAt: TIME,
     outcome: "partial",
-    budgetUsd: 5,
+    model: "haiku",
+    effort: "low",
+    timeoutMinutes: 30,
+    limitResetsAt: null,
     spentUsd: 1.5,
     developers: 2,
     tasks: [
@@ -226,7 +230,7 @@ describe("commits, report and notification", () => {
     skippedInProgress: [{ taskId: 4, title: "T4" }],
   };
 
-  it("TC-AUTO-033: the report has the roadmap, branch, outcome, tasks, reasons, cost and how to merge", () => {
+  it("TC-AUTO-033: the report has the roadmap, branch, outcome, tasks, reasons and how to merge, and no dollars", () => {
     const report = renderReport(state);
     for (const part of [
       "Roadmap: #1 Launch",
@@ -234,19 +238,19 @@ describe("commits, report and notification", () => {
       "Outcome: partial",
       "| #1 T1 | done | `cclinic/auto/20261109-080503/task-1` |",
       "Stopped after 3 QA runs. Last: TC-X-001",
-      "$1.50 of $5.00",
       "git merge cclinic/auto/20261109-080503/run",
       "#4 T4",
     ]) {
       expect(report, part).toContain(part);
     }
+    expect(report).not.toContain("$");
   });
 
   it("TC-AUTO-034: the notification names the roadmap, the outcome and the counts", () => {
     expect(notificationText(state)).toEqual({ title: "cclinic: Launch", message: "Run partial: 1 done, 2 blocked." });
   });
 
-  it("TC-AUTO-008: the plan lists the roadmap, run order, dependencies, branch, developers and budget", () => {
+  it("TC-AUTO-008: the plan lists the roadmap, run order, dependencies, branch and developers, and no budget", () => {
     const plan = renderPlan({
       roadmap: { id: 1, title: "Launch" },
       runnable: [task(1), task(2, [1])],
@@ -254,13 +258,12 @@ describe("commits, report and notification", () => {
       inProgress: [task(4)],
       runBranch: "cclinic/auto/x",
       developers: 2,
-      budgetUsd: 5,
     });
+    expect(plan).not.toContain("$");
     for (const part of [
       "Roadmap #1: Launch",
       "Run branch: cclinic/auto/x",
       "Developers: 2",
-      "Budget: $5.00",
       "#2 T2 (after #1)",
       "#3: Blocked by task #9",
       "#4 T4",
@@ -268,5 +271,14 @@ describe("commits, report and notification", () => {
       expect(plan, part).toContain(part);
     }
     expect(plan.indexOf("#1 T1")).toBeLessThan(plan.indexOf("#2 T2"));
+  });
+});
+
+describe("run outcome", () => {
+  it("FR-AUTO-025: a limit reached with tasks left ends limit-reached; with every task done, the run is completed", () => {
+    expect(decideOutcome([run(1, [], "done"), run(2, [], "open")], false, true)).toBe("limit-reached");
+    expect(decideOutcome([run(1, [], "done"), run(2, [], "done")], false, true)).toBe("completed");
+    expect(decideOutcome([run(1, [], "done"), run(2, [], "blocked")], false, false)).toBe("partial");
+    expect(decideOutcome([run(1, [], "done")], true, true)).toBe("interrupted");
   });
 });

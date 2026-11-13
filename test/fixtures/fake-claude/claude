@@ -4,7 +4,8 @@
 // FAKE_CLAUDE_SCRIPT: a JSON file of rules for agent calls. Each call uses the first rule whose `match`
 // (a regex on the prompt) fits and that has uses left (`times`, default 1, 0 for unlimited). A rule can
 // set `output` (structured output), `message`, `cost`, `exitCode`, `delayMs`, `hang`, `silent` (exit with no
-// result line) and `write` (files to write, relative to the working folder).
+// result line), `events` (stream events written before the result, such as a `rate_limit_event`) and `write`
+// (files to write, relative to the working folder).
 const fs = require("node:fs");
 
 const args = process.argv.slice(2);
@@ -82,12 +83,14 @@ if (scriptFile) {
       fs.writeFileSync(file, content);
     }
     const isError = (rule.exitCode ?? 0) !== 0;
+    for (const event of rule.events ?? []) emit(event);
     if (rule.silent) process.exit(rule.exitCode ?? 1);
     emit({
       type: "result",
       is_error: isError,
       subtype: "success",
       result: rule.message ?? "Done.",
+      ...(rule.apiErrorStatus === undefined ? {} : { api_error_status: rule.apiErrorStatus }),
       ...(rule.output === undefined ? {} : { structured_output: rule.output }),
       total_cost_usd: rule.cost ?? 0.01,
     });

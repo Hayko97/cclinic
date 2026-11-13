@@ -134,7 +134,10 @@ function initial(tasks: readonly Task[], extra: Partial<RunState> = {}): RunStat
     startedAt: TIME,
     finishedAt: null,
     outcome: null,
-    budgetUsd: 100,
+    model: "haiku",
+    effort: "low",
+    timeoutMinutes: 30,
+    limitResetsAt: null,
     spentUsd: 0,
     developers: 2,
     tasks: tasks.map((item): TaskRun => ({
@@ -245,9 +248,10 @@ describe("automated run", () => {
     expect(commits.find((commit) => commit.worktree.endsWith("task-2"))?.message).toContain("WIP");
   });
 
-  it("TC-AUTO-021: each agent gets a budget no higher than what's left", async () => {
-    const { calls } = await run({ tasks: [task(1)], cost: 0.5 }, { budgetUsd: 5 });
-    expect(calls.map((call) => call.maxBudgetUsd)).toEqual([5, 4.5, 4, 3.5, 3]);
+  it("TC-AUTO-021: no agent gets a dollar limit, and the estimated cost is kept in run.json only", async () => {
+    const { calls, state } = await run({ tasks: [task(1)], cost: 0.5 });
+    expect(calls.every((call) => !("maxBudgetUsd" in call))).toBe(true);
+    expect(state.spentUsd).toBe(2.5);
   });
 
   it("TC-AUTO-024: the PM's spec feedback goes back to the developer, with the task's goals", async () => {
@@ -340,15 +344,24 @@ describe("automated run", () => {
     expect(review.byId(1)?.reason).toContain("implementation reviews. Last: again");
   });
 
-  it("TC-AUTO-030: no agent starts once the budget left can't cover one, and unfinished tasks go back to open", async () => {
+  it("TC-AUTO-030: a plan usage limit starts no new agent, puts unfinished tasks back, and isn't a rejected round", async () => {
+    const resetsAt = "2026-11-13T04:00:00.000Z";
     const { calls, state, statuses } = await run(
-      { tasks: [task(1), task(2), task(3)], cost: 1 },
-      { budgetUsd: 4, developers: 1 },
+      {
+        tasks: [task(1), task(2), task(3)],
+        respond: {
+          "spec-review": () =>
+            new AgentCallError("You've hit your session limit · resets 4am", null, { isUsageLimit: true, resetsAt }),
+        },
+      },
+      { developers: 1 },
     );
-    expect(calls).toHaveLength(4);
-    expect(state.spentUsd).toBeLessThanOrEqual(4);
-    expect(state.outcome).toBe("budget-reached");
+    expect(calls.filter((call) => call.stage === "spec-review")).toHaveLength(1);
+    expect(state.outcome).toBe("limit-reached");
+    expect(state.limitResetsAt).toBe(resetsAt);
     expect(state.tasks.map((item) => item.status)).toEqual(["open", "open", "open"]);
+    expect(state.tasks[0]?.rounds.specReviews).toBe(1);
+    expect(state.tasks[0]?.reason).toBe(`Claude's usage limit is reached; it resets ${resetsAt}.`);
     expect(statuses).toContainEqual([1, "open"]);
   });
 

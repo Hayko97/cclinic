@@ -15,7 +15,7 @@ The server works in two modes, which differ only in who answers the gates:
 | Preview | Started with `preview_start` | Skipped and recorded |
 | Commit | The agent commits, only if the user agrees | `cclinic auto` commits and merges, as today |
 
-The steps are the ones in `AGENTS.md` ([agent-instructions](../agent-instructions/spec.md)), including the code review step ([code-review](../code-review/spec.md)). Tasks are the ones in [task-tracking](../task-tracking/spec.md). Auto mode's run-level work (picking tasks, worktrees, budget, merging, report) stays in [automated-mode](../automated-mode/spec.md).
+The steps are the ones in `AGENTS.md` ([agent-instructions](../agent-instructions/spec.md)), including the code review step ([code-review](../code-review/spec.md)). Tasks are the ones in [task-tracking](../task-tracking/spec.md). Auto mode's run-level work (picking tasks, worktrees, usage limits, merging, report) stays in [automated-mode](../automated-mode/spec.md).
 
 ## Steps and gates
 
@@ -39,7 +39,7 @@ begin → spec ─[G1 spec approved]→ implement → qa ─[G2 QA passed]→ re
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
 | FR-MCP-001 | `cclinic mcp` must start an MCP server over stdio for the project in the current folder, or the folder given with `-C, --dir <path>`. It must write only MCP protocol messages to stdout, and its logs to stderr. | confirmed | `src/cli/mcp-command.ts`, `src/cli/main.ts`, `test/e2e/mcp.test.ts`, `user request` |
-| FR-MCP-002 | `cclinic mcp` must accept `--approver <user\|pm-agent>` (default `user`). With `pm-agent`, it must also require `--run <run-id>`, `--task <id>` and `--max-budget-usd <amount>`. A missing or invalid value must exit 2 before serving anything. | docs-only | `user request` |
+| FR-MCP-002 | `cclinic mcp` must accept `--approver <user\|pm-agent>` (default `user`). With `pm-agent`, it must also require `--run <run-id>` and `--task <id>`. It must have no dollar budget option: `--max-budget-usd` is an unknown option (automated-mode FR-AUTO-037). A missing, invalid or unknown value must exit 2 before serving anything. | docs-only | `user request`, `.cclinic/sdd/specs/automated-mode/spec.md` FR-AUTO-025, FR-AUTO-037 |
 | FR-MCP-003 | When `.cclinic/sdd` doesn't exist, `cclinic mcp` must exit 2 with a message on stderr telling the user to run `cclinic` first. | confirmed | `src/cli/mcp-command.ts`, `src/cli/main.ts`, `test/e2e/mcp.test.ts`, `user request`, `AGENTS.md` |
 | FR-MCP-004 | When cclinic installs the skills and the `AGENTS.md` section, it must also write a `cclinic` entry to `.mcp.json` at the project root that runs `npx cclinic mcp`. It must keep every other server in an existing `.mcp.json`, and must leave a `cclinic` entry that differs from its own unchanged, saying so. | confirmed | `src/core/mcp-config.ts`, `src/adapters/storage/skill-installer.ts`, `test/integration/mcp-server.test.ts`, `user request` |
 | FR-MCP-044 | When cclinic writes the `.mcp.json` entry (FR-MCP-004), it must also add to `.claude/settings.json` a Claude Code `PostToolUse` hook whose matcher is `mcp__cclinic__.*` and whose command is `npx cclinic session-link`. It must keep every other setting and hook. When a cclinic hook that differs from its own is already there, it must leave it unchanged and say so. A `.claude/settings.json` whose only content is this hook must be left out of analysis, as FR-MCP-042 does for `.mcp.json`. | confirmed | `src/core/mcp-config.ts` `mergeClaudeSettings`, `src/adapters/storage/skill-installer.ts`, `src/core/constants/workflow.ts` `SESSION_LINK_HOOK`, `test/integration/session-link.test.ts` TC-MCP-069, TC-MCP-070, `user request` |
@@ -94,7 +94,7 @@ begin → spec ─[G1 spec approved]→ implement → qa ─[G2 QA passed]→ re
 | FR-MCP-033 | With `--approver pm-agent`, moving to G3 must start a reviewer agent that follows the `review-code` skill in the task's worktree, may run the project's checks but not change files, and returns a JSON verdict with its findings. `review_report` from the developer agent must be refused. | docs-only | `.cclinic/sdd/specs/code-review/spec.md`, `user request` |
 | FR-MCP-034 | With `--approver pm-agent`, G4 must be skipped and recorded, and G6 must pass without asking. | docs-only | `.cclinic/sdd/specs/automated-mode/spec.md` FR-AUTO-013, `user request` |
 | FR-MCP-035 | With `--approver pm-agent`, a change must have at most 3 PM spec reviews, 3 QA runs, 3 code reviews and 3 PM implementation reviews. When one is used up without approval or a pass, the change must become `blocked` with the last feedback as the reason, and every further `workflow_advance` must be refused. | docs-only | `src/core/constants/agents.ts:32`, `.cclinic/sdd/specs/automated-mode/spec.md` FR-AUTO-024, `user request` |
-| FR-MCP-036 | With `--approver pm-agent`, the server must start no agent whose budget would take the total past `--max-budget-usd`, and must refuse the step with `budget-reached`. It must record the cost of each agent it starts in the change's state. | docs-only | `.cclinic/sdd/specs/automated-mode/spec.md` FR-AUTO-025, `user request` |
+| FR-MCP-036 | With `--approver pm-agent`, once Claude reports that a plan usage limit is reached (a `rate_limit_event` whose status isn't `allowed`, or an agent that ends with Claude Code's usage-limit message), the server must start no new agent, and must refuse the step with `limit-reached`, naming the reset time Claude reported. The agent call that hit the limit must not count as a rejected round. The server must record the cost of each agent it starts in the change's state, as Claude Code's estimate, and must set no dollar limit. | docs-only | `.cclinic/sdd/specs/automated-mode/spec.md` FR-AUTO-025, FR-AUTO-037, `user request` |
 | FR-MCP-037 | With `--approver pm-agent`, a PM, QA or reviewer reply that isn't a valid verdict, or an agent that fails or times out, must count as a rejected round, with the reason recorded. | docs-only | `.cclinic/sdd/specs/automated-mode/spec.md` FR-AUTO-023, `user request` |
 
 ### State and safety
@@ -131,7 +131,7 @@ These specs were refined with this one:
 - `preview_start` fails because a port is in use: the error is returned and recorded, and G4 passes, so the user can still approve, knowing there's no preview.
 - A `no-behaviour` change: G1 is skipped and recorded, and QA runs the project's full checks.
 - In auto mode, the PM agent returns invalid JSON 3 times at G1: 3 rejected rounds, and the change is blocked.
-- In auto mode, the budget runs out while QA is due: the step is refused with `budget-reached`, and `cclinic auto` ends the run as it does today.
+- In auto mode, Claude's usage limit is reached while QA is due: the step is refused with `limit-reached` and the reset time, and `cclinic auto` ends the run as `limit-reached`.
 - The workflow state file is deleted mid-change: `workflow_status` reports no open change, and the agent starts again with `workflow_begin`.
 - The user starts a task by hand that an auto run is working on: `task_start` refuses it and names the run.
 

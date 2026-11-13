@@ -116,7 +116,10 @@ function withRun(root: string, home: string, transcript: readonly unknown[]): vo
     startedAt: minutesAgo(45),
     finishedAt: null,
     outcome: null,
-    budgetUsd: 10,
+    model: "haiku",
+    effort: "low",
+    timeoutMinutes: 30,
+    limitResetsAt: null,
     spentUsd: 3.4,
     developers: 2,
     tasks: [2, 3].map((taskId) => ({
@@ -213,21 +216,18 @@ describe("task panel: steps and live agents", () => {
     expect(sessions.filter((item) => !item.isLive).every((item) => item.currentTool === null)).toBe(true);
   });
 
-  it("TC-GUI-078, TC-GUI-123: the frame and the panel show the run's progress, time and budget", async () => {
+  it("TC-GUI-078, TC-GUI-123: the frame and the panel show the run's progress and time, and no dollar amount", async () => {
     const { page } = await open();
     const frame = page.locator('[data-frame="roadmap-1"]');
     await expect.poll(() => frame.locator(".progress").textContent()).toBe("2 / 5 done");
-    expect(await frame.locator(".run-progress").textContent()).toMatch(
-      /^Running for 4[5-6]m \d\ds\$3\.40 of \$10\.00$/,
-    );
-    const bar = frame.locator(".run-progress progress");
-    expect([await bar.getAttribute("value"), await bar.getAttribute("max")]).toEqual(["3.4", "10"]);
+    expect(await frame.locator(".run-progress").textContent()).toMatch(/^Running for 4[5-6]m \d\ds$/);
+    expect(await frame.textContent()).not.toContain("$");
 
     await page.locator('[data-key="task-2"]').click();
     const run = page.locator(".run-section");
     expect(await run.locator("h3").textContent()).toBe(`Run ${RUN_ID}`);
     expect(await run.locator("p").textContent()).toBe("2 / 5 tasks done in Payments");
-    expect(await run.locator(".budget").textContent()).toBe("$3.40 of $10.00");
+    expect(await run.textContent()).not.toContain("$");
   });
 
   it("TC-GUI-123: the Steps section lists the rounds in order, and the running one shows a timer and its tool", async () => {
@@ -245,7 +245,6 @@ describe("task panel: steps and live agents", () => {
       "Not started",
     ]);
     expect(await rows.nth(2).locator(".step-time").textContent()).toBe("20m 00s");
-    expect(await rows.nth(2).locator(".step-cost").textContent()).toBe("$0.25");
     const qa = rows.nth(3);
     const timer = qa.locator(".timer");
     const first = await timer.textContent();
@@ -254,7 +253,7 @@ describe("task panel: steps and live agents", () => {
     expect(await qa.locator(".tool-name").textContent()).toBe("Bash");
     expect(await qa.locator(".step-tool code").textContent()).toHaveLength(80);
     expect(await qa.locator(".step-stalled").count()).toBe(0);
-    expect(await page.locator(".steps + p").textContent()).toBe("Total cost $0.75");
+    expect(await page.locator("#panel-body").textContent()).not.toContain("$");
   });
 
   it("TC-GUI-079: a running step whose transcript has been quiet for the stall time says so", async () => {

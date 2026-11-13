@@ -124,7 +124,10 @@ function runState(runId: string, change: Partial<RunState> = {}): RunState {
     startedAt: new Date(Date.now() - 600_000).toISOString(),
     finishedAt: null,
     outcome: null,
-    budgetUsd: 10,
+    model: "haiku",
+    effort: "low",
+    timeoutMinutes: 30,
+    limitResetsAt: null,
     spentUsd: 3.4,
     developers: 2,
     tasks: [
@@ -193,11 +196,11 @@ const MODELS = {
 };
 
 function planOf(args: readonly string[]) {
-  const budget = args.find((arg) => arg.startsWith("--max-budget-usd="))?.split("=")[1];
+  const developers = args.find((arg) => arg.startsWith("--developers="))?.split("=")[1] ?? "2";
   return {
     status: "plan",
     roadmapId: 1,
-    plan: `Roadmap #1: Launch\nBudget: $${budget}\n\nTasks in run order:\n  #1 Task a`,
+    plan: `Roadmap #1: Launch\nDevelopers: ${developers}\n\nTasks in run order:\n  #1 Task a`,
     runnable: [1, 2],
     blocked: [],
   };
@@ -218,12 +221,12 @@ describe("QA: cclinic auto --dry-run as a program", () => {
     const harness = agentHarness();
     const branches = git(root, "branch", "--list");
     const status = git(root, "status", "--porcelain", "--ignored");
-    const text = cli(root, harness, "auto", "--roadmap", "1", "--max-budget-usd", "5", "--dry-run");
+    const text = cli(root, harness, "auto", "--roadmap", "1", "--dry-run");
     expect(text.code, text.err).toBe(0);
     expect(text.out).toContain("Roadmap #1: Launch");
     expect(text.out).toContain("Tasks in run order:\n  #1 Task a\n  #2 Task b (after #1)");
     expect(text.out).not.toMatch(/\{"status"/);
-    const json = cli(root, harness, "auto", "--roadmap", "1", "--max-budget-usd", "5", "--dry-run", "--json");
+    const json = cli(root, harness, "auto", "--roadmap", "1", "--dry-run", "--json");
     expect(json.code, json.err).toBe(0);
     const lines = json.out.trim().split("\n");
     expect(lines).toHaveLength(1);
@@ -244,7 +247,7 @@ describe("QA: cclinic auto --dry-run as a program", () => {
     // Task 2 waits on task 3, which is in roadmap 2 and so not in this run.
     changeStore(root, (store) => store.addDependency(2, 3));
     const harness = agentHarness();
-    const json = cli(root, harness, "auto", "--roadmap", "1", "--max-budget-usd", "5", "--dry-run", "--json");
+    const json = cli(root, harness, "auto", "--roadmap", "1", "--dry-run", "--json");
     expect(json.code, json.err).toBe(0);
     const result = JSON.parse(json.out) as { plan: string; runnable: number[]; blocked: number[] };
     expect(result.runnable).toEqual([1]);
@@ -259,17 +262,21 @@ describe("QA: cclinic auto --dry-run as a program", () => {
       store.setStatus(2, "done");
     });
     const harness = agentHarness();
-    const text = cli(root, harness, "auto", "--roadmap", "1", "--max-budget-usd", "5", "--dry-run");
+    const text = cli(root, harness, "auto", "--roadmap", "1", "--dry-run");
     expect(text.code).toBe(2);
     expect(text.err).toContain("Roadmap 1 has no open or blocked tasks to run.");
     expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
   });
 
-  it("FR-AUTO-040: a dry run without a budget is refused like a run, and never opens a menu", () => {
+  it("FR-AUTO-040, TC-AUTO-064: a dry run needs no budget, refuses the removed --max-budget-usd, and never opens a menu", () => {
     const root = repository();
     const harness = agentHarness();
     const result = cli(root, harness, "auto", "--roadmap", "1", "--dry-run");
-    expect(result.code).toBe(2);
+    expect(result.code).toBe(0);
+    expect(result.out).toContain("Roadmap #1:");
+    const removed = cli(root, harness, "auto", "--roadmap", "1", "--max-budget-usd", "5", "--dry-run");
+    expect(removed.code).toBe(2);
+    expect(removed.err).toContain("--max-budget-usd");
     expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
   });
 });
@@ -278,21 +285,10 @@ describe("QA: Run with AI through the API", () => {
   it("TC-GUI-037: the plan from the real CLI is the text cclinic auto prints, and nothing starts", async () => {
     const root = repository();
     const gui = await startReal(root);
-    const reply = await postJob(gui, { command: "auto", options: { roadmap: 1, maxBudgetUsd: 5, developers: 2 } });
+    const reply = await postJob(gui, { command: "auto", options: { roadmap: 1, developers: 2 } });
     expect(reply.status, reply.body).toBe(200);
     const { plan } = JSON.parse(reply.body) as { plan: { plan: string; runnable: number[] } };
-    const printed = cli(
-      root,
-      agentHarness(),
-      "auto",
-      "--roadmap",
-      "1",
-      "--max-budget-usd",
-      "5",
-      "--developers",
-      "2",
-      "--dry-run",
-    );
+    const printed = cli(root, agentHarness(), "auto", "--roadmap", "1", "--developers", "2", "--dry-run");
     const withoutRunId = (text: string) => text.replace(/\d{8}-\d{6}(-\d+)?/g, "<run>");
     expect(withoutRunId(plan.plan)).toBe(withoutRunId(printed.out.trim()));
     expect(plan.runnable).toEqual([1, 2]);
@@ -308,7 +304,7 @@ describe("QA: Run with AI through the API", () => {
       store.setStatus(2, "done");
     });
     const gui = await startReal(root);
-    const reply = await postJob(gui, { command: "auto", options: { roadmap: 1, maxBudgetUsd: 5 } });
+    const reply = await postJob(gui, { command: "auto", options: { roadmap: 1 } });
     expect(reply.status).toBe(409);
     expect(errorOf(reply.body)).toBe("Roadmap 1 has no open or blocked tasks to run.");
   });
@@ -317,7 +313,7 @@ describe("QA: Run with AI through the API", () => {
     const root = repository();
     changeStore(root, (store) => store.addDependency(2, 3));
     const gui = await startReal(root);
-    const reply = await postJob(gui, { command: "auto", options: { roadmap: 1, maxBudgetUsd: 5 } });
+    const reply = await postJob(gui, { command: "auto", options: { roadmap: 1 } });
     expect(reply.status, reply.body).toBe(200);
     const { plan } = JSON.parse(reply.body) as { plan: { plan: string; blocked: number[] } };
     expect(plan.blocked).toEqual([2]);
@@ -327,7 +323,7 @@ describe("QA: Run with AI through the API", () => {
   it("TC-GUI-042: Stop pressed twice sends one SIGINT and the run ends 130, then Stop says no run is going", async () => {
     const root = repository();
     const gui = await startReal(root, [{ match: "developer agent", hang: true, times: 0 }]);
-    const options = { roadmap: 1, maxBudgetUsd: 5, developers: 1, model: "haiku", effort: "low" };
+    const options = { roadmap: 1, developers: 1, model: "haiku", effort: "low" };
     const started = JSON.parse((await postJob(gui, { command: "auto", confirmed: true, options })).body) as {
       job: { id: string };
     };
@@ -361,7 +357,7 @@ describe("QA: Run with AI through the API", () => {
   it("FR-GUI-005: the GUI stopping while its run goes stops the run as Ctrl+C does", async () => {
     const root = repository();
     const gui = await startReal(root, [{ match: "developer agent", hang: true, times: 0 }]);
-    const options = { roadmap: 1, maxBudgetUsd: 5, developers: 1, model: "haiku", effort: "low" };
+    const options = { roadmap: 1, developers: 1, model: "haiku", effort: "low" };
     expect((await postJob(gui, { command: "auto", confirmed: true, options })).status).toBe(201);
     const runId = await vi.waitFor(
       async () => {
@@ -477,15 +473,15 @@ describe("QA: Run with AI in the browser", () => {
     const page = await openPage(gui);
     await page.locator('[data-frame="roadmap-1"] button[data-action="run-ai"]').click();
     const dialog = page.locator("#auto-dialog");
-    await dialog.locator('input[name="maxBudgetUsd"]').fill("5");
+    await dialog.locator('input[name="developers"]').fill("1");
     await dialog.locator("#auto-show-plan").click();
     await vi.waitFor(() => {
       expect(jobs.held).toHaveLength(1);
     });
     jobs.held.shift()?.();
-    await expect.poll(() => dialog.locator("#auto-plan").textContent()).toContain("Budget: $5");
+    await expect.poll(() => dialog.locator("#auto-plan").textContent()).toContain("Developers: 1");
     expect(await page.evaluate(() => document.activeElement?.id)).toBe("auto-start");
-    await dialog.locator('input[name="maxBudgetUsd"]').fill("7");
+    await dialog.locator('input[name="developers"]').fill("3");
     expect(await dialog.locator("#auto-start").isHidden()).toBe(true);
     expect(await dialog.locator("#auto-plan").isHidden()).toBe(true);
     await dialog.locator('select[name="effort"]').selectOption({ index: 1 });
@@ -494,11 +490,11 @@ describe("QA: Run with AI in the browser", () => {
       expect(jobs.held).toHaveLength(1);
     });
     jobs.held.shift()?.();
-    await expect.poll(() => dialog.locator("#auto-plan").textContent()).toContain("Budget: $7");
+    await expect.poll(() => dialog.locator("#auto-plan").textContent()).toContain("Developers: 3");
     await dialog.locator("#auto-start").click();
     await expect.poll(() => dialog.isVisible()).toBe(false);
     const run = jobs.started.find((args) => args.includes("--yes"));
-    expect(run).toContain("--max-budget-usd=7");
+    expect(run).toContain("--developers=3");
     expect(run?.some((arg) => arg.startsWith("--effort="))).toBe(true);
   });
 
@@ -510,7 +506,6 @@ describe("QA: Run with AI in the browser", () => {
     await page.locator('[data-frame="roadmap-1"] button[data-action="run-ai"]').click();
     const dialog = page.locator("#auto-dialog");
     await expect.poll(() => dialog.locator('select[name="effort"] option').count()).toBeGreaterThan(1);
-    await dialog.locator('input[name="maxBudgetUsd"]').fill("5");
     await dialog.locator("#auto-show-plan").click();
     await vi.waitFor(() => {
       expect(jobs.held).toHaveLength(1);
@@ -542,7 +537,6 @@ describe("QA: Run with AI in the browser", () => {
     const runAi = page.locator('[data-frame="roadmap-1"] button[data-action="run-ai"]');
     await runAi.click();
     const dialog = page.locator("#auto-dialog");
-    await dialog.locator('input[name="maxBudgetUsd"]').fill("5");
     await dialog.locator("#auto-show-plan").click();
     await vi.waitFor(() => {
       expect(jobs.held).toHaveLength(1);
@@ -552,7 +546,7 @@ describe("QA: Run with AI in the browser", () => {
     await dialog.locator("#auto-cancel").click();
     expect(await dialog.isVisible()).toBe(false);
     await runAi.click();
-    expect(await dialog.locator('input[name="maxBudgetUsd"]').inputValue()).toBe("");
+    expect(await dialog.locator('input[name="developers"]').inputValue()).toBe("");
     expect(await dialog.locator("#auto-start").isHidden()).toBe(true);
     expect(await dialog.locator("#auto-plan").isHidden()).toBe(true);
     await page.keyboard.press("Escape");
@@ -563,12 +557,11 @@ describe("QA: Run with AI in the browser", () => {
   it("TC-GUI-067: the form and its plan with a long roadmap title don't scroll sideways at 768 px", async () => {
     const long = "Averyveryverylongwordwithoutanyspacesatall".repeat(6);
     const root = repository(long);
-    const jobs = heldJobs(() => ({ ...planOf(["--max-budget-usd=5"]), plan: `Roadmap #1: ${long}\n  #1 ${long}` }));
+    const jobs = heldJobs(() => ({ ...planOf(["--developers=2"]), plan: `Roadmap #1: ${long}\n  #1 ${long}` }));
     const gui = await startHeld(root, jobs);
     const page = await openPage(gui, { width: 768, height: 900 });
     await page.locator('[data-frame="roadmap-1"] button[data-action="run-ai"]').click();
     const dialog = page.locator("#auto-dialog");
-    await dialog.locator('input[name="maxBudgetUsd"]').fill("5");
     await dialog.locator("#auto-show-plan").click();
     await vi.waitFor(() => {
       expect(jobs.held).toHaveLength(1);
@@ -627,7 +620,6 @@ describe("QA: Run with AI in the browser", () => {
     await second.locator('button[data-action="run-ai"]').click();
     const dialog = page.locator("#auto-dialog");
     expect(await dialog.locator("#auto-roadmap").textContent()).toBe("Roadmap #2: Later");
-    await dialog.locator('input[name="maxBudgetUsd"]').fill("5");
     await dialog.locator("#auto-show-plan").click();
     await expect
       .poll(() => dialog.locator("#auto-error").textContent(), { timeout: 15_000 })
@@ -739,7 +731,7 @@ describe("QA run 3: the code-review fixes", () => {
     const root = repository();
     const harness = agentHarness();
     for (const flags of [["--model"], ["--effort"], ["--model", "--effort"]]) {
-      const result = cli(root, harness, "auto", "--roadmap", "1", "--max-budget-usd", "5", "--dry-run", ...flags);
+      const result = cli(root, harness, "auto", "--roadmap", "1", "--dry-run", ...flags);
       expect(result.code, `${flags.join(" ")}: ${result.err}`).toBe(0);
       expect(result.out).toContain("Roadmap #1: Launch");
     }
@@ -750,7 +742,7 @@ describe("QA run 3: the code-review fixes", () => {
   it("TC-AUTO-062: a dry run refuses a wrong --model, --effort or CCLINIC_EFFORT with exit 2, creating nothing", () => {
     const root = repository();
     const harness = agentHarness();
-    const base = ["auto", "--roadmap", "1", "--max-budget-usd", "5", "--dry-run"];
+    const base = ["auto", "--roadmap", "1", "--dry-run"];
     const model = cli(root, harness, ...base, "--model", "not-a-model");
     expect(model.code).toBe(2);
     expect(model.err).toContain("--model");

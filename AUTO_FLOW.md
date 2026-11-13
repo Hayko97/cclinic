@@ -39,7 +39,7 @@ flowchart LR
 4. **Run it:**
 
 ```bash
-cclinic auto --roadmap 1 --max-budget-usd 10
+cclinic auto --roadmap 1
 ```
 
 ### Options
@@ -47,7 +47,6 @@ cclinic auto --roadmap 1 --max-budget-usd 10
 | Option                       | Meaning                                             | Default       |
 | ---------------------------- | --------------------------------------------------- | ------------- |
 | `--roadmap <id>`             | The roadmap to run. Without it, a menu (TTY only)   | menu          |
-| `--max-budget-usd <amount>`  | Total cost cap for every agent in the run           | **required**  |
 | `--developers <n>`           | Tasks worked on at the same time, 1 to 8            | 2             |
 | `-m, --model` / `--effort`   | Model and effort for every agent                    | Claude's own  |
 | `--timeout-minutes <n>`      | Time limit for each agent call                      | 30            |
@@ -94,7 +93,6 @@ A task that depends on a task that's neither `done` nor in this run is reported 
 Roadmap #1: Launch
 Run branch: cclinic/auto/20261109-080503/run
 Developers: 2
-Budget: $10.00
 
 Tasks in run order:
   #1 Lock an account after 5 failed logins
@@ -144,7 +142,7 @@ flowchart TD
 
 - Code is never written before the PM approves the spec.
 - The commit message is `#<id> <title>`, followed by the requirement IDs the PM reported.
-- A PM or QA reply that isn't a valid verdict, or an agent that fails, times out or runs out of budget, counts as a rejected round.
+- A PM or QA reply that isn't a valid verdict, or an agent that fails or times out, counts as a rejected round. An agent stopped by Claude's usage limit doesn't.
 
 ### Limits per task
 
@@ -229,18 +227,20 @@ A blocked or stopped task keeps its work on its task branch, in a commit marked 
 
 ---
 
-## 8. Budget and time
+## 8. Claude's usage limits and time
+
+There is no dollar budget. A run uses your Claude plan, and stops cleanly at the plan's usage limit.
 
 ```mermaid
 flowchart TD
-    N([Next agent call]) --> B{spent + most expensive<br/>call so far ≤ budget?}
-    B -- yes --> Run[Start it, with its own<br/>--max-budget-usd = budget left]
-    B -- no --> Stop[Start no new agents<br/>let running ones finish]
+    N([Next agent call]) --> B{Has Claude said<br/>a usage limit is reached?}
+    B -- no --> Run[Start it]
+    B -- yes --> Stop[Start no new agents<br/>let running ones finish]
     Stop --> Open[Unfinished tasks<br/>back to open]
-    Open --> End([Outcome: budget-reached])
+    Open --> End([Outcome: limit-reached,<br/>with when it resets])
 ```
 
-- The total cost of every agent never goes over `--max-budget-usd`.
+- Each agent call saves Claude's newest plan limits (session and weekly use, and when they reset), which `cclinic gui` shows in its top bar.
 - Each agent call stops after `--timeout-minutes` (default 30).
 
 ---
@@ -249,7 +249,7 @@ flowchart TD
 
 cclinic stops every agent, commits nothing unapproved to the run branch, sets in-progress tasks back to `open`, removes the worktrees, keeps the branches, writes the report with outcome `interrupted`, notifies you, and exits 130 (Ctrl+C) or 143 (SIGTERM).
 
-Runs can't be resumed. Start a new run: it picks up the tasks that are still `open` or `blocked`.
+A run isn't resumed in place. Continue it with a new run (Continue on the roadmap in `cclinic gui`, with the same settings): it picks up the tasks that are still `open` or `blocked`.
 
 ---
 
@@ -263,8 +263,8 @@ stateDiagram-v2
     open --> in_progress: task starts
     blocked --> in_progress: next run
     in_progress --> done: merged into run branch
-    in_progress --> blocked: limit reached, conflict, or blocked dependency
-    in_progress --> open: budget reached or interrupted
+    in_progress --> blocked: round limit reached, conflict, or blocked dependency
+    in_progress --> open: usage limit reached or interrupted
 ```
 
 ### Outcome, exit code and notification
@@ -273,7 +273,7 @@ stateDiagram-v2
 | ---------------- | --------------------------------------- | --------- |
 | `completed`      | Every selected task is `done`           | 0         |
 | `partial`        | Some tasks are blocked                  | 1         |
-| `budget-reached` | The budget ran out                      | 1         |
+| `limit-reached`  | Claude's plan usage limit was reached   | 1         |
 | `interrupted`    | Ctrl+C or SIGTERM                       | 130 / 143 |
 | —                | A usage or precondition error           | 2         |
 
@@ -286,9 +286,9 @@ With `--json`, stdout is one JSON document with the outcome, the run branch, the
 `.cclinic/auto/<run-id>/report.md` lists:
 
 - the roadmap, run branch and outcome;
-- each task with its result, branch, rounds and cost;
+- each task with its result, branch and rounds;
 - why each blocked task stopped;
-- the total cost against the budget;
+- for `limit-reached`, when Claude's usage limit resets;
 - tasks skipped because they were `in-progress`;
 - how to review and merge the run branch.
 
@@ -319,7 +319,7 @@ For a blocked task, inspect its branch `cclinic/auto/<run-id>/task-<id>`, fix it
 | `cclinic tasks roadmaps`                                  | List roadmaps with their status and task counts |
 | `cclinic tasks roadmap show <id>`                         | One roadmap with milestones, tasks and dependencies |
 | `cclinic tasks depend <id> --on <id>` / `undepend`        | Add or remove a dependency                      |
-| `cclinic auto --roadmap <id> --max-budget-usd <n>`        | Run a roadmap with agents                       |
+| `cclinic auto --roadmap <id>`                             | Run a roadmap with agents                       |
 
 ## 13. Rules to remember
 
@@ -327,5 +327,5 @@ For a blocked task, inspect its branch `cclinic/auto/<run-id>/task-<id>`, fix it
 - No spec is implemented before the PM approves it, and no task is merged before QA passes and the PM approves.
 - Only cclinic commits and merges, and only on `cclinic/auto/<run-id>/` branches. Nothing is pushed.
 - Each stage gets at most 3 rounds, then the task is blocked.
-- The budget is a hard cap.
+- Claude's usage limit stops a run cleanly, and you continue it once the limit resets.
 - You decide what gets merged into your branch.

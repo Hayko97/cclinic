@@ -60,7 +60,10 @@ function run(roadmapId: number, taskIds: number[], sessions: AgentSession[], isL
     startedAt: minutesAgo(30),
     finishedAt: null,
     outcome: null,
-    budgetUsd: 10,
+    model: "haiku",
+    effort: "low",
+    timeoutMinutes: 30,
+    limitResetsAt: null,
     spentUsd: 3.4,
     developers: 2,
     tasks: taskIds.map((taskId) => ({
@@ -172,8 +175,7 @@ describe("canvas model", () => {
     expect(view.roadmaps[0]).toMatchObject({
       mode: "ai",
       runId: "20261111-110000",
-      spentUsd: 3.4,
-      budgetUsd: 10,
+      continueWith: null,
       done: 0,
       total: 2,
     });

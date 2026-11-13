@@ -140,10 +140,6 @@ export const STATUS_LABELS = { open: "Open", "in-progress": "In progress", done:
 export const MODE_LABELS = { ai: "AI run", manual: "Manual" };
 export const ROLE_LABELS = { developer: "Developer", pm: "PM", qa: "QA", reviewer: "Reviewer", you: "You" };
 
-export function money(value) {
-  return `$${value.toFixed(2)}`;
-}
-
 const SECONDS_PER = { minute: 60, hour: 3600, day: 86_400 };
 
 /** FR-GUI-065: how long ago `iso` was, such as "just now", "3 min ago" or "2 h ago". */

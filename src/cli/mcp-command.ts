@@ -36,10 +36,9 @@ export interface McpOptions {
   readonly approver: string;
   readonly run?: string;
   readonly task?: number;
-  readonly maxBudgetUsd?: number;
 }
 
-/** FR-MCP-002: pm-agent needs to know its run, its task and its budget. */
+/** FR-MCP-002: pm-agent needs to know its run and its task; it has no dollar budget (FR-MCP-036). */
 function parseApprover(options: McpOptions): Approver {
   const approver = APPROVERS.find((name) => name === options.approver);
   if (approver === undefined) throw new UsageError(`--approver must be ${APPROVERS.join(" or ")}.`);
@@ -47,7 +46,6 @@ function parseApprover(options: McpOptions): Approver {
     for (const [option, value] of [
       ["--run", options.run],
       ["--task", options.task],
-      ["--max-budget-usd", options.maxBudgetUsd],
     ] as const) {
       if (value === undefined) throw new UsageError(`--approver pm-agent needs ${option}.`);
     }
@@ -74,7 +72,6 @@ function summarizeRun(target: string) {
     return {
       runId: state.runId,
       outcome: state.outcome,
-      budgetUsd: state.budgetUsd,
       spentUsd: state.spentUsd,
       tasks: state.tasks.map(({ taskId, title, status, rounds, costUsd, reason }) => ({
         taskId,

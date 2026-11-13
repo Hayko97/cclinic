@@ -92,26 +92,22 @@ const approving: FakeClaudeRule[] = [
   { match: "reviewing finished work", times: 0, output: { verdict: "approve", feedback: "", requirementIds: [] } },
 ];
 
-const base = (root: string): string[] => ["auto", "-C", root, "--roadmap", "1", "--max-budget-usd", "5", "--yes"];
+const base = (root: string): string[] => ["auto", "-C", root, "--roadmap", "1", "--yes"];
 
 describe("cclinic auto", () => {
-  it("TC-AUTO-002: invalid or missing options exit 2, and nothing starts", () => {
+  it("TC-AUTO-002, TC-AUTO-064: invalid options, and the removed --max-budget-usd, exit 2, and nothing starts", () => {
     const root = project();
     const { env, record } = environment(approving);
     for (const args of [
       ["--developers", "0"],
       ["--developers", "9"],
-      ["--max-budget-usd", "0"],
-      ["--max-budget-usd", "abc"],
+      ["--max-budget-usd", "5"],
       ["--roadmap", "abc"],
     ]) {
       const result = cclinic([...base(root), ...args], env);
       expect(result.code, args.join(" ")).toBe(2);
       expect(result.stderr).toContain(args[0]);
     }
-    const missing = cclinic(["auto", "-C", root, "--roadmap", "1", "--yes"], env);
-    expect(missing.code).toBe(2);
-    expect(missing.stderr).toContain("--max-budget-usd");
     const unknown = cclinic([...base(root), "--roadmap", "99"], env);
     expect(unknown.code).toBe(2);
     expect(unknown.stderr).toContain("Roadmap 99");
@@ -171,15 +167,16 @@ describe("cclinic auto", () => {
   it("TC-AUTO-007: with no terminal and no --yes, it exits 2", () => {
     const root = project();
     const { env } = environment(approving);
-    const result = cclinic(["auto", "-C", root, "--roadmap", "1", "--max-budget-usd", "5"], env);
+    const result = cclinic(["auto", "-C", root, "--roadmap", "1"], env);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("--yes");
   });
 
-  it("TC-AUTO-036: --json prints one document, with exit 0 when all is done and 1 when a task is blocked", () => {
+  it("TC-AUTO-036, TC-AUTO-064: with no budget, --json prints one document, exit 0 when all is done, 1 when a task is blocked", () => {
     const done = project();
     const ok = cclinic([...base(done), "--json"], environment(approving).env);
     expect(ok.code).toBe(0);
+    expect(ok.stdout).not.toContain("costUsd");
     const parsed = JSON.parse(ok.stdout) as {
       outcome: string;
       runBranch: string;
@@ -211,7 +208,7 @@ describe("cclinic auto", () => {
     store?.savePlan({ roadmap: { title: "Second", goal: "" }, milestones: [] });
     store?.close();
     const { env } = environment(approving);
-    const listed = cclinic(["auto", "-C", root, "--max-budget-usd", "5", "--yes"], env);
+    const listed = cclinic(["auto", "-C", root, "--yes"], env);
     expect(listed.code).toBe(2);
     expect(listed.stderr).toContain("Roadmaps: 1, 2");
     expect(listed.stderr).toContain("cclinic tasks roadmaps");
@@ -219,17 +216,14 @@ describe("cclinic auto", () => {
     const removing = openTaskStore(path.join(empty, ".cclinic"), "update");
     removing?.removeRoadmap(1);
     removing?.close();
-    const none = cclinic(["auto", "-C", empty, "--max-budget-usd", "5", "--yes"], env);
+    const none = cclinic(["auto", "-C", empty, "--yes"], env);
     expect(none.code).toBe(2);
     expect(none.stderr).toContain("cclinic plan");
   });
 
   it("TC-AUTO-049: --task is not an option", () => {
     const root = project();
-    const result = cclinic(
-      ["auto", "-C", root, "--task", "1", "--yes", "--max-budget-usd", "5"],
-      environment(approving).env,
-    );
+    const result = cclinic(["auto", "-C", root, "--task", "1", "--yes"], environment(approving).env);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("unknown option");
   });

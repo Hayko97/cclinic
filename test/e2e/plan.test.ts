@@ -36,7 +36,8 @@ describe("cclinic plan", () => {
     const root = project();
     for (const args of [
       ["--roadmap", "abc"],
-      ["--max-budget-usd", "0"],
+      // Removed: a plan is limited by the Claude plan's own usage limits (FR-PLAN-015).
+      ["--max-budget-usd", "1"],
       ["--timeout-minutes", "0"],
     ]) {
       const result = cclinic(["plan", "-C", root, ...args]);

@@ -15,6 +15,9 @@ export const GUI_TOKEN_HEADER = "x-cclinic-token";
 export const GUI_TOKEN_QUERY = "token";
 export const GUI_COOKIE_PREFIX = "cclinic_token_";
 
+/** FR-GUI-083: a plan-limit window at this share or more is marked, so a limit coming up is seen in time. */
+export const LIMIT_HIGH_USE = 0.8;
+
 /** FR-GUI-047: the GUI's only files, ignored by Git. */
 export const GUI_FOLDER = `${TOOL_FOLDER_NAME}/gui`;
 export const GUI_LOCK_FILE = "gui.lock";
@@ -40,6 +43,7 @@ export const GUI_ASSETS = {
     "auto.js",
     "plan.js",
     "router.js",
+    "limits.js",
     "styles.css",
   ],
 } as const;

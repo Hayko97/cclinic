@@ -135,8 +135,9 @@ STEP 5: WORK WITH YOUR CODING AGENT
   in .cclinic/tasks.db. On each prompt, your agent checks for open tasks, and
   asks whether to work on one, remove it, or keep it.
 
-  "cclinic auto --roadmap <id> --max-budget-usd <n>" runs a whole roadmap with
-  developer, PM and QA agents, on its own branches, and notifies you at the end.
+  "cclinic auto --roadmap <id>" runs a whole roadmap with developer, PM and QA
+  agents, on its own branches, and notifies you at the end. It stops cleanly when
+  your Claude plan's usage limit is reached; continue it once the limit resets.
 
   Skills you wrote are never replaced. Skills you edited are kept unless you use
   "cclinic skills --force".

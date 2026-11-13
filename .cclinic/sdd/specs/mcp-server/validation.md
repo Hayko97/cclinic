@@ -24,7 +24,7 @@ Acceptance criteria from the user's point of view.
 | VAL-MCP-018 | FR-MCP-028, FR-MCP-029, FR-MCP-030 | The agent can't approve for me | Approval questions come to me, not the agent; if my tool can't show them I answer in a terminal, which an agent can't do; every decision is recorded with who made it |
 | VAL-MCP-019 | FR-MCP-031, FR-MCP-034 | Auto runs still get approved, by the PM agent | In an auto run, the PM agent approves the spec and the finished change, no preview is needed, and nobody is asked |
 | VAL-MCP-020 | FR-MCP-032, FR-MCP-033 | Auto runs are tested and reviewed independently | The developer agent can't report its own QA or review; separate QA and reviewer agents do it |
-| VAL-MCP-021 | FR-MCP-035, FR-MCP-036, FR-MCP-037 | Auto runs stay within limits | A task that can't get approved, tested or reviewed within 3 rounds is blocked with the reason, bad agent replies count as rejections, and the budget is never exceeded |
+| VAL-MCP-021 | FR-MCP-035, FR-MCP-036, FR-MCP-037 | Auto runs stay within limits | A task that can't get approved, tested or reviewed within 3 rounds is blocked with the reason, bad agent replies count as rejections, and no new agent starts once Claude's usage limit is reached, without blocking the task |
 | VAL-MCP-022 | FR-MCP-039 | Secrets don't leak into saved state | No secret appears in the workflow state, feedback or logs |
 | VAL-MCP-023 | FR-MCP-041 | The new state doesn't disturb cclinic | Cleaning keeps the workflow state, and it never changes analysis or generated docs |
 | VAL-MCP-024 | FR-MCP-042 | Adding the server doesn't cost me a re-analysis | After cclinic adds itself to `.mcp.json`, running `cclinic` again doesn't treat the project as changed |

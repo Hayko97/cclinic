@@ -73,7 +73,6 @@ export interface TaskRecords {
 export interface RunSummary {
   readonly runId: string;
   readonly outcome: string | null;
-  readonly budgetUsd: number;
   readonly spentUsd: number;
   readonly tasks: readonly {
     readonly taskId: number;

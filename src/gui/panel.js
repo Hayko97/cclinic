@@ -6,7 +6,6 @@ import {
   duration,
   element,
   MODE_LABELS,
-  money,
   notify,
   ROLE_LABELS,
   STATUS_LABELS,
@@ -25,6 +24,7 @@ import {
 } from "./canvas.js";
 import { runButtons } from "./auto.js";
 import { followView, viewTools } from "./follow.js";
+import { resetText } from "./limits.js";
 import { openPlan } from "./plan.js";
 import { recordView, urls } from "./router.js";
 
@@ -623,18 +623,16 @@ function steps(task) {
             element("span", { className: "step-name" }, stepName(row, source)),
             element("span", { className: `badge step-status is-${row.status}` }, STEP_STATUS_LABELS[row.status]),
             taken === null ? null : element("span", { className: "step-time" }, taken),
-            row.costUsd === null ? null : element("span", { className: "step-cost" }, money(row.costUsd)),
           ),
           times.length === 0 ? null : element("div", { className: "muted step-when" }, ...times),
           row.status === "running" || row.status === "waiting" ? nowDoing(row, task) : null,
         );
       }),
     ),
-    element("p", { className: "muted" }, `Total cost ${money(task.steps.costUsd)}`),
   );
 }
 
-/** FR-GUI-056: the live run the task is in: done tasks against total, time since it started, and budget used. */
+/** FR-GUI-056: the live run the task is in: done tasks against total, and the time since it started. */
 function runSection(task) {
   if (task.runId === null || task.roadmapId === null) return null;
   const roadmap = roadmapById(task.roadmapId);
@@ -671,7 +669,6 @@ function liveRun(roadmap) {
           element("span", { className: "run-task-title" }, `#${task.taskId} ${task.title}`),
           element("span", { className: `badge run-status is-${task.status}` }, task.status),
           element("span", { className: "muted" }, roundsText(task.rounds)),
-          element("span", { className: "muted" }, money(task.costUsd)),
           task.branch === null ? null : element("code", {}, task.branch),
           task.reason === null ? null : element("p", { className: "muted run-reason" }, task.reason),
         ),
@@ -837,7 +834,11 @@ function pastRuns(roadmap) {
                   "aria-expanded": String(state.pastRun?.runId === run.runId),
                   onClick: () => togglePastRun(run.runId),
                 },
-                `${run.runId} · ${run.outcome ?? "ended"} · ${money(run.spentUsd)} of ${money(run.budgetUsd)}`,
+                `${run.runId} · ${run.outcome ?? "ended"}${
+                  run.outcome === "limit-reached" && run.limitResetsAt !== null
+                    ? ` · resets ${resetText(run.limitResetsAt)}`
+                    : ""
+                }`,
               ),
               element("span", { className: "muted" }, " · ", when(run.startedAt)),
               pastRunFiles(run.runId),
@@ -903,7 +904,6 @@ function renderTask(task) {
       row("Run", task.runId),
       row("Step", task.step),
       row("Spec", task.spec),
-      row("Cost so far", money(task.costUsd)),
     ),
     waiting(task.change),
     taskActions(task),

@@ -1,7 +1,7 @@
 /** Entry point and composition root: parses arguments, wires everything, and maps errors to exit codes. */
 import { readFileSync } from "node:fs";
 import { Command, CommanderError, Option } from "commander";
-import { AUTO_LIMITS, PLAN_LIMITS } from "../core/constants/agents.js";
+import { AUTO_LIMITS } from "../core/constants/agents.js";
 import { GUI_MAX_PORT } from "../core/constants/gui.js";
 import { LIMITS, SHUTDOWN_TIMEOUT_MS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
@@ -207,12 +207,6 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .option("--task", "plan one concrete task instead of a roadmap")
     .option("-m, --model [value]", "model to use. With no value, opens a menu")
     .option("--effort [value]", "reasoning level. With no value, opens a menu")
-    .option(
-      "--max-budget-usd <n>",
-      `stop the session at this estimated spend (default: ${PLAN_LIMITS.maxBudgetUsd})`,
-      positiveNumber,
-      PLAN_LIMITS.maxBudgetUsd,
-    )
     .option(...limitOption("--timeout-minutes <n>", "time limit for each PM turn", LIMITS.timeoutMinutes))
     .addHelpText("after", commandHelp("cclinic plan", "cclinic plan --task --roadmap 1"))
     .action(async (options: PlanOptions) => {
@@ -224,7 +218,6 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .description("Run a whole roadmap with developer, PM and QA agents, with no human, on its own branches")
     .option("-C, --dir <path>", "project folder (default: the current folder)")
     .option("--roadmap <id>", "the roadmap to run. Without it, a menu lists them", positiveId)
-    .requiredOption("--max-budget-usd <n>", "the most the whole run may spend (required)", positiveNumber)
     .option(...limitOption("--developers <n>", "developer agents working at once", AUTO_LIMITS.developers))
     .option("-m, --model [value]", "model for every agent. With no value, opens a menu")
     .option("--effort [value]", "reasoning level for every agent. With no value, opens a menu")
@@ -232,10 +225,7 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .option("-y, --yes", "skip the confirmation prompt")
     .option("--dry-run", "check everything and show the plan, without starting the run")
     .option("--json", "print the result as JSON")
-    .addHelpText(
-      "after",
-      commandHelp("cclinic auto", "cclinic auto --roadmap 1 --max-budget-usd 20 --developers 3 --yes"),
-    )
+    .addHelpText("after", commandHelp("cclinic auto", "cclinic auto --roadmap 1 --developers 3 --yes"))
     .action(async (options: AutoOptions) => {
       setExit(await runAutoCommand(options, context));
     });
@@ -249,7 +239,6 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     )
     .option("--run <id>", "with --approver pm-agent: the automated run")
     .option("--task <id>", "with --approver pm-agent: the task", positiveId)
-    .option("--max-budget-usd <n>", "with --approver pm-agent: the most this task may spend", positiveNumber)
     .addHelpText("after", commandHelp("cclinic mcp", "cclinic mcp -C ./my-project"))
     .action(async (options: McpOptions) => {
       await runMcpCommand(options, context);

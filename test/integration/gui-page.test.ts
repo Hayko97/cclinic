@@ -207,7 +207,7 @@ describe("canvas page", () => {
     expect(await page.locator('[data-frame="changes"] [data-key="change-branch-fix-x"]').count()).toBe(1);
   });
 
-  it("TC-GUI-093: a task card shows its ID, title, 2 description lines, status, spec, step, mode, sessions and cost", async () => {
+  it("TC-GUI-093: a task card shows its ID, title, 2 description lines, status, spec, step, mode and sessions, and no cost", async () => {
     const { page } = await open({ withSessions: true });
     const card = page.locator('[data-key="task-2"]');
     expect(await card.locator(".card-id").textContent()).toBe("#2");
@@ -219,7 +219,7 @@ describe("canvas page", () => {
     expect(await card.locator(".agents").textContent()).toBe("You");
     expect(await card.locator(".sessions").textContent()).toBe("2 sessions");
     expect(await card.locator(".sessions .live-dot").count()).toBe(1);
-    expect(await card.locator(".cost").textContent()).toBe("$0.00");
+    expect(await card.textContent()).not.toContain("$");
     // Only 2 lines of the description are shown.
     const lines = await card
       .locator(".card-description")
@@ -791,7 +791,9 @@ describe("QA: live canvas, page side", () => {
     expect(await page.locator('[data-key="task-2"] .mode').textContent()).toBe("AI run");
     expect(await page.locator('[data-key="task-5"] .mode').textContent()).toBe("Manual");
     expect(await page.locator('[data-key="task-5"] .card-step').textContent()).toBe("spec");
-    expect(await page.locator("#budget").textContent()).toBe("$3.40 of $10.00");
+    // FR-GUI-083: no dollars, only the plan limits, and none are known in this project.
+    expect(await page.locator("#limits").textContent()).toBe("");
+    expect(await page.locator("body").textContent()).not.toContain("$3.40");
     await page.locator('[data-key="task-2"]').click();
     expect(await page.locator("#panel-body .details").textContent()).toContain(runId);
   });
@@ -2740,7 +2742,7 @@ describe("QA C2a run 5: the theme toggle and the 768 px top bar", () => {
     expect(await tokens(toggled.page)).toEqual(await tokens(system.page));
   });
 
-  it("FR-GUI-049: at 768 px the top bar shows the folder, the job count and the budget, inside the window", async () => {
+  it("FR-GUI-049: at 768 px the top bar shows the folder, the job count and the plan limits, inside the window", async () => {
     const root = path.join(makeTempFolder(), "deeply-nested-folder-name-".repeat(8), "shop");
     mkdirSync(root, { recursive: true });
     const store = storeOf(root);
@@ -2748,10 +2750,10 @@ describe("QA C2a run 5: the theme toggle and the 768 px top bar", () => {
     store.close();
     const { page } = await openWatched({ viewport: NARROW }, { root });
     await page.evaluate(() => {
-      const budget = document.getElementById("budget");
-      if (budget !== null) budget.textContent = "$12.34 of $50.00 · $1.00 of $5.00";
+      const limits = document.getElementById("limits");
+      if (limits !== null) limits.textContent = "Session 85 % · resets 4:00 PM · Week 40 % · resets Mon 12:00 AM";
     });
-    for (const selector of ["#project-name", "#project-folder", "#job-count", "#budget", "#theme"]) {
+    for (const selector of ["#project-name", "#project-folder", "#job-count", "#limits", "#theme"]) {
       const box = await page.locator(selector).boundingBox();
       expect(box !== null && box.width > 0 && box.x >= 0 && box.x + box.width <= NARROW.width, selector).toBe(true);
     }

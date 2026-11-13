@@ -1,6 +1,7 @@
 /** The `cclinic auto` command: runs a whole roadmap with developer, PM and QA agents (spec: automated-mode). */
 import { randomUUID } from "node:crypto";
 import { openRunRepository, readRepositoryState, branchExists, missingFromHead } from "../adapters/git/run-branches.js";
+import { savePlanLimits } from "../adapters/config/limits-store.js";
 import { claudeTranscriptPath, runAgent } from "../adapters/llm/agent-process.js";
 import { toJsonSchemaObject } from "../adapters/llm/retry.js";
 import { notifyUser } from "../adapters/notify/desktop-notifier.js";
@@ -52,7 +53,6 @@ export interface AutoOptions {
   readonly dir?: string;
   readonly roadmap?: number;
   readonly developers: number;
-  readonly maxBudgetUsd: number;
   readonly model?: string | true;
   readonly effort?: string | true;
   readonly timeoutMinutes: number;
@@ -166,7 +166,10 @@ function agentRunner(settings: {
         prompt: call.prompt,
         model: settings.model,
         effort: settings.effort,
-        maxBudgetUsd: call.maxBudgetUsd,
+        // FR-AUTO-041: each plan-limits report is saved for the GUI; failing to save it never stops the agent.
+        onLimits: (limits) => {
+          savePlanLimits(settings.context.environment, limits).catch(() => undefined);
+        },
         ...(call.schema === undefined ? {} : { jsonSchema: toJsonSchemaObject(call.schema) }),
         tools: isPm ? READ_ONLY_TOOLS : WRITING_TOOLS,
         allowedTools: isPm ? READ_ONLY_TOOLS : WORKTREE_AGENT_ALLOWED_TOOLS,
@@ -184,7 +187,12 @@ function agentRunner(settings: {
     }
     // The agent's work and cost count even if recording its end fails.
     await end(0, result.costUsd).catch(() => undefined);
-    return { costUsd: result.costUsd, finalMessage: result.finalMessage, output: result.structuredOutput };
+    return {
+      costUsd: result.costUsd,
+      finalMessage: result.finalMessage,
+      output: result.structuredOutput,
+      limitReached: result.limitReached,
+    };
   };
 }
 
@@ -282,7 +290,6 @@ export async function runAutoCommand(options: AutoOptions, context: CommandConte
     inProgress,
     runBranch,
     developers: options.developers,
-    budgetUsd: options.maxBudgetUsd,
   });
   if (options.dryRun === true) {
     // The model and reasoning are checked as the run checks them, but no menu opens.
@@ -336,9 +343,12 @@ export async function runAutoCommand(options: AutoOptions, context: CommandConte
       startedAt: new Date().toISOString(),
       finishedAt: null,
       outcome: null,
-      budgetUsd: options.maxBudgetUsd,
       spentUsd: 0,
       developers: options.developers,
+      model,
+      effort,
+      timeoutMinutes: options.timeoutMinutes,
+      limitResetsAt: null,
       tasks: initialRuns(runnable, blockedBefore, allTasks),
       skippedInProgress: inProgress.map((task) => ({ taskId: task.id, title: task.title })),
     };
@@ -388,13 +398,13 @@ export async function runAutoCommand(options: AutoOptions, context: CommandConte
           outcome: state.outcome,
           runBranch: state.runBranch,
           report: reportFile,
-          tasks: state.tasks.map(({ taskId, title, status, branch, reason, costUsd }) => ({
+          ...(state.outcome === "limit-reached" ? { limitResetsAt: state.limitResetsAt } : {}),
+          tasks: state.tasks.map(({ taskId, title, status, branch, reason }) => ({
             taskId,
             title,
             status,
             branch,
             reason,
-            costUsd,
           })),
         }),
       );

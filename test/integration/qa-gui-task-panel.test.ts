@@ -108,7 +108,10 @@ function withRun(
     startedAt: minutesAgo(60),
     finishedAt: options.isLive ? null : minutesAgo(1),
     outcome: options.isLive ? null : "partial",
-    budgetUsd: 10,
+    model: "haiku",
+    effort: "low",
+    timeoutMinutes: 30,
+    limitResetsAt: null,
     spentUsd: 3.4,
     developers: 1,
     tasks: [
@@ -225,7 +228,7 @@ describe("QA: task steps", () => {
           costUsd: 0.1,
         },
       ],
-      { status: "running", costUsd: 0.1 },
+      { status: "running" },
       true,
     );
     expect(view.rows.map((row) => [row.step, row.round, row.status])).toEqual([
@@ -240,14 +243,14 @@ describe("QA: task steps", () => {
       { changeType: "feature", spec: "refunds", taskId: 2 },
       { key: stateKey(2, "main"), approverMode: "user", now: minutesAgo(10) },
     );
-    await openWorkflowStore(fixture.root).save({ ...state, step: "implement", costUsd: 1.2 });
+    await openWorkflowStore(fixture.root).save({ ...state, step: "implement" });
     const { page } = await open(fixture);
     await page.locator('[data-key="task-2"]').click();
     const rows = page.locator(".steps > li .step-name");
     await expect
       .poll(() => rows.allTextContents())
       .toEqual(["Spec", "Implement", "QA", "Code review", "Preview", "Approval", "Commit"]);
-    expect(await page.locator(".steps + p").textContent()).toBe("Total cost $1.20");
+    expect(await page.locator("#panel-body").textContent()).not.toContain("$");
   });
 
   it("at 768 px a long tool input and step name don't make the panel or page scroll sideways", async () => {

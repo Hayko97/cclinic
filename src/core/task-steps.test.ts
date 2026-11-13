@@ -32,7 +32,7 @@ const shape = (rows: readonly { step: string; round: number | null; status: stri
   rows.map((row) => `${row.step} ${row.round ?? "-"} ${row.status}`);
 
 describe("task steps", () => {
-  it("TC-GUI-077: a task in a live run lists each round in order, with its result, times and cost", () => {
+  it("TC-GUI-077: a task in a live run lists each round in order, with its result and times", () => {
     const sessions = [
       session("spec-1", 60, 55),
       session("spec-review-1", 55, 50),
@@ -42,7 +42,7 @@ describe("task steps", () => {
       session("qa-2", 25, 20),
       session("review-1", 20, null),
     ];
-    const view = runSteps([...sessions].reverse(), { status: "running", costUsd: 0.6 }, true);
+    const view = runSteps([...sessions].reverse(), { status: "running" }, true);
 
     expect(shape(view.rows)).toEqual([
       "spec 1 passed",
@@ -57,35 +57,35 @@ describe("task steps", () => {
     expect(view.rows[3]).toMatchObject({
       startedAt: minutesAgo(40),
       endedAt: minutesAgo(35),
-      costUsd: 0.1,
       sessionId: "session-qa-1",
     });
-    expect(view.rows[6]).toMatchObject({ endedAt: null, costUsd: null });
-    expect(view).toMatchObject({ source: "run", costUsd: 0.6 });
+    expect(view.rows[6]).toMatchObject({ endedAt: null });
+    expect(JSON.stringify(view)).not.toContain("costUsd");
+    expect(view).toMatchObject({ source: "run" });
   });
 
   it("TC-GUI-120: the last round of a blocked task, and an agent that exited non-zero, failed", () => {
     const blocked = runSteps(
       [session("qa-1", 30, 25), session("implement-2", 25, 20), session("qa-3", 20, 10)],
-      { status: "blocked", costUsd: 1 },
+      { status: "blocked" },
       false,
     );
     expect(shape(blocked.rows).at(-2)).toBe("qa 3 failed");
 
     const crashed = runSteps(
       [session("spec-1", 30, 25), session("implement-1", 25, 20, { exitCode: 1 })],
-      { status: "running", costUsd: 1 },
+      { status: "running" },
       true,
     );
     expect(shape(crashed.rows)[1]).toBe("implement 1 failed");
   });
 
   it("a session left open by a run that is no longer live failed, and a done task's merge passed", () => {
-    expect(shape(runSteps([session("qa-1", 10, null)], { status: "open", costUsd: 0 }, false).rows)).toEqual([
+    expect(shape(runSteps([session("qa-1", 10, null)], { status: "open" }, false).rows)).toEqual([
       "qa 1 failed",
       "merge - not-started",
     ]);
-    expect(shape(runSteps([session("review-1", 10, 5)], { status: "done", costUsd: 0 }, false).rows)).toEqual([
+    expect(shape(runSteps([session("review-1", 10, 5)], { status: "done" }, false).rows)).toEqual([
       "review 1 passed",
       "merge - passed",
     ]);
@@ -121,7 +121,7 @@ describe("task steps", () => {
       "commit - not-started",
     ]);
     expect(view.rows[2]).toMatchObject({ endedAt: minutesAgo(40) });
-    expect(view).toMatchObject({ source: "workflow", costUsd: 1.2 });
+    expect(view).toMatchObject({ source: "workflow" });
   });
 
   it("a change waiting for an answer, a blocked change and a finished one show it on the current step", () => {
@@ -159,7 +159,10 @@ describe("session activity", () => {
     startedAt: minutesAgo(30),
     finishedAt: null,
     outcome: null,
-    budgetUsd: 10,
+    model: "haiku",
+    effort: "low",
+    timeoutMinutes: 30,
+    limitResetsAt: null,
     spentUsd: 3.4,
     developers: 1,
     tasks: [],

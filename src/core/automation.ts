@@ -7,13 +7,12 @@ import {
   RUN_ID_FIELD_DIGITS,
   WIP_COMMIT_MARKER,
 } from "./constants/agents.js";
-import { USD_DECIMAL_PLACES } from "./constants/terminal.js";
 import { findCycle, type Roadmap, type Task } from "./tasks.js";
 
-export const RUN_OUTCOMES = ["completed", "partial", "budget-reached", "interrupted"] as const;
+export const RUN_OUTCOMES = ["completed", "partial", "limit-reached", "interrupted"] as const;
 export type RunOutcome = (typeof RUN_OUTCOMES)[number];
 
-/** `open` is a task put back for a later run, after the budget ran out or the run was stopped. */
+/** `open` is a task put back for a later run, after a plan usage limit was reached or the run was stopped. */
 export type TaskRunStatus = "waiting" | "running" | "done" | "blocked" | "skipped" | "open";
 
 export interface StageRounds {
@@ -68,9 +67,15 @@ export interface RunState {
   readonly startedAt: string;
   readonly finishedAt: string | null;
   readonly outcome: RunOutcome | null;
-  readonly budgetUsd: number;
+  /** Claude Code's estimate of what the agents cost, kept in the file only: the GUI and the report show none (FR-AUTO-027). */
   readonly spentUsd: number;
   readonly developers: number;
+  /** FR-AUTO-027: what the run runs with, so it can be continued with the same (gui FR-GUI-084). */
+  readonly model: string;
+  readonly effort: string;
+  readonly timeoutMinutes: number;
+  /** FR-AUTO-025: when the plan limit that stopped the run resets, if Claude Code said. */
+  readonly limitResetsAt: string | null;
   readonly tasks: readonly TaskRun[];
   /** In progress when the run started, so left alone (FR-AUTO-001). */
   readonly skippedInProgress: readonly { readonly taskId: number; readonly title: string }[];
@@ -185,10 +190,12 @@ export function readyTasks(runs: readonly TaskRun[], doneIds: ReadonlySet<number
     .slice(0, Math.max(freeSlots, 0));
 }
 
-export function decideOutcome(runs: readonly TaskRun[], isInterrupted: boolean, isBudgetReached: boolean): RunOutcome {
+export function decideOutcome(runs: readonly TaskRun[], isInterrupted: boolean, isLimitReached: boolean): RunOutcome {
+  const isAllDone = runs.every((run) => run.status === "done");
   if (isInterrupted) return "interrupted";
-  if (isBudgetReached) return "budget-reached";
-  return runs.every((run) => run.status === "done") ? "completed" : "partial";
+  // A limit reached by the last call leaves nothing to continue.
+  if (isLimitReached && !isAllDone) return "limit-reached";
+  return isAllDone ? "completed" : "partial";
 }
 
 export function commitMessage(
@@ -349,8 +356,6 @@ export function buildImplementationReviewPrompt(context: TaskContext, diff: stri
   ].join("\n");
 }
 
-const usd = (value: number): string => `$${value.toFixed(USD_DECIMAL_PLACES)}`;
-
 function roundsText(rounds: StageRounds): string {
   return `${rounds.specReviews} spec, ${rounds.qaRuns} QA, ${rounds.implementationReviews} review`;
 }
@@ -365,15 +370,17 @@ export function renderReport(state: RunState): string {
     `- Outcome: ${state.outcome ?? "running"}`,
     `- Started: ${state.startedAt}`,
     `- Finished: ${state.finishedAt ?? "not yet"}`,
-    `- Total cost: ${usd(state.spentUsd)} of ${usd(state.budgetUsd)} (estimate)`,
+    ...(state.outcome === "limit-reached"
+      ? [`- Claude's usage limit was reached. It resets ${state.limitResetsAt ?? "later"}; continue the run then.`]
+      : []),
     "",
     "## Tasks",
     "",
-    "| Task | Result | Branch | Rounds | Cost | Reason |",
-    "|---|---|---|---|---|---|",
+    "| Task | Result | Branch | Rounds | Reason |",
+    "|---|---|---|---|---|",
     ...state.tasks.map(
       (run) =>
-        `| #${run.taskId} ${run.title.replaceAll("|", "\\|")} | ${run.status} | ${run.branch === null ? "" : `\`${run.branch}\``} | ${roundsText(run.rounds)} | ${usd(run.costUsd)} | ${(run.reason ?? "").replaceAll("|", "\\|").replaceAll("\n", " ")} |`,
+        `| #${run.taskId} ${run.title.replaceAll("|", "\\|")} | ${run.status} | ${run.branch === null ? "" : `\`${run.branch}\``} | ${roundsText(run.rounds)} | ${(run.reason ?? "").replaceAll("|", "\\|").replaceAll("\n", " ")} |`,
     ),
   ];
   if (state.skippedInProgress.length > 0) {
@@ -412,7 +419,6 @@ export function renderPlan(input: {
   inProgress: readonly Task[];
   runBranch: string;
   developers: number;
-  budgetUsd: number;
 }): string {
   const needs = (task: Task): string =>
     task.dependsOn.length === 0 ? "" : ` (after ${task.dependsOn.map((id) => `#${id}`).join(", ")})`;
@@ -420,7 +426,6 @@ export function renderPlan(input: {
     `Roadmap #${input.roadmap.id}: ${input.roadmap.title}`,
     `Run branch: ${input.runBranch}`,
     `Developers: ${input.developers}`,
-    `Budget: ${usd(input.budgetUsd)}`,
     "",
     "Tasks in run order:",
     ...input.runnable.map((task) => `  #${task.id} ${task.title}${needs(task)}`),

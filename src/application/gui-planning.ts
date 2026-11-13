@@ -90,7 +90,7 @@ export function createPlanner(ports: PlannerPorts): Planner {
   const run = async (prepared: PreparedSession): Promise<void> => {
     try {
       const outcome = await runPlanningSession(prepared.input, {
-        callPm: (prompt, maxBudgetUsd) => prepared.callPm(prompt, maxBudgetUsd),
+        callPm: prepared.callPm,
         answer: (question) => wait({ step: "question", question: shown(question) }),
         review: async (text) => (await wait({ step: "review", proposal: shown(text) })) as ReviewChoice,
         feedback: () => Promise.resolve(feedback),

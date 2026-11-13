@@ -1,5 +1,4 @@
 /** Runs a roadmap's tasks with developer, PM and QA agents, in dependency order (spec: automated-mode). */
-import { canStartCall, NO_SPENDING, recordCall, remainingUsd, type Spending } from "../core/agent-budget.js";
 import {
   buildDeveloperPrompt,
   buildImplementationReviewPrompt,
@@ -34,7 +33,6 @@ export interface AgentCall {
   readonly role: AgentRole;
   readonly cwd: string;
   readonly prompt: string;
-  readonly maxBudgetUsd: number;
   readonly schema?: ReplySchema;
 }
 
@@ -42,6 +40,8 @@ export interface AgentReply {
   readonly costUsd: number | null;
   readonly finalMessage: string;
   readonly output: unknown;
+  /** FR-AUTO-025: Claude said a plan usage limit is reached, though this call finished. */
+  readonly limitReached?: { readonly resetsAt: string | null } | null;
 }
 
 export type MergeResult =
@@ -77,7 +77,7 @@ export interface AutomationInput {
   readonly doneBefore: ReadonlySet<number>;
 }
 
-/** Why a task stopped early. The stage limit and merge conflicts block it; the budget and Ctrl+C put it back. */
+/** Why a task stopped early. The stage limit and merge conflicts block it; a plan usage limit and Ctrl+C put it back. */
 class TaskStop extends CclinicError {
   constructor(
     readonly status: "blocked" | "open",
@@ -91,54 +91,68 @@ const NO_ROUNDS: StageRounds = { specReviews: 0, qaRuns: 0, implementationReview
 
 export async function runAutomation(input: AutomationInput, ports: AutomationPorts): Promise<RunState> {
   let state = input.state;
-  let spending: Spending = NO_SPENDING;
-  let isBudgetReached = false;
+  /** Claude Code's estimate of what the agents cost, kept in `run.json` only (FR-AUTO-027). */
+  let spentUsd = 0;
+  /** FR-AUTO-025: a plan usage limit is reached, so no new agent starts. */
+  let isLimitReached = false;
+  let limitResetsAt: string | null = null;
   const doneIds = new Set(input.doneBefore);
   let merging: Promise<unknown> = Promise.resolve();
 
   const save = async (): Promise<void> => {
-    await ports.saveState({ ...state, spentUsd: spending.spentUsd });
+    await ports.saveState({ ...state, spentUsd, limitResetsAt });
   };
   const update = (taskId: number, change: Partial<TaskRun>): void => {
     state = { ...state, tasks: state.tasks.map((run) => (run.taskId === taskId ? { ...run, ...change } : run)) };
   };
   const current = (taskId: number): TaskRun | undefined => state.tasks.find((item) => item.taskId === taskId);
   const addCost = (taskId: number, costUsd: number | null): void => {
-    spending = recordCall(spending, costUsd);
+    spentUsd += costUsd ?? 0;
     update(taskId, { costUsd: (current(taskId)?.costUsd ?? 0) + (costUsd ?? 0) });
   };
   // Read through a function, because the signal can be aborted while an agent runs.
   const isStopped = (): boolean => ports.signal.aborted;
 
-  /** Runs one agent, counting its cost against the run's budget (FR-AUTO-025). */
+  const limitReason = (): string =>
+    `Claude's usage limit is reached${limitResetsAt === null ? "" : `; it resets ${limitResetsAt}`}.`;
+
+  /** Runs one agent. A plan usage limit stops the run, putting the task back, not counting a round (FR-AUTO-025). */
   const callAgent = async <T>(
     taskId: number,
     name: string,
-    call: Omit<AgentCall, "maxBudgetUsd" | "taskId" | "step">,
+    call: Omit<AgentCall, "taskId" | "step">,
     schema?: ReplySchema<T>,
   ) => {
     if (isStopped()) throw new TaskStop("open", "The run was stopped.");
-    if (!canStartCall(spending, state.budgetUsd)) {
-      isBudgetReached = true;
-      throw new TaskStop("open", "The run's budget ran out.");
-    }
+    if (isLimitReached) throw new TaskStop("open", limitReason());
     let reply: AgentReply;
     try {
       reply = await ports.runAgent({
         ...call,
         taskId,
         step: name,
-        maxBudgetUsd: remainingUsd(spending, state.budgetUsd),
         ...(schema === undefined ? {} : { schema }),
       });
     } catch (error) {
       if (error instanceof CancelledError || isStopped()) throw new TaskStop("open", "The run was stopped.");
+      if (error instanceof AgentCallError && error.isUsageLimit) {
+        isLimitReached = true;
+        limitResetsAt = error.resetsAt ?? limitResetsAt;
+        addCost(taskId, error.costUsd);
+        await ports.saveLog(`task-${taskId}-${name}`, `STOPPED: ${error.message}`);
+        throw new TaskStop("open", limitReason());
+      }
       addCost(taskId, error instanceof AgentCallError ? error.costUsd : null);
       const message = error instanceof Error ? error.message : String(error);
       await ports.saveLog(`task-${taskId}-${name}`, `FAILED: ${message}`);
       return { isOk: false as const, reason: `The ${call.role} agent failed: ${message}` };
     }
     addCost(taskId, reply.costUsd);
+    // The call's own work counts; the limit only stops the agents after it.
+    if (reply.limitReached !== undefined && reply.limitReached !== null) {
+      isLimitReached = true;
+      limitResetsAt = reply.limitReached.resetsAt ?? limitResetsAt;
+    }
     await ports.saveLog(`task-${taskId}-${name}`, `${reply.finalMessage}\n\n${JSON.stringify(reply.output ?? null)}`);
     await save();
     if (schema === undefined) return { isOk: true as const, value: undefined as T };
@@ -296,7 +310,7 @@ export async function runAutomation(input: AutomationInput, ports: AutomationPor
   await save();
   const running = new Map<number, Promise<void>>();
   for (;;) {
-    const canStartMore = !isStopped() && !isBudgetReached;
+    const canStartMore = !isStopped() && !isLimitReached;
     if (canStartMore) {
       for (const run of readyTasks(state.tasks, doneIds, state.developers - running.size)) {
         update(run.taskId, { status: "running" });
@@ -311,7 +325,7 @@ export async function runAutomation(input: AutomationInput, ports: AutomationPor
   }
 
   // Tasks that never started keep their status in the task list.
-  const wasCutShort = isStopped() || isBudgetReached;
+  const wasCutShort = isStopped() || isLimitReached;
   for (const run of state.tasks.filter((item) => item.status === "waiting")) {
     update(run.taskId, {
       status: wasCutShort ? "open" : "skipped",
@@ -320,9 +334,10 @@ export async function runAutomation(input: AutomationInput, ports: AutomationPor
   }
   state = {
     ...state,
-    spentUsd: spending.spentUsd,
+    spentUsd,
+    limitResetsAt,
     finishedAt: ports.now().toISOString(),
-    outcome: decideOutcome(state.tasks, isStopped(), isBudgetReached),
+    outcome: decideOutcome(state.tasks, isStopped(), isLimitReached),
   };
   await ports.saveState(state);
   return state;

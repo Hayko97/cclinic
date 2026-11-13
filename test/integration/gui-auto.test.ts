@@ -135,7 +135,10 @@ function runState(runId: string, change: Partial<RunState> = {}): RunState {
     startedAt: new Date(Date.now() - 600_000).toISOString(),
     finishedAt: null,
     outcome: null,
-    budgetUsd: 10,
+    model: "haiku",
+    effort: "low",
+    timeoutMinutes: 30,
+    limitResetsAt: null,
     spentUsd: 3.4,
     developers: 2,
     tasks: [
@@ -186,24 +189,21 @@ describe("Run with AI through the API", () => {
   it("TC-GUI-037: a run without confirming gets the plan from a dry run, and no run starts", async () => {
     const jobs = scriptedJobs(PLAN);
     const gui = await startScripted(makeTempFolder(), jobs);
-    const reply = await postJob(gui, { command: "auto", options: { roadmap: 1, maxBudgetUsd: 5, developers: 2 } });
+    const reply = await postJob(gui, { command: "auto", options: { roadmap: 1, developers: 2 } });
     expect(reply.status).toBe(200);
     expect(JSON.parse(reply.body)).toEqual({ plan: PLAN });
-    expect(jobs.started).toEqual([
-      ["auto", "--roadmap=1", "--max-budget-usd=5", "--developers=2", "--dry-run", "--json"],
-    ]);
+    expect(jobs.started).toEqual([["auto", "--roadmap=1", "--developers=2", "--dry-run", "--json"]]);
   });
 
   it("TC-GUI-038: a confirmed run starts cclinic auto with the form's options and --yes --json", async () => {
     const jobs = scriptedJobs(PLAN);
     const gui = await startScripted(makeTempFolder(), jobs);
-    const options = { roadmap: 1, maxBudgetUsd: 5, developers: 2, model: "haiku", effort: "low", timeoutMinutes: 10 };
+    const options = { roadmap: 1, developers: 2, model: "haiku", effort: "low", timeoutMinutes: 10 };
     expect((await postJob(gui, { command: "auto", confirmed: true, options })).status).toBe(201);
     expect(jobs.started).toEqual([
       [
         "auto",
         "--roadmap=1",
-        "--max-budget-usd=5",
         "--developers=2",
         "--model=haiku",
         "--effort=low",
@@ -220,12 +220,13 @@ describe("Run with AI through the API", () => {
   it("FR-GUI-027: values the CLI would refuse are refused in the CLI's words, and nothing starts", async () => {
     const jobs = scriptedJobs(PLAN);
     const gui = await startScripted(makeTempFolder(), jobs);
-    const developers = await postJob(gui, { command: "auto", options: { roadmap: 1, maxBudgetUsd: 5, developers: 9 } });
+    const developers = await postJob(gui, { command: "auto", options: { roadmap: 1, developers: 9 } });
     expect(developers.status).toBe(400);
     expect((JSON.parse(developers.body) as { error: string }).error).toBe(
       "option '--developers <n>' argument '9' is invalid. It must be a whole number from 1 to 8.",
     );
-    const budget = await postJob(gui, { command: "auto", options: { roadmap: 1, maxBudgetUsd: 0 } });
+    // FR-AUTO-002: the budget option is gone, so a request that sends one is refused.
+    const budget = await postJob(gui, { command: "auto", options: { roadmap: 1, maxBudgetUsd: 5 } });
     expect(budget.status).toBe(400);
     expect(jobs.started).toEqual([]);
   });
@@ -234,7 +235,7 @@ describe("Run with AI through the API", () => {
     const root = repository();
     writeProject(root, { "src/shared.txt": "changed\n" });
     const gui = await startReal(root);
-    const changed = await postJob(gui, { command: "auto", options: { roadmap: 1, maxBudgetUsd: 5 } });
+    const changed = await postJob(gui, { command: "auto", options: { roadmap: 1 } });
     expect(changed.status).toBe(409);
     expect((JSON.parse(changed.body) as { error: string }).error).toMatch(/tracked|commit|changes/i);
 
@@ -242,7 +243,7 @@ describe("Run with AI through the API", () => {
     mkdirSync(path.join(locked, ".cclinic/auto"), { recursive: true });
     writeFileSync(path.join(locked, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
     const lockedGui = await startReal(locked);
-    const busy = await postJob(lockedGui, { command: "auto", options: { roadmap: 1, maxBudgetUsd: 5 } });
+    const busy = await postJob(lockedGui, { command: "auto", options: { roadmap: 1 } });
     expect(busy.status).toBe(409);
     expect((JSON.parse(busy.body) as { error: string }).error).toContain(`Automated run ${LIVE_RUN}`);
   });
@@ -250,7 +251,7 @@ describe("Run with AI through the API", () => {
   it("TC-GUI-042: Stop sends the GUI's run SIGINT, and the run ends interrupted with its task open again", async () => {
     const root = repository();
     const gui = await startReal(root, [{ match: "developer agent", hang: true, times: 0 }]);
-    const options = { roadmap: 1, maxBudgetUsd: 5, developers: 1, model: "haiku", effort: "low" };
+    const options = { roadmap: 1, developers: 1, model: "haiku", effort: "low" };
     expect((await postJob(gui, { command: "auto", options })).status).toBe(200);
     const started = JSON.parse((await postJob(gui, { command: "auto", confirmed: true, options })).body) as {
       job: { id: string };
@@ -317,15 +318,15 @@ describe("Run with AI through the API", () => {
       if (stream.events.length === 0) throw new Error("no canvas yet");
     });
     const first = (stream.events[0]?.data as { canvas: CanvasView }).canvas.roadmaps[0]?.run;
-    expect(first).toMatchObject({ runId: LIVE_RUN, spentUsd: 3.4, budgetUsd: 10, pid: process.pid });
-    expect(first?.tasks[0]).toMatchObject({ taskId: 1, status: "running", costUsd: 1.25 });
+    expect(first).toMatchObject({ runId: LIVE_RUN, pid: process.pid });
+    expect(first?.tasks[0]).toMatchObject({ taskId: 1, status: "running" });
+    expect(JSON.stringify(first)).not.toMatch(/costUsd|spentUsd|budgetUsd/);
     const updated = runState(LIVE_RUN, { spentUsd: 4.1 });
     writeRun(root, { ...updated, tasks: updated.tasks.map((task) => ({ ...task, status: "done", costUsd: 1.95 })) });
     await Promise.all([...checks].map((check) => check()));
     await vi.waitFor(() => {
       const last = (stream.events.at(-1)?.data as { canvas: CanvasView }).canvas.roadmaps[0]?.run;
-      expect(last).toMatchObject({ spentUsd: 4.1 });
-      expect(last?.tasks[0]).toMatchObject({ status: "done", costUsd: 1.95 });
+      expect(last?.tasks[0]).toMatchObject({ status: "done" });
     });
     stream.close();
   });
@@ -442,7 +443,6 @@ describe("Run with AI and the roadmap panel in the browser", () => {
     await frame.locator('button[data-action="run-ai"]').click();
     const dialog = page.locator("#auto-dialog");
     expect(await dialog.locator("#auto-roadmap").textContent()).toBe("Roadmap #1: Launch");
-    await dialog.locator('input[name="maxBudgetUsd"]').fill("5");
     await dialog.locator('input[name="developers"]').fill("1");
     await dialog.locator("#auto-show-plan").click();
     await expect
@@ -451,12 +451,13 @@ describe("Run with AI and the roadmap panel in the browser", () => {
     expect(existsSync(path.join(root, ".cclinic/auto/.lock"))).toBe(false);
     await dialog.locator("#auto-start").click();
     await expect.poll(() => frame.locator('button[data-action="stop-run"]').count(), { timeout: 20_000 }).toBe(1);
-    expect(await frame.locator(".run-progress").textContent()).toContain("of $5.00");
+    expect(await frame.locator(".run-progress").textContent()).toMatch(/^Running for /);
     await frame.locator('button[data-action="stop-run"]').click();
     // FR-GUI-061: stopping asks first, naming the run and its effect.
     expect(await page.locator("#confirm-message").textContent()).toContain("Its tasks in progress go back to open");
     await page.locator("#confirm-ok").click();
-    await expect.poll(() => frame.locator('button[data-action="run-ai"]').count(), { timeout: 20_000 }).toBe(1);
+    // FR-GUI-084: the stopped run still has open tasks, so its roadmap offers Continue in place of Run with AI.
+    await expect.poll(() => frame.locator('button[data-action="continue-run"]').count(), { timeout: 20_000 }).toBe(1);
     const [runId] = (await canvasOf(gui)).roadmaps[0]?.pastRuns.map((run) => run.runId) ?? [];
     const state = JSON.parse(
       readFileSync(path.join(root, ".cclinic/auto", runId ?? "", "run.json"), "utf8"),
@@ -471,7 +472,6 @@ describe("Run with AI and the roadmap panel in the browser", () => {
     const page = await openPage(gui);
     await page.locator('[data-frame="roadmap-1"] button[data-action="run-ai"]').click();
     const dialog = page.locator("#auto-dialog");
-    await dialog.locator('input[name="maxBudgetUsd"]').fill("5");
     await dialog.locator("#auto-show-plan").click();
     await expect.poll(() => dialog.locator("#auto-error").textContent(), { timeout: 15_000 }).not.toBe("");
     expect(await dialog.locator("#auto-start").isHidden()).toBe(true);
@@ -492,14 +492,14 @@ describe("Run with AI and the roadmap panel in the browser", () => {
     ]);
     const run = panel.locator(".run-section");
     expect(await run.locator("h3").textContent()).toBe(`Run ${LIVE_RUN}`);
-    expect(await run.locator(".budget").textContent()).toBe("$3.40 of $10.00");
+    expect(await run.textContent()).not.toContain("$");
     expect(await run.locator('[data-run-task="1"]').textContent()).toContain("1 spec · 2 QA · 0 review");
     expect(await panel.locator('button[data-action="stop-run"]').count()).toBe(1);
 
     const past = panel.locator(".past-runs > li");
     expect(await past.locator("button").allTextContents()).toEqual([
-      `${OLD_RUN} · completed · $2.00 of $10.00`,
-      `${OLDER_RUN} · partial · $2.00 of $10.00`,
+      `${OLD_RUN} · completed`,
+      `${OLDER_RUN} · partial`,
     ]);
     await past.first().locator("button").click();
     await expect.poll(() => panel.locator(".run-report").textContent()).toContain("Outcome: completed");

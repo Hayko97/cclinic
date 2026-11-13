@@ -99,7 +99,7 @@ async function waitForStep(gui: TestGui, step: PlanView["step"]): Promise<PlanVi
   }, WAIT);
 }
 
-const NEW_ROADMAP = { target: { kind: "new-roadmap" }, model: "sonnet", effort: "low", maxBudgetUsd: 1 };
+const NEW_ROADMAP = { target: { kind: "new-roadmap" }, model: "sonnet", effort: "low" };
 
 describe("Plan through the API", () => {
   it("TC-GUI-032: Plan starts the same session as cclinic plan, and the PM's question reaches the browser", async () => {
@@ -118,10 +118,9 @@ describe("Plan through the API", () => {
     const cli = agentHarness({ rules: pmRules(asking("Who pays?")) });
     vi.mocked(select).mockResolvedValueOnce("new");
     vi.mocked(input).mockRejectedValueOnce(new Error("stop here"));
-    await runPlanCommand(
-      { dir: root, maxBudgetUsd: 1, timeoutMinutes: 30, model: "sonnet", effort: "low" },
-      cli.context,
-    ).catch(() => undefined);
+    await runPlanCommand({ dir: root, timeoutMinutes: 30, model: "sonnet", effort: "low" }, cli.context).catch(
+      () => undefined,
+    );
     const withoutIds = (args: readonly string[]) =>
       args.map((arg) => arg.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "ID"));
     expect(withoutIds(harness.calls()[0]?.args ?? [])).toEqual(withoutIds(cli.calls()[0]?.args ?? []));
@@ -215,9 +214,12 @@ describe("Plan through the API", () => {
     expect(JSON.parse(missing.body)).toEqual({
       error: "Roadmap 9 doesn't exist. See your roadmaps with: cclinic tasks roadmaps",
     });
-    const budget = await post(gui, "/api/plan", { target: { kind: "new-roadmap" }, maxBudgetUsd: 0 });
+    // FR-PLAN-001: the budget option is gone, so a request that sends one is refused.
+    const budget = await post(gui, "/api/plan", { target: { kind: "new-roadmap" }, maxBudgetUsd: 1 });
     expect(budget.status).toBe(400);
-    expect((JSON.parse(budget.body) as { error: string }).error).toContain("--max-budget-usd");
+    const timeout = await post(gui, "/api/plan", { target: { kind: "new-roadmap" }, timeoutMinutes: 0 });
+    expect(timeout.status).toBe(400);
+    expect((JSON.parse(timeout.body) as { error: string }).error).toContain("--timeout-minutes");
     expect((await post(gui, "/api/plan/answer", { text: "Hi" })).status).toBe(409);
     expect((await post(gui, "/api/plan/review", { choice: "approve" })).status).toBe(409);
     expect((await post(gui, "/api/plan/review", { choice: "refine" })).status).toBe(400);
@@ -251,7 +253,6 @@ describe("Plan in the browser", () => {
     await page.locator("#plan-open").click();
     const dialog = page.locator("#plan-dialog");
     expect(await dialog.locator("#plan-target").textContent()).toBe("A new roadmap.");
-    await dialog.locator('input[name="maxBudgetUsd"]').fill("1");
     await dialog.locator("#plan-start").click();
     await expect.poll(() => dialog.locator(".plan-question-text").textContent(), WAIT).toBe("Who pays?");
     await expect.poll(() => page.locator("#needs-count").textContent()).toBe("1");

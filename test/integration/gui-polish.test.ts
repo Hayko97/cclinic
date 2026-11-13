@@ -231,10 +231,10 @@ describe("GUI polish", () => {
     jobs.end("doctor", 0);
   });
 
-  it("TC-GUI-089: times read as how long ago, with the exact time on hover, and costs have 2 decimals", async () => {
+  it("TC-GUI-089: times read as how long ago, with the exact time on hover", async () => {
     const { page } = await open();
     const shown = await page.evaluate(`(async () => {
-      const { ago, money, when } = await import("/assets/api.js");
+      const { ago, when } = await import("/assets/api.js");
       const threeMinutesAgo = new Date(Date.now() - 180_000).toISOString();
       const node = when(threeMinutesAgo);
       return {
@@ -242,10 +242,9 @@ describe("GUI polish", () => {
         title: node.title === new Date(threeMinutesAgo).toLocaleString(),
         justNow: ago(new Date().toISOString()),
         hours: ago(new Date(Date.now() - 7_200_000).toISOString()),
-        cost: money(1.234),
       };
     })()`);
-    expect(shown).toEqual({ text: "3 min ago", title: true, justNow: "just now", hours: "2 h ago", cost: "$1.23" });
+    expect(shown).toEqual({ text: "3 min ago", title: true, justNow: "just now", hours: "2 h ago" });
   });
 
   it("TC-GUI-090: a slow canvas shows a placeholder until it arrives; a failed one says why, with Retry that loads it", async () => {

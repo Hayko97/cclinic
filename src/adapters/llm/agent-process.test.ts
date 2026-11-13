@@ -10,7 +10,6 @@ describe("agent process arguments", () => {
     const args = buildAgentArgs({
       model: "haiku",
       effort: "low",
-      maxBudgetUsd: 2,
       jsonSchema: { type: "object" },
       tools: READ_ONLY_TOOLS,
       allowedTools: READ_ONLY_TOOLS,
@@ -25,7 +24,7 @@ describe("agent process arguments", () => {
     for (const flag of ["--safe-mode", "--no-session-persistence"]) expect(args).toContain(flag);
     expect(args[args.indexOf("--permission-mode") + 1]).toBe("dontAsk");
     expect(args[args.indexOf("--json-schema") + 1]).toBe('{"type":"object"}');
-    expect(args.slice(-2)).toEqual(["--max-budget-usd", "2.000000"]);
+    expect(args).not.toContain("--max-budget-usd");
     for (const tool of ["Bash", "Write", "Edit"])
       expect(between(args, "--tools", "--allowedTools")).not.toContain(tool);
   });
@@ -34,7 +33,6 @@ describe("agent process arguments", () => {
     const args = buildAgentArgs({
       model: "haiku",
       effort: "low",
-      maxBudgetUsd: 2,
       tools: READ_ONLY_TOOLS,
       allowedTools: READ_ONLY_TOOLS,
       deniedTools: AGENT_DENIED_TOOLS,
@@ -42,6 +40,8 @@ describe("agent process arguments", () => {
     });
     expect(args).not.toContain("--no-session-persistence");
     expect(args[args.indexOf("--session-id") + 1]).toBe("7c1e0000-0000-4000-8000-00000000a90f");
+    // FR-AUTO-016: no dollar limit; the plan's own usage limits stop the work (FR-AUTO-025).
+    expect(args).not.toContain("--max-budget-usd");
   });
 
   it("TC-AUTO-057: the transcript is in Claude Code's config folder, and an empty CLAUDE_CONFIG_DIR counts as unset", () => {

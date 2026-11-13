@@ -291,7 +291,6 @@ export const planRequestSchema = z.strictObject({
   ]),
   model: modelValueSchema.optional(),
   effort: effortValueSchema.optional(),
-  maxBudgetUsd: budgetSchema.optional(),
   timeoutMinutes: limit("--timeout-minutes <n>", LIMITS.timeoutMinutes),
 });
 export type PlanRequest = z.output<typeof planRequestSchema>;
@@ -315,7 +314,6 @@ export const planReviewSchema = z
 /** FR-GUI-027: `cclinic auto`'s options, checked with the CLI's own limits. */
 export const autoOptionsSchema = z.strictObject({
   roadmap: idSchema,
-  maxBudgetUsd: budgetSchema,
   developers: limit("--developers <n>", AUTO_LIMITS.developers),
   model: modelValueSchema.optional(),
   effort: effortValueSchema.optional(),
@@ -336,7 +334,6 @@ export type AutoPlan = z.output<typeof autoPlanSchema>;
 function autoArgs(options: AutoOptions): string[] {
   const valued: [string, string | number | undefined][] = [
     ["--roadmap", options.roadmap],
-    ["--max-budget-usd", options.maxBudgetUsd],
     ["--developers", options.developers],
     ["--model", options.model],
     ["--effort", options.effort],

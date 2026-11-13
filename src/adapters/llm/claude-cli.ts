@@ -105,6 +105,11 @@ export function resultMessage(result: ResultEvent): string {
 }
 
 const USAGE_LIMIT = /hit your (.{0,40}?)limit/i;
+
+/** FR-AUTO-025: Claude Code's message for a used-up plan limit, unlike a short-lived HTTP 429 throttle. */
+export function isUsageLimitMessage(message: string): boolean {
+  return USAGE_LIMIT.test(message);
+}
 const MODEL_NAMES = Object.values(CLAUDE_MODELS)
   .map((model) => model.value)
   .join("|");

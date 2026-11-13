@@ -32,6 +32,7 @@ import {
   TRANSCRIPT_POLL_MS,
 } from "../core/constants/gui.js";
 import type { SendEvent } from "../core/gui.js";
+import { limitsView, type LimitsView, type PlanLimits } from "../core/limits.js";
 import { redact } from "../core/redaction.js";
 
 export interface CanvasPorts {
@@ -47,6 +48,8 @@ export interface CanvasPorts {
   readonly readTranscript: (file: string, from: TranscriptPosition | undefined) => Promise<TranscriptLines>;
   /** FR-GUI-057: the whole lines at a transcript's end, and when it was last written to. */
   readonly readTranscriptTail: (file: string) => Promise<{ readonly lines: string[]; readonly modifiedAt: Date }>;
+  /** FR-GUI-083: the newest Claude plan limits cclinic saved, or null when none are known. */
+  readonly readLimits: () => Promise<PlanLimits | null>;
   readonly now: () => Date;
   /** Runs `run` every `ms`, and returns what stops it. `run` resolves once its check is done. */
   readonly every: (ms: number, run: () => Promise<void>) => () => void;
@@ -73,6 +76,8 @@ export interface CanvasPayload {
   readonly sizes: typeof LAYOUT;
   /** FR-GUI-059: tool results longer than this many lines are folded. */
   readonly foldLines: number;
+  /** FR-GUI-083: the Claude plan limits to mirror, or null when none are known. */
+  readonly limits: LimitsView | null;
 }
 
 /**
@@ -109,6 +114,11 @@ export async function readCanvas(ports: CanvasPorts): Promise<CanvasPayload> {
     nextStep: nextStep(canvas, ports.hasDocuments()),
     sizes: LAYOUT,
     foldLines: TRANSCRIPT_FOLD_LINES,
+    // Limits that can't be read are shown as unknown; the canvas itself still loads.
+    limits: await ports
+      .readLimits()
+      .then((limits) => (limits === null ? null : limitsView(limits, ports.now())))
+      .catch(() => null),
   };
 }
 

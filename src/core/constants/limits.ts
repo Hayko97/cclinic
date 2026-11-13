@@ -4,6 +4,8 @@ export const BYTES_PER_KIB = 1024;
 export const BYTES_PER_MIB = BYTES_PER_KIB * BYTES_PER_KIB;
 export const MS_PER_SECOND = 1000;
 export const MS_PER_MINUTE = 60_000;
+/** FR-AUTO-041: the longest plan-limit status kept; Claude Code's are short words such as `allowed` or `rejected`. */
+export const LIMIT_STATUS_MAX_CHARS = 40;
 
 /** Command-line limits. Each can be changed with its flag. */
 export const LIMITS = {

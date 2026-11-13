@@ -1,4 +1,5 @@
 /** The `cclinic plan` command: the PM agent creates a roadmap or a task with the user (spec: roadmap-planning). */
+import { savePlanLimits } from "../adapters/config/limits-store.js";
 import { runAgent } from "../adapters/llm/agent-process.js";
 import { toJsonSchemaObject } from "../adapters/llm/retry.js";
 import { projectPaths } from "../adapters/storage/document-store.js";
@@ -13,7 +14,7 @@ import {
 import { AGENT_SKILLS } from "../core/agent-skills.js";
 import { AGENT_DENIED_TOOLS, READ_ONLY_TOOLS } from "../core/constants/agents.js";
 import { MS_PER_MINUTE } from "../core/constants/limits.js";
-import { AgentSessionError, LlmError, UsageError } from "../core/errors.js";
+import { AgentCallError, AgentSessionError, LlmError, UsageError } from "../core/errors.js";
 import type { Effort, ModelChoice } from "../core/models.js";
 import { replySchemaFor, toRoadmapPlan, type PlanTarget } from "../core/planning.js";
 import type { RoadmapOverview, Task } from "../core/tasks.js";
@@ -29,7 +30,6 @@ export interface PlanOptions {
   readonly task?: boolean;
   readonly model?: string | true;
   readonly effort?: string | true;
-  readonly maxBudgetUsd: number;
   readonly timeoutMinutes: number;
 }
 
@@ -122,7 +122,7 @@ function pmCaller(settings: {
   context: CommandContext;
 }) {
   const jsonSchema = toJsonSchemaObject(replySchemaFor(settings.planTarget));
-  return async (prompt: string, maxBudgetUsd: number) => {
+  return async (prompt: string) => {
     settings.context.reporter.info("The PM is thinking...");
     try {
       const result = await runAgent({
@@ -130,7 +130,10 @@ function pmCaller(settings: {
         prompt,
         model: settings.model,
         effort: settings.effort,
-        maxBudgetUsd,
+        // FR-AUTO-041: each plan-limits report is saved for the GUI; failing to save it never stops the PM.
+        onLimits: (limits) => {
+          savePlanLimits(settings.context.environment, limits).catch(() => undefined);
+        },
         jsonSchema,
         tools: READ_ONLY_TOOLS,
         allowedTools: READ_ONLY_TOOLS,
@@ -141,6 +144,13 @@ function pmCaller(settings: {
       });
       return { reply: result.structuredOutput, costUsd: result.costUsd };
     } catch (error) {
+      if (error instanceof AgentCallError && error.isUsageLimit) {
+        const resets = error.resetsAt === null ? "" : ` It resets ${error.resetsAt}.`;
+        throw new AgentSessionError(
+          `The PM stopped: Claude's usage limit is reached.${resets} Nothing was saved. Plan again once it resets.`,
+          { cause: error },
+        );
+      }
       if (error instanceof LlmError) {
         throw new AgentSessionError(`The PM stopped: ${error.message} Nothing was saved.`, { cause: error });
       }
@@ -165,7 +175,6 @@ export function preparePlanning(
     readonly planTarget: PlanTarget;
     readonly model: ModelChoice;
     readonly effort: Effort;
-    readonly maxBudgetUsd: number;
     readonly timeoutMinutes: number;
   },
   context: CommandContext,
@@ -188,7 +197,6 @@ export function preparePlanning(
       overview,
       existingTasks: tasks,
       roadmapMilestoneIds: milestones.map((milestone) => milestone.id),
-      maxBudgetUsd: settings.maxBudgetUsd,
     },
     callPm: pmCaller({ ...settings, context }),
     save: (outcome) => savePlanningOutcome(target, planTarget, outcome, context),
@@ -205,7 +213,7 @@ export async function runPlanCommand(options: PlanOptions, context: CommandConte
   const { model, effort } = await resolveModelAndEffort({ model: options.model, effort: options.effort }, context);
   const planTarget = await chooseTarget(options, overview);
   const prepared = preparePlanning(
-    { target, planTarget, model, effort, maxBudgetUsd: options.maxBudgetUsd, timeoutMinutes: options.timeoutMinutes },
+    { target, planTarget, model, effort, timeoutMinutes: options.timeoutMinutes },
     context,
   );
   const outcome = await runPlanningSession(prepared.input, {

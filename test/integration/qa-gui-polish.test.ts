@@ -314,7 +314,6 @@ describe("QA FR-GUI-062: job notices", () => {
     const frame = page.locator('[data-frame="roadmap-1"]');
     await frame.locator('button[data-action="run-ai"]').click();
     const dialog = page.locator("#auto-dialog");
-    await dialog.locator('input[name="maxBudgetUsd"]').fill("5");
     await dialog.locator('input[name="developers"]').fill("1");
     await dialog.locator("#auto-show-plan").click();
     await expect.poll(() => dialog.locator("#auto-plan").textContent()).toContain("Roadmap #1: Payments");

@@ -61,7 +61,10 @@ function runState(runId: string): RunState {
     startedAt: "2026-11-11T10:00:00.000Z",
     finishedAt: null,
     outcome: null,
-    budgetUsd: 10,
+    model: "haiku",
+    effort: "low",
+    timeoutMinutes: 30,
+    limitResetsAt: null,
     spentUsd: 1,
     developers: 1,
     tasks: [
@@ -212,14 +215,12 @@ describe("QA run 3: canvas server", () => {
     const first = (await canvasOf(gui)).canvas;
     const task = first.tasks.find((item) => item.id === 1);
     expect(new Set(task?.sessions.map((session) => session.runId))).toEqual(new Set(readable));
-    expect(task?.costUsd).toBeCloseTo(0.5 * readable.length);
     expect(first.problems).toEqual(["The state of automated run 20261111-100023 isn't readable."]);
     expect(first.roadmaps[0]).toMatchObject({ mode: "ai", runId: live });
     // A finished run read before is still dropped once its folder is removed.
     rmSync(path.join(root, ".cclinic/auto", "20261111-100005"), { recursive: true });
     const after = (await canvasOf(gui)).canvas.tasks.find((item) => item.id === 1);
     expect(after?.sessions.map((session) => session.runId)).not.toContain("20261111-100005");
-    expect(after?.costUsd).toBeCloseTo(0.5 * (readable.length - 1));
   });
 
   it("TC-GUI-099, TC-GUI-101: layout saves and Tidy up at the same moment all succeed, and leave one whole layout", async () => {

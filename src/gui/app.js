@@ -1,5 +1,6 @@
 // The GUI's page: a top bar, a rail with Canvas, Setup and Jobs, and a side panel (FR-GUI-049).
-import { api, element, money, notify, remember, remembered, startClock } from "./api.js";
+import { api, element, notify, remember, remembered, startClock } from "./api.js";
+import { drawLimits } from "./limits.js";
 import { addIcons } from "./icons.js";
 import { startAuto } from "./auto.js";
 import { openPlan, startPlan } from "./plan.js";
@@ -122,11 +123,8 @@ onCanvasChange((canvas, payload) => {
   showAttention(canvas, payload.nextStep);
   drawList(canvas, openTask);
   refreshPanel();
-  const spent = canvas.roadmaps.filter((roadmap) => roadmap.spentUsd !== null);
-  document.getElementById("budget").textContent =
-    spent.length === 0
-      ? ""
-      : spent.map((roadmap) => `${money(roadmap.spentUsd)} of ${money(roadmap.budgetUsd)}`).join(" · ");
+  // FR-GUI-083: the Claude plan's limits, not dollars.
+  drawLimits(payload.limits);
 });
 startPanel();
 startAuto();

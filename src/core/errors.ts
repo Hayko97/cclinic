@@ -42,13 +42,24 @@ export class AgentCallError extends LlmError {
   /** The agent process's exit code, or null when it didn't exit on its own (FR-AUTO-039). */
   readonly exitCode: number | null;
 
+  /** FR-AUTO-025: Claude refused the call because a plan usage limit is reached. */
+  readonly isUsageLimit: boolean;
+  /** When that limit resets, if Claude Code said. */
+  readonly resetsAt: string | null;
+
   constructor(
     message: string,
     readonly costUsd: number | null,
-    options?: ErrorOptions & { readonly exitCode?: number | null },
+    options?: ErrorOptions & {
+      readonly exitCode?: number | null;
+      readonly isUsageLimit?: boolean;
+      readonly resetsAt?: string | null;
+    },
   ) {
     super(message, options);
     this.exitCode = options?.exitCode ?? null;
+    this.isUsageLimit = options?.isUsageLimit ?? false;
+    this.resetsAt = options?.resetsAt ?? null;
   }
 }
 

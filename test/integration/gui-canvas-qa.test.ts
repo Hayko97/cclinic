@@ -377,21 +377,21 @@ function writeRunFiles(root: string, runId: string, state: string, sessions: Rec
 }
 
 describe("QA run 3: every run is read, and finished ones are kept (FR-GUI-068, FR-GUI-077)", () => {
-  it("TC-GUI-054: a damaged run that's later fixed shows with its sessions and cost, and its problem goes", async () => {
+  it("TC-GUI-054: a damaged run that's later fixed shows with its sessions and steps, and its problem goes", async () => {
     const root = project();
     const runId = "20261101-090000";
     writeRunFiles(root, runId, "{broken");
     const gui = await start(root);
     const before = (await canvasOf(gui)).canvas;
     expect(before.problems).toEqual([`The state of automated run ${runId} isn't readable.`]);
-    expect(before.tasks.find((task) => task.id === 1)?.costUsd).toBe(0);
+    expect(before.tasks.find((task) => task.id === 1)?.steps).toBeNull();
     writeRunFiles(root, runId, JSON.stringify(runState(runId, "2026-11-01T10:00:00.000Z", 0.75)), {
       [`${agentId(1)}.json`]: JSON.stringify(agentSession(1, true)),
     });
     const after = (await canvasOf(gui)).canvas;
     expect(after.problems).toEqual([]);
     const task = after.tasks.find((item) => item.id === 1);
-    expect(task?.costUsd).toBeCloseTo(0.75);
+    expect(task?.steps?.source).toBe("run");
     expect(task?.sessions.map((session) => session.id)).toEqual([agentId(1)]);
   });
 
@@ -452,7 +452,6 @@ describe("QA run 3: every run is read, and finished ones are kept (FR-GUI-068, F
     expect(finished?.roadmaps[0]).toMatchObject({ mode: null, runId: null });
     const task = finished?.tasks.find((item) => item.id === 1);
     expect(task?.mode).toBeNull();
-    expect(task?.costUsd).toBeCloseTo(0.9);
     expect(task?.sessions.map((session) => session.isLive)).toEqual([false]);
     // Kept now: checks with nothing new send nothing, which a change made after them proves.
     const count = canvases().length;
@@ -470,11 +469,7 @@ describe("QA run 3: every run is read, and finished ones are kept (FR-GUI-068, F
       ).toBe(true);
     });
     expect(canvases()).toHaveLength(count + 1);
-    expect(
-      canvases()
-        .at(-1)
-        ?.tasks.find((item) => item.id === 1)?.costUsd,
-    ).toBeCloseTo(0.9);
+    expect(canvases().at(-1)?.roadmaps[0]?.pastRuns).toHaveLength(1);
     stream.close();
   });
 
@@ -483,9 +478,9 @@ describe("QA run 3: every run is read, and finished ones are kept (FR-GUI-068, F
     const runId = "20261101-090000";
     writeRunFiles(root, runId, JSON.stringify(runState(runId, null, 0.1)));
     const gui = await start(root);
-    expect((await canvasOf(gui)).canvas.tasks.find((task) => task.id === 1)?.costUsd).toBeCloseTo(0.1);
+    expect((await canvasOf(gui)).canvas.roadmaps[0]?.pastRuns[0]?.finishedAt).toBeNull();
     writeRunFiles(root, runId, JSON.stringify(runState(runId, "2026-11-01T10:00:00.000Z", 0.4)));
-    expect((await canvasOf(gui)).canvas.tasks.find((task) => task.id === 1)?.costUsd).toBeCloseTo(0.4);
+    expect((await canvasOf(gui)).canvas.roadmaps[0]?.pastRuns[0]?.finishedAt).toBe("2026-11-01T10:00:00.000Z");
   });
 });
 

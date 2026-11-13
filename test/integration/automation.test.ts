@@ -8,7 +8,7 @@ import { notifyUser } from "../../src/adapters/notify/desktop-notifier.js";
 import { openTaskStore, tasksDatabaseFile, type TaskStore } from "../../src/adapters/storage/task-store.js";
 import { runAutoCommand, type AutoOptions } from "../../src/cli/auto-command.js";
 import { runClean } from "../../src/cli/other-commands.js";
-import { agentSessionSchema } from "../../src/core/automation.js";
+import { agentSessionSchema, type RunState } from "../../src/core/automation.js";
 import { AUTO_REQUIRED_SKILLS } from "../../src/core/constants/agents.js";
 import { exitCodeFor, UsageError } from "../../src/core/errors.js";
 import type { RoadmapPlan } from "../../src/core/tasks.js";
@@ -112,7 +112,6 @@ async function auto(root: string, harness: ReturnType<typeof agentHarness>, opti
       dir: root,
       roadmap: 1,
       developers: 2,
-      maxBudgetUsd: 5,
       timeoutMinutes: 30,
       yes: true,
       model: "haiku",
@@ -219,7 +218,7 @@ describe("cclinic auto on a real repository", () => {
     roadmap(root, planned("a"), planned("b"));
     git(root, "add", "-f", ".cclinic/tasks.db");
     git(root, "commit", "-q", "-m", "share the roadmap");
-    expect(await auto(root, agentHarness({ rules: happyRules([1]) }), { developers: 1, maxBudgetUsd: 5 })).not.toBe(2);
+    expect(await auto(root, agentHarness({ rules: happyRules([1]) }), { developers: 1 })).not.toBe(2);
     const store = openStore(root);
     store.setStatus(2, "open");
     store.close();
@@ -314,7 +313,7 @@ describe("cclinic auto on a real repository", () => {
     }
   });
 
-  it("TC-AUTO-021: every agent call is non-interactive, keeps its own session, uses the run's model and effort, and stays within the budget left", async () => {
+  it("TC-AUTO-021: every agent call is non-interactive, keeps its own session, uses the run's model and effort, and passes no dollar limit", async () => {
     const root = repository();
     roadmap(root, planned("a"));
     const harness = agentHarness({ rules: happyRules([1]).map((rule) => ({ ...rule, cost: 0.5 })) });
@@ -322,7 +321,7 @@ describe("cclinic auto on a real repository", () => {
     const calls = harness.calls();
     expect(calls).toHaveLength(5);
     const after = (args: readonly string[], flag: string) => args[args.indexOf(flag) + 1];
-    calls.forEach((call, index) => {
+    calls.forEach((call) => {
       expect(call.args[0]).toBe("-p");
       expect(after(call.args, "--permission-mode")).toBe("dontAsk");
       expect(call.args).toContain("--safe-mode");
@@ -330,7 +329,7 @@ describe("cclinic auto on a real repository", () => {
       expect(after(call.args, "--session-id")).toMatch(/^[0-9a-f-]{36}$/);
       expect(after(call.args, "--model")).toBe("sonnet");
       expect(after(call.args, "--effort")).toBe("high");
-      expect(Number(after(call.args, "--max-budget-usd"))).toBeLessThanOrEqual(5 - 0.5 * index);
+      expect(call.args).not.toContain("--max-budget-usd");
     });
     expect(new Set(calls.map((call) => after(call.args, "--session-id"))).size).toBe(calls.length);
   });
@@ -468,7 +467,7 @@ describe("cclinic auto on a real repository", () => {
     // No --model or --effort, so the run reads them from the environment.
     const run = (dryRun: boolean) =>
       runAutoCommand(
-        { dir: root, roadmap: 1, developers: 1, maxBudgetUsd: 5, timeoutMinutes: 30, yes: true, dryRun },
+        { dir: root, roadmap: 1, developers: 1, timeoutMinutes: 30, yes: true, dryRun },
         agentHarness({ env: { CCLINIC_MODEL: "not-a-model" } }).context,
       ).catch((caught: unknown) => caught);
     const dry = await run(true);
@@ -476,6 +475,90 @@ describe("cclinic auto on a real repository", () => {
     expect(dry).toBeInstanceOf(UsageError);
     expect((dry as Error).message).toBe((real as Error).message);
     expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+  });
+
+  it("TC-AUTO-063: Claude's plan limits are saved in the user config folder, and a malformed report changes nothing", async () => {
+    const limitEvent = {
+      type: "rate_limit_event",
+      rate_limit_info: {
+        status: "allowed",
+        resetsAt: 1794532800,
+        unifiedWindows: {
+          five_hour: { utilization: 0.25, resetsAt: 1794532800, status: "allowed" },
+          seven_day: { utilization: 0.4, resetsAt: 1794927600, status: "allowed" },
+        },
+      },
+    };
+    const root = repository();
+    roadmap(root, planned("a"));
+    const harness = agentHarness({ rules: happyRules([1]).map((rule) => ({ ...rule, events: [limitEvent] })) });
+    expect(await auto(root, harness)).toBe(0);
+    const file = path.join(harness.environment["XDG_CONFIG_HOME"] ?? "", "cclinic", "limits.json");
+    const saved = readFileSync(file, "utf8");
+    expect(JSON.parse(saved)).toMatchObject({
+      status: "allowed",
+      session: { used: 0.25, resetsAt: new Date(1794532800 * 1000).toISOString() },
+      week: { used: 0.4, resetsAt: new Date(1794927600 * 1000).toISOString() },
+    });
+    expect(saved).not.toContain("Task #1");
+
+    const again = repository();
+    roadmap(again, planned("a"));
+    const malformed = { type: "rate_limit_event", rate_limit_info: { status: 7 } };
+    const second = agentHarness({
+      rules: happyRules([1]).map((rule) => ({ ...rule, events: [malformed] })),
+      env: { XDG_CONFIG_HOME: harness.environment["XDG_CONFIG_HOME"] ?? "" },
+    });
+    expect(await auto(again, second)).toBe(0);
+    expect(readFileSync(file, "utf8")).toBe(saved);
+  });
+
+  it("TC-AUTO-030: a plan usage limit ends the run limit-reached, with the reset time in the report, exit 1", async () => {
+    const resetsAt = 1794532800;
+    const rejected = {
+      type: "rate_limit_event",
+      rate_limit_info: {
+        status: "rejected",
+        resetsAt,
+        unifiedWindows: { five_hour: { utilization: 1, resetsAt, status: "rejected" } },
+      },
+    };
+    const root = repository();
+    roadmap(root, planned("a"), planned("b"), planned("c"));
+    const limit: FakeClaudeRule = {
+      match: "reviewing a spec change",
+      times: 1,
+      events: [rejected],
+      exitCode: 1,
+      message: "You've hit your session limit · resets 4am",
+    };
+    const harness = agentHarness({ rules: happyRules([1, 2, 3], [limit]) });
+    expect(await auto(root, harness, { developers: 1 })).toBe(1);
+    const state = JSON.parse(readFileSync(path.join(runFolderOf(root), "run.json"), "utf8")) as RunState;
+    expect(state.outcome).toBe("limit-reached");
+    expect(state.tasks.map((item) => item.status)).toEqual(["open", "open", "open"]);
+    expect(harness.calls()).toHaveLength(2);
+    const report = readFileSync(path.join(runFolderOf(root), "report.md"), "utf8");
+    expect(report).toContain(`It resets ${new Date(resetsAt * 1000).toISOString()}`);
+    expect(report).not.toContain("$");
+  });
+
+  it("FR-AUTO-025: a plain HTTP 429 with no usage-limit message or event fails the round, not the run", async () => {
+    const root = repository();
+    roadmap(root, planned("a"), planned("b"));
+    const throttled: FakeClaudeRule = {
+      match: "reviewing a spec change",
+      times: 1,
+      exitCode: 1,
+      apiErrorStatus: 429,
+      message: "API Error: 429 rate_limit_error",
+    };
+    const harness = agentHarness({ rules: happyRules([1, 2], [throttled]) });
+    await auto(root, harness, { developers: 1 });
+    const state = JSON.parse(readFileSync(path.join(runFolderOf(root), "run.json"), "utf8")) as RunState;
+    expect(state.outcome).not.toBe("limit-reached");
+    expect(state.limitResetsAt).toBeNull();
+    expect(state.tasks[1]?.status).toBe("done");
   });
 
   it("TC-AUTO-039: a lock left by a process that has ended is replaced", async () => {
@@ -535,13 +618,7 @@ describe("cclinic auto on a real repository", () => {
     const harness = agentHarness();
     const error = await auto(root, harness, { yes: false }).catch((caught: unknown) => caught);
     expect(exitCodeFor(error)).toBe(2);
-    for (const part of [
-      "Roadmap #1: Launch",
-      "#2 Task b (after #1)",
-      "Run branch: cclinic/auto/",
-      "Developers: 2",
-      "Budget: $5.00",
-    ]) {
+    for (const part of ["Roadmap #1: Launch", "#2 Task b (after #1)", "Run branch: cclinic/auto/", "Developers: 2"]) {
       expect(harness.output.err, part).toContain(part);
     }
     expect(git(root, "branch", "--list", "cclinic/*")).toBe("");
@@ -559,7 +636,7 @@ describe("cclinic auto on a real repository", () => {
     const harness = agentHarness({ rules: happyRules([2, 3]) });
     expect(
       await runAutoCommand(
-        { dir: root, developers: 2, maxBudgetUsd: 5, timeoutMinutes: 30, model: "haiku", effort: "low", yes: true },
+        { dir: root, developers: 2, timeoutMinutes: 30, model: "haiku", effort: "low", yes: true },
         harness.context,
       ),
     ).toBe(0);

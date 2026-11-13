@@ -254,6 +254,10 @@ export interface FakeClaudeRule {
   readonly delayMs?: number;
   readonly hang?: boolean;
   readonly silent?: boolean;
+  /** Stream events written before the result, such as a `rate_limit_event`. */
+  readonly events?: readonly unknown[];
+  /** The result's `api_error_status`, such as 429. */
+  readonly apiErrorStatus?: number;
   readonly write?: Readonly<Record<string, string>>;
 }
 
@@ -320,6 +324,7 @@ export const EMPTY_CANVAS: CanvasPorts = {
   readTranscript: () =>
     Promise.resolve({ lines: [], next: { offset: 0, fileId: "" }, isRestart: false, isTruncated: false }),
   readTranscriptTail: () => Promise.resolve({ lines: [], modifiedAt: new Date(0) }),
+  readLimits: () => Promise.resolve(null),
   now: () => new Date(0),
   every: () => () => undefined,
 };

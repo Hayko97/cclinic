@@ -13,7 +13,7 @@ Test cases for automation testers. Start each automated test's name with its `TC
 
 | ID | Covers | Level | Given | When | Then |
 |---|---|---|---|---|---|
-| TC-PLAN-001 | FR-PLAN-001 | e2e | A ready project | Run `plan` with `--roadmap abc`, `--max-budget-usd 0` and `--timeout-minutes 0` | Each exits 2, names the option, and the fake `claude` is never called |
+| TC-PLAN-001 | FR-PLAN-001 | e2e | A ready project | Run `plan` with `--roadmap abc`, `--timeout-minutes 0` and the removed `--max-budget-usd 1` | Each exits 2, names the option, and the fake `claude` is never called |
 | TC-PLAN-002 | FR-PLAN-002 | e2e | A ready project, stdin not a TTY | Run `plan` | Exit 2, the message says a terminal is needed, and no `tasks.db` is created |
 | TC-PLAN-003 | FR-PLAN-003 | e2e | Projects with: the anthropic-api provider; no `claude` on `PATH`; no `.cclinic/sdd` | Run `plan` in a pseudo-terminal | Each exits 2 naming the failed check and how to fix it |
 | TC-PLAN-004 | FR-PLAN-004 | integration | Roadmaps 1 and 2 exist | Run `plan` and choose "extend roadmap 2" | The list shows both with ID, title and status, and the PM prompt says it's extending roadmap 2 |
@@ -34,8 +34,8 @@ Test cases for automation testers. Start each automated test's name with its `TC
 | TC-PLAN-019 | FR-PLAN-013 | integration | A store that fails while saving the third task | Approve a proposal | No roadmap, milestone or task from the proposal is in the database, the exit code isn't 0, and the proposal is printed |
 | TC-PLAN-020 | FR-PLAN-014 | integration | A valid proposal | Choose `cancel` | Exit 0, and the database is unchanged |
 | TC-PLAN-021 | FR-PLAN-014 | e2e | A fake PM that waits 10 seconds | Send SIGINT during the turn, then repeat with SIGTERM | The fake `claude` process ends, nothing is saved, and the exit codes are 130 and 143 |
-| TC-PLAN-022 | FR-PLAN-015 | integration | A fake PM that always asks questions, at 0.01 USD per turn | Run `plan` and answer each question | The session stops after 20 PM turns with exit 4 naming the turn limit, and nothing is saved |
-| TC-PLAN-023 | FR-PLAN-015 | integration | A fake PM costing 0.6 USD per turn, `--max-budget-usd 1` | Run `plan` | No turn starts once the remaining budget can't cover it, total cost is at most 1, exit 4 names the budget, nothing is saved |
+| TC-PLAN-022 | FR-PLAN-015 | integration | A fake PM that always asks questions | Run `plan` and answer each question | The session stops after 20 PM turns with exit 4 naming the turn limit, and nothing is saved |
+| TC-PLAN-023 | FR-PLAN-015 | integration | A fake PM whose second turn reports a `rate_limit_event` with status `rejected` and a reset time | Run `plan` and answer the first question | No turn starts after it, exit 4 names the usage limit and its reset time, and nothing is saved |
 | TC-PLAN-024 | FR-PLAN-015 | integration | A fake PM that never returns, with a shortened timeout | Run `plan` | The turn is stopped at the timeout |
 | TC-PLAN-025 | FR-PLAN-016 | e2e | A ready project | Run `tasks roadmap add --title X`, `tasks milestone add --title M` and `tasks add --title T --milestone 1` | Each exits 2, says to use `cclinic plan`, and nothing is saved |
 | TC-PLAN-026 | FR-PLAN-016 | integration | A full session that ends in `approve` | Watch `tasks.db` during the session | It isn't written until the user approves, and the fake `claude` was never given a write or Bash tool |

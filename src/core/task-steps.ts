@@ -11,15 +11,12 @@ export interface StepRow {
   readonly status: StepStatus;
   readonly startedAt: string | null;
   readonly endedAt: string | null;
-  readonly costUsd: number | null;
   readonly sessionId: string | null;
 }
 
 export interface StepsView {
   readonly source: "run" | "workflow";
   readonly rows: readonly StepRow[];
-  /** The cost of all the steps together. */
-  readonly costUsd: number;
 }
 
 /** Steps whose rounds review the work before them, so a later round means this one sent it back. */
@@ -37,7 +34,7 @@ function parseStepName(name: string): { readonly step: string; readonly round: n
  */
 export function runSteps(
   sessions: readonly AgentSession[],
-  task: { readonly status: TaskRunStatus; readonly costUsd: number },
+  task: { readonly status: TaskRunStatus },
   isRunLive: boolean,
 ): StepsView {
   const own = [...sessions].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
@@ -61,7 +58,6 @@ export function runSteps(
       status,
       startedAt: session.startedAt,
       endedAt: session.endedAt,
-      costUsd: session.costUsd,
       sessionId: session.sessionId,
     };
   });
@@ -71,16 +67,15 @@ export function runSteps(
     status: task.status === "done" ? "passed" : "not-started",
     startedAt: null,
     endedAt: null,
-    costUsd: null,
     sessionId: null,
   };
-  return { source: "run", rows: [...rows, merge], costUsd: task.costUsd };
+  return { source: "run", rows: [...rows, merge] };
 }
 
 const WORKFLOW_STEPS = STEPS.filter((step) => step !== "done");
 
 function row(step: string, status: StepStatus, round: number | null = null, endedAt: string | null = null): StepRow {
-  return { step, round, status, startedAt: null, endedAt, costUsd: null, sessionId: null };
+  return { step, round, status, startedAt: null, endedAt, sessionId: null };
 }
 
 /**
@@ -112,5 +107,5 @@ export function workflowSteps(state: WorkflowState): StepsView {
     if (rounds.length === 0) return [row(step, plain)];
     return index === current && plain !== "skipped" ? [...rounds, row(step, plain, rounds.length + 1)] : rounds;
   });
-  return { source: "workflow", rows, costUsd: state.costUsd };
+  return { source: "workflow", rows };
 }

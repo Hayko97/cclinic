@@ -19,7 +19,7 @@
           Needs you <span id="needs-count" class="count">0</span>
         </button>
         <span id="job-count" class="muted"></span>
-        <span id="budget" class="muted"></span>
+        <span id="limits" class="limits" aria-label="Claude plan limits"></span>
         <button id="theme" type="button">Theme: Auto</button>
       </div>
     </header>
@@ -304,7 +304,6 @@
         <h2 id="auto-title">Run with AI</h2>
         <p id="auto-roadmap" class="muted"></p>
         <div>
-          <label>Budget, US dollars <input name="maxBudgetUsd" inputmode="decimal" required /></label>
           <label>Developers <input name="developers" inputmode="numeric" /></label>
           <label
             >Model
@@ -346,7 +345,6 @@
             >Reasoning
             <select name="effort" data-efforts></select
           ></label>
-          <label>Budget, US dollars <input name="maxBudgetUsd" inputmode="decimal" /></label>
           <label>Time limit per PM turn, minutes <input name="timeoutMinutes" inputmode="numeric" /></label>
         </div>
         <div class="actions">

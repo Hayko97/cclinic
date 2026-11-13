@@ -25,7 +25,7 @@ import {
 } from "./gui-canvas.js";
 import { ENVIRONMENT_CONSENT_MESSAGE } from "../core/environment.js";
 import { mcpInfo, type McpFile } from "../core/gui-setup.js";
-import { AUTO_LIMITS, PLAN_LIMITS } from "../core/constants/agents.js";
+import { AUTO_LIMITS } from "../core/constants/agents.js";
 import { LIMITS } from "../core/constants/limits.js";
 import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ENVIRONMENT_MAX_BUDGET_USD } from "../core/constants/environment.js";
@@ -169,8 +169,6 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
             environmentBudgetUsd: ENVIRONMENT_MAX_BUDGET_USD,
             // FR-GUI-027: Run with AI's developers default.
             autoDevelopers: AUTO_LIMITS.developers.default,
-            // FR-GUI-023: Plan's budget default.
-            planBudgetUsd: PLAN_LIMITS.maxBudgetUsd,
             providers: PROVIDER_CHOICES,
           },
         });

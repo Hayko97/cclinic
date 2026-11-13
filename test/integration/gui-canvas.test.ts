@@ -80,7 +80,10 @@ function writeRun(root: string, roadmapId: number, runningTasks: number[], sessi
     startedAt: new Date(Date.now() - 600_000).toISOString(),
     finishedAt: null,
     outcome: null,
-    budgetUsd: 10,
+    model: "haiku",
+    effort: "low",
+    timeoutMinutes: 30,
+    limitResetsAt: null,
     spentUsd: 3.4,
     developers: 2,
     tasks: runningTasks.map((taskId) => ({
@@ -410,7 +413,8 @@ describe("canvas data", () => {
     await saveChange(root, 3);
     const { canvas } = await canvasOf(await start(root));
     expect(canvas.roadmaps.map((roadmap) => roadmap.mode)).toEqual(["ai", null]);
-    expect(canvas.roadmaps[0]).toMatchObject({ runId: RUN_ID, spentUsd: 3.4, budgetUsd: 10 });
+    expect(canvas.roadmaps[0]).toMatchObject({ runId: RUN_ID });
+    expect(JSON.stringify(canvas)).not.toMatch(/spentUsd|budgetUsd|costUsd/);
     expect([taskOf(canvas, 1)?.mode, taskOf(canvas, 2)?.mode, taskOf(canvas, 3)?.mode]).toEqual(["ai", null, "manual"]);
   });
 

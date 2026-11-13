@@ -24,7 +24,6 @@ export const WORKTREE_AGENT_ALLOWED_TOOLS: readonly string[] = [
 /** FR-PLAN-015. The limits are estimates, recorded as an open question. */
 export const PLAN_LIMITS = {
   maxTurns: 20,
-  maxBudgetUsd: 2,
   maxQuestions: 5,
   invalidRepliesInARow: 2,
 } as const;

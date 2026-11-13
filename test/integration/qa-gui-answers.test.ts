@@ -254,9 +254,13 @@ describe("QA: the notes form", () => {
     const notes = section.locator("textarea");
     await notes.pressSequentially("abc");
     // Something else about task 2's change moves on, so its panel is drawn again.
-    await openWorkflowStore(root).save({ ...taskChange, costUsd: 1.5, updatedAt: new Date().toISOString() });
+    await openWorkflowStore(root).save({
+      ...taskChange,
+      qaRuns: [{ passed: true, failures: [], at: new Date().toISOString() }],
+      updatedAt: new Date().toISOString(),
+    });
     await tick();
-    await expect.poll(() => page.locator("#panel-body").textContent()).toContain("1.50");
+    await expect.poll(() => page.locator('#panel-body [data-step="qa-1"]').count()).toBe(1);
     expect(await notes.inputValue()).toBe("abc");
     expect(await notes.evaluate((node) => node === document.activeElement)).toBe(true);
     await page.keyboard.type("def");

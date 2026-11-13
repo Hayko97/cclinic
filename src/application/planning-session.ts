@@ -1,5 +1,4 @@
 /** The conversation between the user and the PM agent in `cclinic plan` (spec: roadmap-planning). */
-import { canStartCall, NO_SPENDING, recordCall, remainingUsd, type Spending } from "../core/agent-budget.js";
 import { PLAN_LIMITS } from "../core/constants/agents.js";
 import { AgentSessionError } from "../core/errors.js";
 import {
@@ -22,7 +21,7 @@ export type ReviewChoice = "approve" | "refine" | "cancel";
 
 /** Everything the session needs from outside: Claude and the terminal. */
 export interface PlanningPorts {
-  callPm(prompt: string, maxBudgetUsd: number): Promise<{ readonly reply: unknown; readonly costUsd: number | null }>;
+  callPm(prompt: string): Promise<{ readonly reply: unknown; readonly costUsd: number | null }>;
   answer(question: string): Promise<string>;
   review(proposalText: string): Promise<ReviewChoice>;
   feedback(): Promise<string>;
@@ -35,7 +34,6 @@ export interface PlanningInput {
   readonly existingTasks: readonly Task[];
   /** The chosen roadmap's milestones, for a single task in a roadmap. */
   readonly roadmapMilestoneIds?: readonly number[];
-  readonly maxBudgetUsd: number;
   readonly maxTurns?: number;
 }
 
@@ -61,7 +59,8 @@ const UNKNOWN_ANSWER = "unknown";
 export async function runPlanningSession(input: PlanningInput, ports: PlanningPorts): Promise<PlanningOutcome> {
   const maxTurns = input.maxTurns ?? PLAN_LIMITS.maxTurns;
   const conversation: ConversationTurn[] = [];
-  let spending: Spending = NO_SPENDING;
+  /** Claude Code's estimate of what the PM cost, kept for the outcome only; no dollar limit stops it (FR-PLAN-015). */
+  let spentUsd = 0;
   let turns = 0;
   let invalidInARow = 0;
 
@@ -96,11 +95,6 @@ export async function runPlanningSession(input: PlanningInput, ports: PlanningPo
     if (turns >= maxTurns) {
       throw new AgentSessionError(`Planning stopped at the limit of ${maxTurns} PM turns. Nothing was saved.`);
     }
-    if (!canStartCall(spending, input.maxBudgetUsd)) {
-      throw new AgentSessionError(
-        `Planning stopped at its budget of $${input.maxBudgetUsd} (--max-budget-usd). Nothing was saved.`,
-      );
-    }
     turns += 1;
     const prompt = buildPmPrompt({
       skill: input.skill,
@@ -108,8 +102,8 @@ export async function runPlanningSession(input: PlanningInput, ports: PlanningPo
       overview: input.overview,
       conversation,
     });
-    const { reply, costUsd } = await ports.callPm(prompt, remainingUsd(spending, input.maxBudgetUsd));
-    spending = recordCall(spending, costUsd);
+    const { reply, costUsd } = await ports.callPm(prompt);
+    spentUsd += costUsd ?? 0;
     conversation.push({ from: "pm", text: JSON.stringify(reply) });
 
     const parsed = parse(reply);
@@ -142,8 +136,8 @@ export async function runPlanningSession(input: PlanningInput, ports: PlanningPo
 
     const text = render(parsed.proposal);
     const choice = await ports.review(text);
-    if (choice === "cancel") return { kind: "cancelled", costUsd: spending.spentUsd };
-    if (choice === "approve") return { ...parsed.proposal, text, costUsd: spending.spentUsd };
+    if (choice === "cancel") return { kind: "cancelled", costUsd: spentUsd };
+    if (choice === "approve") return { ...parsed.proposal, text, costUsd: spentUsd };
     conversation.push({ from: "user", text: `Feedback on the proposal: ${(await ports.feedback()).trim()}` });
   }
 }

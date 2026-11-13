@@ -59,12 +59,10 @@ const proposing = (proposal: RoadmapProposal | TaskProposal) => ({ questions: []
 /** Fake ports: scripted PM replies, answers and review choices. */
 function ports(replies: unknown[], choices: ReviewChoice[] = ["approve"], answers: string[] = [], cost = 0.01) {
   const prompts: string[] = [];
-  const budgets: number[] = [];
   const shown: string[] = [];
   const port: PlanningPorts = {
-    callPm: (prompt, maxBudgetUsd) => {
+    callPm: (prompt) => {
       prompts.push(prompt);
-      budgets.push(maxBudgetUsd);
       return Promise.resolve({ reply: replies.shift() ?? questions("More?"), costUsd: cost });
     },
     answer: () => Promise.resolve(answers.shift() ?? ""),
@@ -74,7 +72,7 @@ function ports(replies: unknown[], choices: ReviewChoice[] = ["approve"], answer
     },
     feedback: () => Promise.resolve("split task b"),
   };
-  return { port, prompts, budgets, shown };
+  return { port, prompts, shown };
 }
 
 const session = (target: Parameters<typeof runPlanningSession>[0]["target"] = { kind: "new-roadmap" }) => ({
@@ -82,7 +80,6 @@ const session = (target: Parameters<typeof runPlanningSession>[0]["target"] = { 
   skill: "PM instructions",
   overview: { roadmaps: [], unassigned: [] },
   existingTasks: [],
-  maxBudgetUsd: 2,
 });
 
 describe("planning session", () => {
@@ -151,20 +148,35 @@ describe("planning session", () => {
     expect(fake.prompts).toHaveLength(20);
   });
 
-  it("TC-PLAN-023: no turn starts once the budget left can't cover one, and each turn gets the budget left", async () => {
-    const fake = ports(
-      Array.from({ length: 5 }, () => questions("Again?")),
-      [],
-      [],
-      0.6,
-    );
-    const error = await runPlanningSession({ ...session(), maxBudgetUsd: 1 }, fake.port).catch(
-      (caught: unknown) => caught,
-    );
-    expect(String(error)).toContain("budget of $1");
-    expect(fake.prompts).toHaveLength(1);
-    expect(fake.budgets).toEqual([1]);
+  it("TC-PLAN-023: a plan usage limit stops the session with its reset time, starts no other turn and saves nothing", async () => {
+    const root = project();
+    const resetsAt = 1794532800;
+    const limitEvent = {
+      type: "rate_limit_event",
+      rate_limit_info: {
+        status: "rejected",
+        resetsAt,
+        unifiedWindows: { five_hour: { utilization: 1, resetsAt, status: "rejected" } },
+      },
+    };
+    const harness = agentHarness({
+      rules: [
+        { output: questions("Who pays?"), cost: 0.01 },
+        { events: [limitEvent], exitCode: 1, message: "You've hit your session limit · resets 4am" },
+      ],
+    });
+    selectMock.mockResolvedValueOnce("new");
+    inputMock.mockResolvedValueOnce("Shoppers");
+    const error = await plan(root, harness).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(AgentSessionError);
     expect(exitCodeFor(error)).toBe(4);
+    expect((error as Error).message).toContain("Claude's usage limit is reached.");
+    expect((error as Error).message).toContain(`It resets ${new Date(resetsAt * 1000).toISOString()}.`);
+    expect((error as Error).message).toContain("Nothing was saved.");
+    expect(harness.calls()).toHaveLength(2);
+    const store = openStore(root);
+    expect(store.listRoadmaps()).toHaveLength(1);
+    store.close();
   });
 
   it("TC-PLAN-031: task mode asks, retries invalid replies, takes feedback, and cancels", async () => {
@@ -210,10 +222,7 @@ function pmRules(...replies: unknown[]): FakeClaudeRule[] {
 }
 
 async function plan(root: string, harness: ReturnType<typeof agentHarness>, options: Partial<PlanOptions> = {}) {
-  await runPlanCommand(
-    { dir: root, maxBudgetUsd: 2, timeoutMinutes: 30, model: "haiku", effort: "low", ...options },
-    harness.context,
-  );
+  await runPlanCommand({ dir: root, timeoutMinutes: 30, model: "haiku", effort: "low", ...options }, harness.context);
 }
 
 describe("cclinic plan", () => {

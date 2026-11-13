@@ -93,19 +93,17 @@ describe("cclinic mcp", () => {
     expect(lines[1]).toContain("# user-login");
   });
 
-  it("TC-MCP-003: a wrong --approver, or pm-agent without its options, exits 2 with nothing on stdout", () => {
+  it("TC-MCP-003: a wrong --approver, pm-agent without its options, or the removed --max-budget-usd exits 2 with nothing on stdout", () => {
     const root = makeProject();
-    for (const args of [
-      ["--approver", "robot"],
-      ["--approver", "pm-agent", "--task", "1", "--max-budget-usd", "1"],
-      ["--approver", "pm-agent", "--run", "R", "--max-budget-usd", "1"],
-      ["--approver", "pm-agent", "--run", "R", "--task", "1"],
-    ]) {
+    for (const [args, named] of [
+      [["--approver", "robot"], "--approver"],
+      [["--approver", "pm-agent", "--task", "1"], "--run"],
+      [["--approver", "pm-agent", "--run", "R"], "--task"],
+      [["--approver", "pm-agent", "--run", "R", "--task", "1", "--max-budget-usd", "1"], "--max-budget-usd"],
+    ] as const) {
       const result = cclinic(["mcp", "-C", root, ...args]);
       expect(result.code).toBe(2);
       expect(result.stdout).toBe("");
-      const named =
-        args[1] === "robot" ? "--approver" : ["--run", "--task", "--max-budget-usd"].find((o) => !args.includes(o));
       expect(result.stderr).toContain(named);
     }
   });
@@ -119,8 +117,8 @@ describe("cclinic mcp", () => {
   it("TC-CLI-056: help lists the options, and a bad value exits 2", () => {
     const help = cclinic(["help", "mcp"]);
     expect(help.code).toBe(0);
-    for (const option of ["--dir", "--approver", "--run", "--task", "--max-budget-usd"])
-      expect(help.stdout).toContain(option);
+    for (const option of ["--dir", "--approver", "--run", "--task"]) expect(help.stdout).toContain(option);
+    expect(help.stdout).not.toContain("--max-budget-usd");
     expect(cclinic(["mcp", "--approver", "robot"]).code).toBe(2);
   });
 });

@@ -16,12 +16,18 @@ function options() {
   const chosen = (name) => (value(name) === "" ? undefined : value(name));
   return {
     roadmap: state.roadmap.id,
-    maxBudgetUsd: numberOrText(value("maxBudgetUsd")) ?? "",
     developers: numberOrText(value("developers")),
     model: chosen("model"),
     effort: chosen("effort"),
     timeoutMinutes: numberOrText(value("timeoutMinutes")),
   };
+}
+
+/** Selects `value`, adding it when the menu doesn't list it, so a stopped run's setting is never dropped (FR-GUI-084). */
+function choose(select, value) {
+  if (value === undefined) return;
+  if (![...select.options].some((option) => option.value === value)) select.append(element("option", { value }, value));
+  select.value = value;
 }
 
 /** Any change to the form needs a new plan, so the run can't start with options the user didn't see planned. */
@@ -37,19 +43,31 @@ function showError(message) {
   byId("auto-error").textContent = message;
 }
 
-/** FR-GUI-027: opens the form with this roadmap chosen. The defaults come from the CLI, through the server. */
-export async function openAutoDialog(roadmap) {
+/**
+ * FR-GUI-027: opens the form with this roadmap chosen. The defaults come from the CLI, through the server. With
+ * `settings`, it continues a stopped run with the settings that run used (FR-GUI-084).
+ */
+export async function openAutoDialog(roadmap, settings = undefined) {
   state.roadmap = roadmap;
   const form = byId("auto-form");
   form.reset();
   clearPlan();
   showError("");
+  byId("auto-title").textContent = settings === undefined ? "Run with AI" : "Continue the run";
   byId("auto-roadmap").textContent = `Roadmap #${roadmap.id}: ${roadmap.title}`;
   byId("auto-dialog").showModal();
   try {
     const [{ defaults }] = await Promise.all([api("/api/setup"), ensureModels()]);
     form.elements.namedItem("developers").placeholder = `Default: ${defaults.autoDevelopers}`;
     form.elements.namedItem("timeoutMinutes").placeholder = `Default: ${defaults.limits.timeoutMinutes}`;
+    if (settings !== undefined) {
+      // Set once the choices are loaded, so the model and reasoning menus hold them.
+      form.elements.namedItem("developers").value = String(settings.developers);
+      choose(form.elements.namedItem("model"), settings.model);
+      choose(form.elements.namedItem("effort"), settings.effort);
+      if (settings.timeoutMinutes !== undefined)
+        form.elements.namedItem("timeoutMinutes").value = String(settings.timeoutMinutes);
+    }
   } catch (error) {
     showError(error.message);
   }
@@ -133,6 +151,19 @@ export function startAuto() {
 
 /** The buttons a roadmap offers for its run, on its frame and its panel (FR-GUI-078). */
 export function runButtons(roadmap, className = "small") {
+  // FR-GUI-084: a stopped run, or one that reached a plan limit, is continued with the same settings.
+  if (roadmap.run === null && roadmap.continueWith !== null)
+    return element(
+      "button",
+      {
+        type: "button",
+        className: `${className} primary`,
+        "data-action": "continue-run",
+        "aria-label": `Continue the run of ${roadmap.title}`,
+        onClick: () => void openAutoDialog(roadmap, roadmap.continueWith),
+      },
+      "Continue",
+    );
   return roadmap.run === null
     ? element(
         "button",

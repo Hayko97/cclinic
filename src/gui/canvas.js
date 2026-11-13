@@ -5,7 +5,6 @@ import {
   confirmAction,
   element,
   MODE_LABELS,
-  money,
   notify,
   remember,
   remembered,
@@ -209,7 +208,6 @@ function taskCard(task) {
         live.length > 0 ? element("span", { className: "live-dot", "aria-hidden": "true" }) : null,
         `${task.sessions.length} session${task.sessions.length === 1 ? "" : "s"}`,
       ),
-      element("span", { className: "cost" }, money(task.costUsd)),
     ),
   );
 }
@@ -239,23 +237,10 @@ function changeCard(change) {
 
 const ROADMAP_STATUS_LABELS = { planned: "Planned", "in-progress": "In progress", done: "Done" };
 
-/** FR-GUI-056: how long a roadmap's live run has been going, and its budget used as a bar with the amount. */
+/** FR-GUI-056: how long a roadmap's live run has been going. Its use shows as the plan limits (FR-GUI-083). */
 export function runProgress(roadmap) {
   if (roadmap.runStartedAt === null) return null;
-  const budget =
-    roadmap.budgetUsd === null
-      ? null
-      : element(
-          "span",
-          { className: "budget" },
-          element("progress", {
-            max: roadmap.budgetUsd,
-            value: Math.min(roadmap.spentUsd ?? 0, roadmap.budgetUsd),
-            "aria-label": "Budget used",
-          }),
-          `${money(roadmap.spentUsd ?? 0)} of ${money(roadmap.budgetUsd)}`,
-        );
-  return element("span", { className: "run-progress" }, timer(roadmap.runStartedAt, "Running for "), budget);
+  return element("span", { className: "run-progress" }, timer(roadmap.runStartedAt, "Running for "));
 }
 
 /** FR-GUI-067: the frame's title and actions, then its status, mode and progress, then its goal. */

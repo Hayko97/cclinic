@@ -2,11 +2,18 @@
 import { realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BUDGET_DECIMAL_PLACES } from "../../core/constants/llm.js";
 import { LIMITS } from "../../core/constants/limits.js";
-import { AgentCallError, LlmError } from "../../core/errors.js";
+import { AgentCallError, LlmError, RateLimitError } from "../../core/errors.js";
+import { isLimitReached, limitsFromEvent, type PlanLimits } from "../../core/limits.js";
 import type { Effort, ModelChoice } from "../../core/models.js";
-import { claudeEnvironment, findResult, requireSuccessfulResult, resultMessage, runProcess } from "./claude-cli.js";
+import {
+  claudeEnvironment,
+  findResult,
+  isUsageLimitMessage,
+  requireSuccessfulResult,
+  resultMessage,
+  runProcess,
+} from "./claude-cli.js";
 
 export interface AgentToolSettings {
   readonly tools: readonly string[];
@@ -19,7 +26,6 @@ export interface AgentRequest extends AgentToolSettings {
   readonly prompt: string;
   readonly model: ModelChoice;
   readonly effort: Effort;
-  readonly maxBudgetUsd: number;
   /** When given, the agent must end with JSON in this shape. */
   readonly jsonSchema?: Record<string, unknown>;
   readonly environment: NodeJS.ProcessEnv;
@@ -27,19 +33,22 @@ export interface AgentRequest extends AgentToolSettings {
   readonly timeoutMs: number;
   /** FR-AUTO-016: keeps the session under this ID. Without it, no session is saved (FR-PLAN-005). */
   readonly sessionId?: string;
+  /** FR-AUTO-041: called with each plan-limits report Claude Code makes during the call. */
+  readonly onLimits?: (limits: PlanLimits) => void;
 }
 
 export interface AgentResult {
   readonly costUsd: number | null;
   readonly finalMessage: string;
   readonly structuredOutput: unknown;
+  /** FR-AUTO-025: Claude reported during the call that a plan usage limit is reached, with when it resets. */
+  readonly limitReached: { readonly resetsAt: string | null } | null;
 }
 
 export function buildAgentArgs(
   input: AgentToolSettings & {
     model: string;
     effort: string;
-    maxBudgetUsd: number;
     jsonSchema?: Record<string, unknown>;
     sessionId?: string;
   },
@@ -63,20 +72,25 @@ export function buildAgentArgs(
     "--permission-mode",
     "dontAsk",
     ...(input.sessionId === undefined ? ["--no-session-persistence"] : ["--session-id", input.sessionId]),
-    // Keeps the login, and stops the project's own hooks and settings from running.
+    // Keeps the login, and stops the project's own hooks and settings from running. No dollar limit is passed: the
+    // plan's own usage limits stop the work (FR-AUTO-025).
     "--safe-mode",
-    "--max-budget-usd",
-    input.maxBudgetUsd.toFixed(BUDGET_DECIMAL_PLACES),
   ];
 }
 
 export async function runAgent(request: AgentRequest): Promise<AgentResult> {
+  let limits: PlanLimits | undefined;
   const { events, exitCode } = await runProcess(buildAgentArgs(request), request.prompt, {
     cwd: request.cwd,
     environment: claudeEnvironment(request.environment, LIMITS.maxRetries.default),
     timeoutMs: request.timeoutMs,
     signal: request.signal,
-    onEvent: () => undefined,
+    onEvent: (event) => {
+      const reported = limitsFromEvent(event, new Date());
+      if (reported === undefined) return;
+      limits = reported;
+      request.onLimits?.(reported);
+    },
   });
   try {
     const result = requireSuccessfulResult(events, exitCode, request.model);
@@ -84,10 +98,19 @@ export async function runAgent(request: AgentRequest): Promise<AgentResult> {
       costUsd: result.total_cost_usd ?? null,
       finalMessage: resultMessage(result),
       structuredOutput: result.structured_output ?? null,
+      limitReached: limits !== undefined && isLimitReached(limits) ? { resetsAt: limits.resetsAt } : null,
     };
   } catch (error) {
     if (!(error instanceof LlmError)) throw error;
-    throw new AgentCallError(error.message, findResult(events)?.total_cost_usd ?? null, { cause: error, exitCode });
+    const isUsageLimit =
+      (error instanceof RateLimitError && isUsageLimitMessage(error.message)) ||
+      (limits !== undefined && isLimitReached(limits));
+    throw new AgentCallError(error.message, findResult(events)?.total_cost_usd ?? null, {
+      cause: error,
+      exitCode,
+      isUsageLimit,
+      resetsAt: limits?.resetsAt ?? null,
+    });
   }
 }
 

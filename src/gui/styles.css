@@ -207,7 +207,8 @@ body {
   align-items: baseline;
   gap: var(--space-l);
   flex: 1 1 0;
-  min-width: 0;
+  /* The project's name keeps part of the bar however long the status on its right gets. */
+  min-width: 25%;
   overflow: hidden;
   white-space: nowrap;
 }
@@ -236,14 +237,14 @@ body {
 .top-status {
   margin-left: auto;
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   gap: var(--space-m);
   align-items: center;
   white-space: nowrap;
 }
 
-#job-count,
-#budget {
+#job-count {
   display: inline-flex;
   align-items: center;
   gap: var(--space-s);
@@ -267,7 +268,7 @@ body {
   box-shadow: 0 0 0 3px var(--done-soft);
 }
 
-#budget:empty {
+#limits:empty {
   display: none;
 }
 
@@ -1848,12 +1849,12 @@ details > summary {
 /* On a phone, the top bar keeps the project, Needs you and the theme; the job count is on the Jobs screen. */
 @media (max-width: 560px) {
   #job-count,
-  #budget {
+  #limits {
     display: none;
   }
 }
 
-/* FR-GUI-056, FR-GUI-057: a task's workflow steps, and its live run's time and budget. */
+/* FR-GUI-056, FR-GUI-057: a task's workflow steps, and its live run's time. */
 .steps {
   display: grid;
   gap: var(--space-s);
@@ -1894,7 +1895,6 @@ details > summary {
 }
 
 .step-time,
-.step-cost,
 .step-when {
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
@@ -1988,18 +1988,6 @@ details > summary {
   align-items: center;
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
-}
-
-.budget {
-  display: inline-flex;
-  gap: var(--space-xs);
-  align-items: center;
-}
-
-.budget progress {
-  width: 72px;
-  height: 6px;
-  accent-color: var(--ai);
 }
 
 /* FR-GUI-058, FR-GUI-059: search, filter and "Jump to latest" over output and transcripts. */
@@ -2194,4 +2182,37 @@ mark {
 
 .skeleton-entry {
   height: 44px;
+}
+
+/* FR-GUI-083: the Claude plan's usage limits in the top bar, marked as they near or reach the limit. */
+.limits {
+  /* It gives up its room before the project's name does, so the top bar never loses where you are. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  display: inline-flex;
+  gap: var(--space-s);
+  align-items: center;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.limit {
+  padding: var(--space-px) var(--space-s);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.limit.is-high {
+  color: var(--progress);
+  background: var(--progress-soft);
+}
+
+.limit.is-reached {
+  color: var(--danger);
+  background: var(--danger-soft);
+  font-weight: 600;
 }

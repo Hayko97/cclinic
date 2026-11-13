@@ -8,6 +8,7 @@ import { claudeConfigFolder } from "../adapters/llm/agent-process.js";
 import { createAssetReader, startGuiServer } from "../adapters/http/gui-server.js";
 import { startProcess } from "../adapters/process/job-process.js";
 import { projectPaths } from "../adapters/storage/document-store.js";
+import { readPlanLimits } from "../adapters/config/limits-store.js";
 import { acquireGuiLock, readLayout, readMcpConfig, saveLayout } from "../adapters/storage/gui-store.js";
 import { createRunLister, readRunFiles } from "../adapters/storage/run-store.js";
 import { openTaskStore } from "../adapters/storage/task-store.js";
@@ -26,7 +27,6 @@ import { GUI_DEFAULT_PORT, GUI_HOST, GUI_TOKEN_BYTES, GUI_TOKEN_QUERY } from "..
 import { UsageError } from "../core/errors.js";
 import type { PlanRequest } from "../core/gui.js";
 import type { PlanTarget } from "../core/planning.js";
-import { PLAN_LIMITS } from "../core/constants/agents.js";
 import { LIMITS } from "../core/constants/limits.js";
 import { resolveModelAndEffort } from "./generate-command.js";
 import { checkPlanning, preparePlanning } from "./plan-command.js";
@@ -117,6 +117,7 @@ function canvasPorts(
       locateTranscript(session.transcriptPath, session.id, path.join(claudeConfigFolder(environment), "projects")),
     readTranscript: readTranscriptLines,
     readTranscriptTail,
+    readLimits: () => readPlanLimits(environment),
     now: () => new Date(),
     every: repeat,
   };
@@ -155,7 +156,6 @@ async function preparePlan(
       planTarget: options.target,
       model,
       effort,
-      maxBudgetUsd: options.maxBudgetUsd ?? PLAN_LIMITS.maxBudgetUsd,
       timeoutMinutes: options.timeoutMinutes ?? LIMITS.timeoutMinutes.default,
     },
     session,
