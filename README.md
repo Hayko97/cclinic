@@ -2,15 +2,49 @@
 
 `cclinic` sets up spec-driven development for your project. It reads your code, uses Claude to write specs, and gives your coding agent skills to work from them. You can then plan work with a PM agent, run whole roadmaps with AI, and watch everything in a local web GUI.
 
+## Quick start
+
+```bash
+npm install -g cclinic       # install
+claude auth login            # connect to Claude, if you haven't already
+cd /path/to/your-project
+cclinic doctor               # check your setup, with no Claude usage
+cclinic                      # set up specs and agent skills for the project
+cclinic gui                  # open the web GUI
+```
+
+Each step is explained below.
+
 ## 1. Install
 
-You need Node.js 22.18 or newer.
+You need Node.js 22.18 or newer (`node --version`). Install cclinic from npm:
 
 ```bash
 npm install -g cclinic
+cclinic --version
 ```
 
-Or run it once without installing: `npx cclinic`.
+Or run it without installing, from your project folder:
+
+```bash
+npx cclinic doctor
+npx cclinic
+```
+
+`npx` downloads cclinic the first time. Add `@latest` (`npx cclinic@latest`) to make sure you run the newest version.
+
+Update or remove it:
+
+```bash
+npm install -g cclinic@latest   # update
+npm uninstall -g cclinic        # remove
+```
+
+If the install fails:
+
+- **`cclinic: command not found`:** npm's global folder isn't on your `PATH`. Run `npm prefix -g`, and add its `bin` folder to your `PATH`.
+- **`EACCES: permission denied`:** don't use `sudo`. Install Node.js with a version manager such as [nvm](https://github.com/nvm-sh/nvm), or [change npm's global folder](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally).
+- **"cclinic needs Node.js 22.18 or newer":** update Node.js, then install cclinic again.
 
 To work on cclinic itself, install it from this repository instead:
 
