@@ -2,7 +2,7 @@
 
 How `cclinic auto` hands a whole roadmap to a team of Claude CLI agents that build it with no human in the loop, and what you get back when it finishes.
 
-Source of truth: the automated-mode spec in [`.cclinic/sdd/specs/automated-mode/`](.cclinic/sdd/specs/automated-mode/spec.md), roadmap planning in [`.cclinic/sdd/specs/roadmap-planning/`](.cclinic/sdd/specs/roadmap-planning/spec.md), and task storage in [`.cclinic/sdd/specs/task-tracking/`](.cclinic/sdd/specs/task-tracking/spec.md). For how roadmaps are planned, see [PLANNING_FLOW.md](PLANNING_FLOW.md). For the normal, human-approved lifecycle, see [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md).
+Source of truth: the automated-mode spec in [`.cclinic/sdd/specs/automated-mode/`](.cclinic/sdd/specs/automated-mode/spec.md), roadmap planning in [`.cclinic/sdd/specs/roadmap-planning/`](.cclinic/sdd/specs/roadmap-planning/spec.md), and task storage in [`.cclinic/sdd/specs/task-tracking/`](.cclinic/sdd/specs/task-tracking/spec.md). For how roadmaps are planned, see [PLANNING_FLOW.md](PLANNING_FLOW.md). For the normal, human-approved lifecycle, see [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md). To start, watch, stop and continue runs from a web page, see [GUI_FLOW.md](GUI_FLOW.md).
 
 ---
 
@@ -44,15 +44,15 @@ cclinic auto --roadmap 1
 
 ### Options
 
-| Option                       | Meaning                                             | Default       |
-| ---------------------------- | --------------------------------------------------- | ------------- |
-| `--roadmap <id>`             | The roadmap to run. Without it, a menu (TTY only)   | menu          |
-| `--developers <n>`           | Tasks worked on at the same time, 1 to 8            | 2             |
-| `-m, --model` / `--effort`   | Model and effort for every agent                    | Claude's own  |
-| `--timeout-minutes <n>`      | Time limit for each agent call                      | 30            |
-| `-y, --yes`                  | Skip the confirmation (needed with no TTY)          |               |
-| `--json`                     | Print one JSON result on stdout                     |               |
-| `-C, --dir <path>`           | Run on another project                              | current folder |
+| Option                     | Meaning                                           | Default        |
+| -------------------------- | ------------------------------------------------- | -------------- |
+| `--roadmap <id>`           | The roadmap to run. Without it, a menu (TTY only) | menu           |
+| `--developers <n>`         | Tasks worked on at the same time, 1 to 8          | 2              |
+| `-m, --model` / `--effort` | Model and effort for every agent                  | Claude's own   |
+| `--timeout-minutes <n>`    | Time limit for each agent call                    | 30             |
+| `-y, --yes`                | Skip the confirmation (needed with no TTY)        |                |
+| `--json`                   | Print one JSON result on stdout                   |                |
+| `-C, --dir <path>`         | Run on another project                            | current folder |
 
 ---
 
@@ -78,12 +78,12 @@ flowchart TD
 
 ### Which tasks run
 
-| Task status   | What happens                                                    |
-| ------------- | --------------------------------------------------------------- |
-| `open`        | Runs                                                            |
-| `blocked`     | Runs again from the start, on a new branch                      |
-| `done`        | Left alone; counts as a finished dependency                     |
-| `in-progress` | Skipped and reported, since someone may be working on it        |
+| Task status   | What happens                                             |
+| ------------- | -------------------------------------------------------- |
+| `open`        | Runs                                                     |
+| `blocked`     | Runs again from the start, on a new branch               |
+| `done`        | Left alone; counts as a finished dependency              |
+| `in-progress` | Skipped and reported, since someone may be working on it |
 
 A task that depends on a task that's neither `done` nor in this run is reported as blocked before the run starts, along with everything that depends on it.
 
@@ -109,14 +109,14 @@ Won't run:
 
 ## 4. The team
 
-| Role             | Runs as                                      | Can                                                        |
-| ---------------- | -------------------------------------------- | ---------------------------------------------------------- |
-| **Orchestrator** | cclinic itself, no LLM                       | Picks tasks, makes every branch, commit and merge, updates `tasks.db`, enforces limits, writes the report, notifies you |
-| **Developer**    | `claude -p` in the task's worktree           | Writes the spec, then the code and tests; fixes what QA or the PM reports |
-| **PM**           | A separate `claude -p`, read-only            | Approves or sends back the spec, then the finished work    |
-| **QA**           | A separate `claude -p` in the task's worktree | Tests the change against the spec with `test-spec`, including end-to-end tests |
+| Role             | Runs as                                       | Can                                                                                                                     |
+| ---------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Orchestrator** | cclinic itself, no LLM                        | Picks tasks, makes every branch, commit and merge, updates `tasks.db`, enforces limits, writes the report, notifies you |
+| **Developer**    | `claude -p` in the task's worktree            | Writes the spec, then the code and tests; fixes what QA or the PM reports                                               |
+| **PM**           | A separate `claude -p`, read-only             | Approves or sends back the spec, then the finished work                                                                 |
+| **QA**           | A separate `claude -p` in the task's worktree | Tests the change against the spec with `test-spec`, including end-to-end tests                                          |
 
-Every agent runs with `--permission-mode dontAsk`, `--safe-mode` and `--no-session-persistence`. No agent may run `git` or `sudo`, or read `.env` and other secret files. The PM can only read files (Read, Glob, Grep). Only cclinic commits.
+Every agent runs with `--permission-mode dontAsk`, `--safe-mode` and its own `--session-id`, recorded in `.cclinic/auto/<run-id>/sessions/`, so `cclinic gui` can show each agent's transcript live. No agent may run `git` or `sudo`, or read `.env` and other secret files. The PM can only read files (Read, Glob, Grep). Only cclinic commits.
 
 ---
 
@@ -146,11 +146,11 @@ flowchart TD
 
 ### Limits per task
 
-| Stage                  | Max rounds |
-| ---------------------- | ---------- |
-| PM spec review         | 3          |
-| QA run                 | 3          |
-| PM implementation review | 3        |
+| Stage                    | Max rounds |
+| ------------------------ | ---------- |
+| PM spec review           | 3          |
+| QA run                   | 3          |
+| PM implementation review | 3          |
 
 When a limit is reached without approval or a pass, the task becomes `blocked`, with the last feedback or failures as the reason.
 
@@ -203,14 +203,14 @@ gitGraph
     merge "cclinic/auto/<run-id>/task-2"
 ```
 
-| What                 | Where                                                    |
-| -------------------- | -------------------------------------------------------- |
-| Run branch           | `cclinic/auto/<run-id>/run`, from your `HEAD`            |
-| Task branch          | `cclinic/auto/<run-id>/task-<id>`, kept after the run    |
-| Task worktree        | `.cclinic/auto/<run-id>/worktrees/task-<id>`, removed when the task ends |
-| Run state            | `.cclinic/auto/<run-id>/run.json`, updated after every step |
-| Agent logs           | `.cclinic/auto/<run-id>/logs/`                           |
-| Report               | `.cclinic/auto/<run-id>/report.md`                       |
+| What          | Where                                                                    |
+| ------------- | ------------------------------------------------------------------------ |
+| Run branch    | `cclinic/auto/<run-id>/run`, from your `HEAD`                            |
+| Task branch   | `cclinic/auto/<run-id>/task-<id>`, kept after the run                    |
+| Task worktree | `.cclinic/auto/<run-id>/worktrees/task-<id>`, removed when the task ends |
+| Run state     | `.cclinic/auto/<run-id>/run.json`, updated after every step              |
+| Agent logs    | `.cclinic/auto/<run-id>/logs/`                                           |
+| Report        | `.cclinic/auto/<run-id>/report.md`                                       |
 
 - The run ID is the UTC start time, `YYYYMMDD-HHMMSS`, with a suffix if it's taken.
 - Your branch, index and working tree are never changed, apart from `.cclinic/tasks.db` and `.cclinic/auto/`. `/.cclinic/auto/` is added to `.git/info/exclude`, so worktrees don't show in `git status`.
@@ -269,13 +269,13 @@ stateDiagram-v2
 
 ### Outcome, exit code and notification
 
-| Outcome          | When                                    | Exit code |
-| ---------------- | --------------------------------------- | --------- |
-| `completed`      | Every selected task is `done`           | 0         |
-| `partial`        | Some tasks are blocked                  | 1         |
-| `limit-reached`  | Claude's plan usage limit was reached   | 1         |
-| `interrupted`    | Ctrl+C or SIGTERM                       | 130 / 143 |
-| —                | A usage or precondition error           | 2         |
+| Outcome         | When                                  | Exit code |
+| --------------- | ------------------------------------- | --------- |
+| `completed`     | Every selected task is `done`         | 0         |
+| `partial`       | Some tasks are blocked                | 1         |
+| `limit-reached` | Claude's plan usage limit was reached | 1         |
+| `interrupted`   | Ctrl+C or SIGTERM                     | 130 / 143 |
+| —               | A usage or precondition error         | 2         |
 
 You get a desktop notification for any outcome, such as **"cclinic: Launch — Run partial: 2 done, 1 blocked."** It uses `osascript` on macOS, `notify-send` on Linux, and otherwise a terminal bell and a printed message.
 
@@ -309,19 +309,43 @@ For a blocked task, inspect its branch `cclinic/auto/<run-id>/task-<id>`, fix it
 
 ---
 
-## 12. Commands you can run yourself
+## 12. Runs in the GUI
 
-| Command                                                   | What it does                                    |
-| --------------------------------------------------------- | ----------------------------------------------- |
-| `cclinic plan`                                            | Plan a new roadmap with the PM agent            |
-| `cclinic plan --roadmap <id>`                             | Add to an existing roadmap                      |
-| `cclinic plan --task`                                     | Plan one task, standalone or in a roadmap       |
-| `cclinic tasks roadmaps`                                  | List roadmaps with their status and task counts |
-| `cclinic tasks roadmap show <id>`                         | One roadmap with milestones, tasks and dependencies |
-| `cclinic tasks depend <id> --on <id>` / `undepend`        | Add or remove a dependency                      |
-| `cclinic auto --roadmap <id>`                             | Run a roadmap with agents                       |
+`cclinic gui` does all of this from a roadmap's frame ([GUI_FLOW.md](GUI_FLOW.md)):
 
-## 13. Rules to remember
+```mermaid
+flowchart LR
+    R[Run with AI<br/>or Continue] --> F[Developers, model,<br/>effort, timeout]
+    F --> P[Plan from<br/>auto --dry-run --json]
+    P --> S[Start:<br/>auto --yes --json]
+    S --> W[Watch: progress, steps,<br/>agents, live transcripts]
+    W --> X[Stop = Ctrl+C]
+```
+
+- **Run with AI** starts a run on that roadmap, after showing the same plan you'd confirm in the terminal.
+- **Continue** replaces it when the newest run was `interrupted` or `limit-reached` and tasks are left. It reuses that run's developers, model, effort and timeout.
+- The frame and roadmap panel show the run's progress and each task's status, branch and rounds. The task panel shows each agent's steps and its transcript, live and read-only. Runs started from the terminal show too.
+- **Stop** has the same effect as Ctrl+C. Closing the GUI stops a run it started.
+- The roadmap panel lists past runs with their `report.md` and agent logs.
+- The top bar shows Claude's plan limits, so you can see a limit coming before a run hits it.
+
+---
+
+## 13. Commands you can run yourself
+
+| Command                                            | What it does                                        |
+| -------------------------------------------------- | --------------------------------------------------- |
+| `cclinic plan`                                     | Plan a new roadmap with the PM agent                |
+| `cclinic plan --roadmap <id>`                      | Add to an existing roadmap                          |
+| `cclinic plan --task`                              | Plan one task, standalone or in a roadmap           |
+| `cclinic tasks roadmaps`                           | List roadmaps with their status and task counts     |
+| `cclinic tasks roadmap show <id>`                  | One roadmap with milestones, tasks and dependencies |
+| `cclinic tasks depend <id> --on <id>` / `undepend` | Add or remove a dependency                          |
+| `cclinic auto --roadmap <id>`                      | Run a roadmap with agents                           |
+| `cclinic auto --roadmap <id> --dry-run`            | Show the plan only, without starting anything       |
+| `cclinic gui`                                      | Start, watch, stop and continue runs in a web page  |
+
+## 14. Rules to remember
 
 - Only the PM agent creates roadmaps, and auto mode only runs roadmaps.
 - No spec is implemented before the PM approves it, and no task is merged before QA passes and the PM approves.

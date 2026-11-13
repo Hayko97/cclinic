@@ -2,7 +2,7 @@
 
 How to use the `product-engineer` skill to turn an idea into a roadmap of tasks, and how those tasks then flow into development.
 
-Source of truth: the skill in [`.agents/skills/product-engineer/`](.agents/skills/product-engineer/SKILL.md), the workflow in [`AGENTS.md`](AGENTS.md), and the task-tracking spec in [`.cclinic/sdd/specs/task-tracking/`](.cclinic/sdd/specs/task-tracking/spec.md). For what happens when you work on a task, see [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md).
+Source of truth: the skill in [`.agents/skills/product-engineer/`](.agents/skills/product-engineer/SKILL.md), the workflow in [`AGENTS.md`](AGENTS.md), and the task-tracking spec in [`.cclinic/sdd/specs/task-tracking/`](.cclinic/sdd/specs/task-tracking/spec.md). For what happens when you work on a task, see [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md). To plan from a web page (New roadmap, or Plan a task on a roadmap), see [GUI_FLOW.md](GUI_FLOW.md).
 
 ---
 
