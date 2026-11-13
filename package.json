@@ -1,6 +1,6 @@
 {
   "name": "cclinic",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Generate spec-driven development documents for an existing project, using Claude",
   "keywords": [
     "claude",
