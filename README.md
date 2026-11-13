@@ -4,7 +4,15 @@
 
 ## Quick start
 
-**1. Install cclinic.** It isn't on npm yet, so install it from this repository:
+**1. Install cclinic.** You need Node.js 22.18 or newer.
+
+```bash
+npm install -g cclinic
+```
+
+Or run it once without installing: `npx cclinic`.
+
+To work on cclinic itself, install it from this repository instead:
 
 ```bash
 git clone https://github.com/Hayko97/cclinic.git

@@ -8,7 +8,7 @@ export const tsupConfig = defineConfig({
   outDir: "dist",
   clean: true,
   splitting: false,
-  sourcemap: true,
+  sourcemap: false,
   // Keeps "node:sqlite", which only exists with the prefix.
   removeNodeProtocol: false,
   // The GUI's pages ship with the package, next to the code that serves them (FR-GUI-045).
