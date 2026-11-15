@@ -9,3 +9,5 @@ package-lock.json
 .claude/
 AGENTS.md
 CLAUDE.md
+plugins/
+.claude-plugin/

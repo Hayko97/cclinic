@@ -19,7 +19,7 @@ Test cases for automation testers. Start each automated test's name with its `TC
 | TC-MCP-001 | FR-MCP-001 | e2e | A ready project | Start `luseen mcp` and send `initialize` and `tools/list` over stdio | Valid MCP responses arrive on stdout, every stdout line is a protocol message, and log lines appear only on stderr |
 | TC-MCP-002 | FR-MCP-001 | e2e | A ready project in another folder | Start `luseen mcp -C <folder>` and call `workflow_status` | The state reported is the other folder's |
 | TC-MCP-003 | FR-MCP-002 | e2e | A ready project | Start with `--approver robot`, with `--approver pm-agent` and no `--run` or no `--task` in turn, and with `--max-budget-usd 1` | Each exits 2 naming the option, and nothing is written to stdout |
-| TC-MCP-004 | FR-MCP-003 | e2e | A Git repository with no `.luseen/sdd` | Start `luseen mcp` | Exit 2, and stderr says to run `luseen` first |
+| TC-MCP-004 | FR-MCP-003 | e2e | A Git repository with no `.luseen/sdd` | Start `luseen mcp`, list tools and call `workflow_status` | The server starts, offers only `workflow_status`, and its answer says the project isn't set up and how to set it up (see claude-plugin TC-PLUG-008) |
 | TC-MCP-005 | FR-MCP-004 | integration | A project with no `.mcp.json` | Run the skills install | `.mcp.json` has a `luseen` server that runs `npx luseen mcp` |
 | TC-MCP-006 | FR-MCP-004 | integration | A `.mcp.json` with servers `a` and `b` | Run the skills install | `a` and `b` are unchanged, and `luseen` is added |
 | TC-MCP-007 | FR-MCP-004 | integration | A `.mcp.json` whose `luseen` entry runs a different command | Run the skills install | The entry is unchanged, and the output says it was left as it is |

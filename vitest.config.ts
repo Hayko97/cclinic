@@ -4,7 +4,7 @@ export const vitestConfig = defineConfig({
   test: {
     coverage: {
       include: ["src/**/*.ts"],
-      exclude: ["src/**/*.test.ts", "src/cli/main.ts"],
+      exclude: ["src/**/*.test.ts", "src/cli/main.ts", "src/cli/build-plugin.ts"],
       reporter: ["text-summary", "json-summary"],
       thresholds: {
         lines: 80,

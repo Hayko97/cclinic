@@ -11,6 +11,7 @@ import {
   BUILT_IN_REVIEW_SKILL_NAME,
   LEGACY_NAME,
   LEGACY_TOOL_FOLDER_NAME,
+  PRODUCT_NAME,
   REVIEW_CODE_SKILL_NAME,
   REVIEW_DOC_SKILL_NAME,
   REVIEWS_FOLDER,
@@ -646,10 +647,24 @@ Any other reply, such as a question, isn't approval: answer it, and offer the op
 
 If the user tells you to skip a stage, do as they ask, and say which stage was skipped. If \`{{DOCS}}\` doesn't exist, ask the user to run \`luseen\` first. If nobody can answer, as in an unattended run, stop at stage 2 and report the spec, because silence isn't approval.`;
 
-export function renderAgentsBlock(docsPath: string): string {
+/** Where the agent finds the skills: the project's own folders, or the luseen Claude Code plugin (FR-PLUG-013). */
+export type SkillSource = "project" | "plugin";
+
+const SKILLS_INTRO: Readonly<Record<SkillSource, string>> = {
+  project:
+    "Skills are in `.agents/skills/<name>/SKILL.md`. If your tool doesn't load skills automatically, read the matching file and follow it:",
+  plugin: `Skills come from the ${PRODUCT_NAME} Claude Code plugin, as \`/${PRODUCT_NAME}:<skill>\`. Claude Code loads them when they fit the task:`,
+};
+
+export function skillSourceOf(options: { readonly plugin?: boolean }): SkillSource {
+  return options.plugin === true ? "plugin" : "project";
+}
+
+export function renderAgentsBlock(docsPath: string, source: SkillSource = "project"): string {
   const rows = AGENT_SKILLS.map((skill) => {
     const when = skill.description.split(". ")[0] ?? skill.description;
-    return `| \`${skill.name}\` | ${when.replace(/\.$/, "")} |`;
+    const name = source === "plugin" ? `/${PRODUCT_NAME}:${skill.name}` : skill.name;
+    return `| \`${name}\` | ${when.replace(/\.$/, "")} |`;
   });
   return `${BLOCK_START}
 ${AGENT_WORKFLOW.replaceAll("{{DOCS}}", docsPath)}
@@ -658,7 +673,7 @@ ${AGENT_WORKFLOW.replaceAll("{{DOCS}}", docsPath)}
 
 Follow \`${docsPath}/developer-guidelines.md\` for all code.
 
-Skills are in \`.agents/skills/<name>/SKILL.md\`. If your tool doesn't load skills automatically, read the matching file and follow it:
+${SKILLS_INTRO[source]}
 
 | Skill | Purpose |
 |---|---|

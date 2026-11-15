@@ -26,7 +26,8 @@
   },
   "files": [
     "bin",
-    "dist"
+    "dist",
+    "!dist/build-plugin.js"
   ],
   "engines": {
     "node": ">=22.18"
@@ -34,6 +35,7 @@
   "scripts": {
     "prepublishOnly": "npm run build",
     "build": "tsup",
+    "build:plugin": "tsup && node dist/build-plugin.js",
     "test": "vitest run --project unit --project integration",
     "test:coverage": "vitest run --project unit --project integration --coverage",
     "test:e2e": "npm run build && vitest run --project e2e",

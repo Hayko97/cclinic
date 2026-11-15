@@ -9,6 +9,7 @@ import { hasInstalledSkills, installSkills, summarizeInstall } from "../adapters
 import { BYTES_PER_KIB, BYTES_PER_MIB, MINIMUM_NODE, VERSION_CHECK_TIMEOUT_MS } from "../core/constants/limits.js";
 import { LIST_LABEL_WIDTH, LIST_VALUE_WIDTH, SIZE_DECIMAL_PLACES } from "../core/constants/terminal.js";
 import { GIT_INSTALL_LINK } from "../core/constants/git.js";
+import { skillSourceOf } from "../core/agent-skills.js";
 import { EXIT_CODES, UsageError } from "../core/errors.js";
 import type { GitStatus } from "../core/git-history.js";
 import {
@@ -278,6 +279,7 @@ function formatBytes(bytes: number): string {
 export interface SkillsCommandOptions {
   readonly out?: string;
   readonly force?: boolean;
+  readonly plugin?: boolean;
   readonly json?: boolean;
 }
 
@@ -295,14 +297,15 @@ export async function runSkillsCommand(
   if (!isFolder) throw new UsageError(`"${given ?? absolute}" isn't a folder.`);
   const target = await realpath(absolute);
   const paths = projectPaths(target, options.out);
-  const entries = await installSkills({ target, out: paths.out, isForced: options.force === true });
+  const skillSource = skillSourceOf(options);
+  const entries = await installSkills({ target, out: paths.out, isForced: options.force === true, skillSource });
   if (options.json === true) {
     context.reporter.result(JSON.stringify({ status: "success", skills: entries }));
     return;
   }
   context.reporter.result(
     [
-      summarizeInstall(entries),
+      summarizeInstall(entries, skillSource),
       ...entries
         .filter((entry) => entry.status.startsWith("skipped"))
         .map((entry) => `  ${entry.path} ${entry.status}`),

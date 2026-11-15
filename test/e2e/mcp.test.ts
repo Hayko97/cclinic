@@ -108,8 +108,8 @@ describe("luseen mcp", () => {
     }
   });
 
-  it("TC-MCP-004: a project without luseen's documents exits 2, saying to run luseen", () => {
-    const result = luseen(["mcp", "-C", makeTempFolder()]);
+  it("TC-MCP-075: a driven server for a project without luseen's documents exits 2, saying to run luseen", () => {
+    const result = luseen(["mcp", "-C", makeTempFolder(), "--plan", "plan-1"]);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('Run "luseen"');
   });

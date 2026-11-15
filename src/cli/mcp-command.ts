@@ -13,7 +13,7 @@ import { openTaskStore, type OpenMode, type TaskStore } from "../adapters/storag
 import { openWorkflowStore } from "../adapters/storage/workflow-store.js";
 import { createPlanTools } from "../application/plan-tools.js";
 import { approveProposal, cancelSession, releaseSessionHold } from "../application/planning-session.js";
-import { createWorkflowTools, type RunSummary } from "../application/workflow-tools.js";
+import { createNotSetUpTools, createWorkflowTools, type RunSummary } from "../application/workflow-tools.js";
 import { TOOL_FOLDER_NAME } from "../core/constants/paths.js";
 import { MCP_SERVER_NAME, SESSION_LINK_LOCK_WAIT_MS, SESSION_LINK_TIMEOUT_MS } from "../core/constants/workflow.js";
 import { ENVIRONMENT_FILE_PATH } from "../core/environment.js";
@@ -134,9 +134,14 @@ export async function createProjectServer(options: McpOptions, context: CommandC
   const target = await projectFolder(options.dir);
   const approverMode = parseApprover(options);
   const paths = projectPaths(target, undefined);
-  if (!existsSync(paths.out))
-    throw new UsageError(`There are no project documents in ${paths.out}. Run "luseen" in the project first.`);
   const connection = createMcpServer({ name: MCP_SERVER_NAME, version: context.version });
+  if (!existsSync(paths.out)) {
+    // FR-MCP-046: a driven server serves a session of a project that is set up.
+    if (options.plan !== undefined)
+      throw new UsageError(`There are no project documents in ${paths.out}. Run "luseen" in the project first.`);
+    for (const tool of createNotSetUpTools()) connection.addTool(tool);
+    return connection;
+  }
   if (options.plan !== undefined) {
     await requireOpenPlan(target, options.plan);
     for (const tool of planTools(target, connection, options.plan)) connection.addTool(tool);
@@ -178,7 +183,8 @@ export async function runMcpCommand(options: McpOptions, context: CommandContext
   await connection.connect();
   context.reporter.debug("The luseen MCP server is running.");
   await connection.waitUntilClosed();
-  if (options.plan === undefined) await releaseHeldPlans(await projectFolder(options.dir));
+  const target = await projectFolder(options.dir);
+  if (options.plan === undefined && existsSync(projectPaths(target, undefined).out)) await releaseHeldPlans(target);
 }
 
 /** FR-PLAN-045: a proposal a Claude Code session couldn't ask about, approved or cancelled here. */

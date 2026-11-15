@@ -9,6 +9,7 @@ import {
   renderAgentsBlock,
   renderClaudeBlock,
   renderSkill,
+  skillSourceOf,
   stripManagedSection,
   type AgentSkill,
 } from "./agent-skills.js";
@@ -69,6 +70,13 @@ describe("protecting existing work", () => {
     const windows = render("write-code").replace(/\n/g, "\r\n");
     expect(classifySkill(windows, hash)).toBe("managed");
     expect(isSameSkill(windows, render("write-code"))).toBe(true);
+  });
+
+  it("TC-PLUG-014: with the plugin, the skills table names /luseen:<skill> instead of .agents/skills", () => {
+    const block = renderAgentsBlock(".luseen/sdd", skillSourceOf({ plugin: true }));
+    for (const item of AGENT_SKILLS) expect(block).toContain(`| \`/luseen:${item.name}\` |`);
+    expect(block).not.toContain(".agents/skills");
+    expect(renderAgentsBlock(".luseen/sdd", skillSourceOf({}))).toBe(renderAgentsBlock(".luseen/sdd"));
   });
 
   it("TC-SKILL-018: only the marked section changes", () => {

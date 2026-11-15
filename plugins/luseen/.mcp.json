@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "luseen": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "luseen@0.1.1",
+        "mcp",
+        "-C",
+        "${CLAUDE_PROJECT_DIR}"
+      ]
+    }
+  }
+}

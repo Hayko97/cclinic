@@ -1,5 +1,6 @@
 /** The MCP server's tools and resources: the change workflow and the tasks (spec: mcp-server). */
 import { SPEC_FILES } from "../core/constants/paths.js";
+import { NOT_SET_UP_MESSAGE } from "../core/constants/plugin.js";
 import { RESOURCE_URIS } from "../core/constants/workflow.js";
 import { UsageError } from "../core/errors.js";
 import { specNameSchema, taskInputSchema, type Task, type TaskInput, type TaskStatus } from "../core/tasks.js";
@@ -112,6 +113,10 @@ type Reply = Awaited<ReturnType<WorkflowTool["run"]>>;
 const NO_BRANCH = "no-branch";
 const APPROVE_COMMAND = "luseen approve";
 const NO_INPUT = advanceInputSchema.pick({});
+
+const WORKFLOW_STATUS_TOOL = "workflow_status";
+const WORKFLOW_STATUS_DESCRIPTION =
+  "Call first in every session. Returns the open change: its step, task, spec, QA runs and code reviews used, preview, decisions and skips.";
 
 function ok(message: string, extra: Record<string, unknown> = {}): Reply {
   return { text: JSON.stringify({ status: "ok", message, ...extra }), isError: false };
@@ -242,9 +247,8 @@ export function createWorkflowTools(ports: WorkflowPorts): {
 
   const toolList: WorkflowTool[] = [
     {
-      name: "workflow_status",
-      description:
-        "Call first in every session. Returns the open change: its step, task, spec, QA runs and code reviews used, preview, decisions and skips.",
+      name: WORKFLOW_STATUS_TOOL,
+      description: WORKFLOW_STATUS_DESCRIPTION,
       inputSchema: NO_INPUT,
       run: async () => {
         const state = await findOpen();
@@ -514,4 +518,16 @@ function changeTask(run: () => Task): Task | string {
 function tasksCall(run: () => Task): Reply {
   const task = changeTask(run);
   return typeof task === "string" ? refused(task) : json({ task });
+}
+
+/** FR-PLUG-007: the only tool in a project that isn't set up, so the plugin's server starts in any folder. */
+export function createNotSetUpTools(): WorkflowTool[] {
+  return [
+    {
+      name: WORKFLOW_STATUS_TOOL,
+      description: WORKFLOW_STATUS_DESCRIPTION,
+      inputSchema: NO_INPUT,
+      run: () => Promise.resolve(ok(NOT_SET_UP_MESSAGE, { change: null })),
+    },
+  ];
 }

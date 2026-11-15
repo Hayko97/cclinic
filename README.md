@@ -46,6 +46,20 @@ If the install fails:
 - **`EACCES: permission denied`:** don't use `sudo`. Install Node.js with a version manager such as [nvm](https://github.com/nvm-sh/nvm), or [change npm's global folder](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally).
 - **"luseen needs Node.js 22.18 or newer":** update Node.js, then install luseen again.
 
+### Or install the Claude Code plugin
+
+In Claude Code, add this repository as a plugin marketplace, install the plugin, then set up your project:
+
+```text
+/plugin marketplace add Hayko97/cclinic
+/plugin install luseen@luseen
+/luseen:init
+```
+
+On Claude Code 2.1.275 or later, `/plugin install luseen --marketplace Hayko97/cclinic` does the first two in one step.
+
+The plugin brings luseen's skills (`/luseen:create-spec`, `/luseen:plan`, `/luseen:status`, `/luseen:gui` and more), its MCP server and the hook that links your sessions to the GUI, so your project only gets the specs and the `AGENTS.md` and `CLAUDE.md` sections. It needs Node.js 22.18 or newer, and runs luseen with `npx`. To set up a project from a terminal instead, run `luseen --plugin`.
+
 To work on luseen itself, install it from this repository instead:
 
 ```bash
@@ -192,3 +206,5 @@ npm run test:e2e        # the built binary, against a fake claude
 ```
 
 Automated tests never call real Claude.
+
+The Claude Code plugin in `plugins/luseen/` and `.claude-plugin/marketplace.json` are generated: run `npm run build:plugin` after changing the skills or the version, and commit the result. A test fails when they're out of date.

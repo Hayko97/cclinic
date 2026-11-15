@@ -11,6 +11,7 @@ import {
   renderAgentsBlock,
   renderClaudeBlock,
   renderSkill,
+  type SkillSource,
 } from "../../core/agent-skills.js";
 import { AGENTS_FILE, CLAUDE_FILE, LEGACY_NAME, SKILL_FILE, SKILL_FOLDERS } from "../../core/constants/paths.js";
 import { CLAUDE_SETTINGS_FILE, CODEX_MCP_CONFIG, MCP_CONFIG_FILE } from "../../core/constants/workflow.js";
@@ -105,6 +106,8 @@ export interface InstallOptions {
   readonly isForced: boolean;
   /** Install only into these files, relative to the target (FR-CLI-038). */
   readonly only?: ReadonlySet<string>;
+  /** With the plugin, it brings the skills, server and hook, so only the instruction sections go in (FR-PLUG-013). */
+  readonly skillSource?: SkillSource;
 }
 
 function skillPaths(): string[] {
@@ -141,10 +144,19 @@ export function relativeDocsPath(target: string, out: string): string {
 }
 
 export async function installSkills(options: InstallOptions): Promise<readonly SkillInstallEntry[]> {
-  const { target, out, isForced, only } = options;
+  const { target, out, isForced, only, skillSource = "project" } = options;
   const isIncluded = (relative: string): boolean => only === undefined || only.has(relative);
   const docsPath = relativeDocsPath(target, out);
+  const instructions = [
+    [AGENTS_FILE, renderAgentsBlock(docsPath, skillSource)],
+    [CLAUDE_FILE, renderClaudeBlock()],
+  ] as const;
   const entries: SkillInstallEntry[] = [];
+  if (skillSource === "plugin") {
+    for (const [relative, section] of instructions)
+      entries.push({ path: relative, status: await installInstructionFile(path.join(target, relative), section) });
+    return entries;
+  }
   for (const folder of SKILL_FOLDERS) {
     for (const skill of AGENT_SKILLS) {
       const relative = `${folder}/${skill.name}/${SKILL_FILE}`;
@@ -157,10 +169,6 @@ export async function installSkills(options: InstallOptions): Promise<readonly S
       entries.push({ path: relative, status });
     }
   }
-  const instructions = [
-    [AGENTS_FILE, renderAgentsBlock(docsPath)],
-    [CLAUDE_FILE, renderClaudeBlock()],
-  ] as const;
   for (const [relative, section] of instructions)
     if (isIncluded(relative))
       entries.push({ path: relative, status: await installInstructionFile(path.join(target, relative), section) });
@@ -173,7 +181,7 @@ export async function installSkills(options: InstallOptions): Promise<readonly S
   return entries;
 }
 
-export function summarizeInstall(entries: readonly SkillInstallEntry[]): string {
+export function summarizeInstall(entries: readonly SkillInstallEntry[], skillSource: SkillSource = "project"): string {
   const counts = new Map<string, number>();
   for (const { status } of entries) {
     const label = status.startsWith("skipped") ? "skipped" : status;
@@ -183,6 +191,8 @@ export function summarizeInstall(entries: readonly SkillInstallEntry[]): string 
     .filter((label) => counts.has(label))
     .map((label) => `${counts.get(label) ?? 0} ${label}`)
     .join(", ");
+  if (skillSource === "plugin")
+    return `Agent instructions: ${summary}. Locations: ${AGENTS_FILE}, ${CLAUDE_FILE}. The skills, MCP server and hook come from the luseen Claude Code plugin.`;
   return `Agent skills: ${summary}. Locations: ${SKILL_FOLDERS.join(", ")}, ${AGENTS_FILE}, ${CLAUDE_FILE}, ${MCP_CONFIG_FILE}, ${CLAUDE_SETTINGS_FILE}
 For Codex, add the luseen MCP server to ~/.codex/config.toml:
 ${CODEX_MCP_CONFIG}`;

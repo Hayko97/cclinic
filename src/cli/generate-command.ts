@@ -25,6 +25,7 @@ import {
   promptForChunk,
   type PreparedRun,
 } from "../application/pipeline.js";
+import { skillSourceOf } from "../core/agent-skills.js";
 import { GIT_INSTALL_LINK } from "../core/constants/git.js";
 import { ESTIMATION_CONCURRENCY, EXTRACTION_CONCURRENCY, MS_PER_SECOND } from "../core/constants/limits.js";
 import { ENV_VARS, PROVIDER_CHOICES } from "../core/constants/llm.js";
@@ -80,6 +81,7 @@ export interface GenerateOptions {
   readonly maxRetries: number;
   readonly json?: boolean;
   readonly skills?: boolean;
+  readonly plugin?: boolean;
   readonly environment?: boolean;
   readonly git?: boolean;
   readonly quiet?: boolean;
@@ -453,7 +455,12 @@ export async function runGenerate(
     let skills: readonly SkillInstallEntry[] = [];
     if (options.skills !== false) {
       try {
-        skills = await installSkills({ target, out: paths.out, isForced: options.force === true });
+        skills = await installSkills({
+          target,
+          out: paths.out,
+          isForced: options.force === true,
+          skillSource: skillSourceOf(options),
+        });
       } catch (error) {
         // The documents are already saved, so a skills problem mustn't fail the run (FR-SKILL-005).
         const reason = error instanceof Error ? error.message : "unknown error";
@@ -522,7 +529,7 @@ export async function runGenerate(
         reporter.bold(`Documents written to ${paths.out}`),
         `${result.specCount} specs, ${result.requirementCount} requirements, ${result.testCaseCount} test cases`,
         `${(result.inputTokens + result.outputTokens).toLocaleString("en-US")} tokens${cost}, ${durationSeconds}s, ${result.cachedChunks} of ${result.totalChunks} chunks from cache`,
-        ...(skills.length === 0 ? [] : [summarizeInstall(skills)]),
+        ...(skills.length === 0 ? [] : [summarizeInstall(skills, skillSourceOf(options))]),
         NEXT_STEPS,
         ...skills
           .filter((entry) => entry.status.startsWith("skipped"))

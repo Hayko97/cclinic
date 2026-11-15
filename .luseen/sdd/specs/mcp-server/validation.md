@@ -4,7 +4,7 @@ Acceptance criteria from the user's point of view.
 
 | ID | Covers | User need | Accepted when |
 |---|---|---|---|
-| VAL-MCP-001 | FR-MCP-001, FR-MCP-002, FR-MCP-003 | The server starts by itself and fails clearly | Opening the project in Claude Code starts the server with no command from me; a wrong option or a project without luseen docs gives a clear message instead of a broken session |
+| VAL-MCP-001 | FR-MCP-001, FR-MCP-002, FR-MCP-003 | The server starts by itself and fails clearly | Opening the project in Claude Code starts the server with no command from me; a wrong option or a project without luseen docs tells me how to set it up instead of a broken session |
 | VAL-MCP-002 | FR-MCP-004, FR-MCP-005 | Setting it up takes nothing extra | Running `luseen` adds the server to `.mcp.json` without touching my other servers, and shows me what to add for Codex |
 | VAL-MCP-003 | FR-MCP-006 | The new dependency is justified and contained | The MCP library is listed with its reason, and only one part of luseen uses it |
 | VAL-MCP-004 | FR-MCP-007, FR-MCP-008, FR-MCP-016 | The agent has the tools it needs, and bad calls do no harm | The agent sees the listed tools and resources, and a tool called with wrong input explains what's wrong and changes nothing |

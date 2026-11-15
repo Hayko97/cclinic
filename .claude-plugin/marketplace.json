@@ -1,0 +1,14 @@
+{
+  "name": "luseen",
+  "description": "luseen: spec-driven development in Claude Code",
+  "owner": {
+    "name": "Hayko97"
+  },
+  "plugins": [
+    {
+      "name": "luseen",
+      "source": "./plugins/luseen",
+      "description": "Generate spec-driven development documents for an existing project, using Claude"
+    }
+  ]
+}

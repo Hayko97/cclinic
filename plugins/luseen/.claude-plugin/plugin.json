@@ -1,0 +1,11 @@
+{
+  "name": "luseen",
+  "version": "0.1.1",
+  "description": "Generate spec-driven development documents for an existing project, using Claude",
+  "author": {
+    "name": "Hayko97"
+  },
+  "homepage": "https://github.com/Hayko97/cclinic#readme",
+  "repository": "https://github.com/Hayko97/cclinic",
+  "license": "SEE LICENSE IN LICENSE"
+}

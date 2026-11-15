@@ -16,6 +16,7 @@ import {
   nextPlanId,
   parseChatInput,
   parseProposal,
+  isPlanToolCall,
   planIdOfToolCall,
   planSuggestInputSchema,
   releaseHold,
@@ -222,6 +223,15 @@ describe("sessions", () => {
     // The same process ID in another place, as in tests that run both in one process, isn't the holder.
     expect(releaseHold(held, { place: "gui", pid: 10 }, TIME)).toBe(held);
     expect(releaseHold(held, holder, TIME).holder).toBeNull();
+  });
+
+  it("TC-PLUG-007: the plugin's tool names give the same planning ID as mcp__luseen__", () => {
+    const reply = [{ type: "text", text: JSON.stringify({ status: "ok", planId: "plan-4" }) }];
+    expect(planIdOfToolCall("mcp__plugin_luseen_luseen__plan_resume", reply)).toBe("plan-4");
+    expect(planIdOfToolCall("mcp__luseen__plan_resume", reply)).toBe("plan-4");
+    expect(planIdOfToolCall("mcp__plugin_luseen_luseen__workflow_status", reply)).toBeUndefined();
+    expect(isPlanToolCall("mcp__plugin_luseen_luseen__plan_suggest")).toBe(true);
+    expect(isPlanToolCall("mcp__plugin_luseen_luseen__workflow_status")).toBe(false);
   });
 
   it("TC-PLAN-064: a planning tool call names its session, and links the Claude session to it", () => {

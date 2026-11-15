@@ -2,7 +2,8 @@ import { cp } from "node:fs/promises";
 import { defineConfig } from "tsup";
 
 export const tsupConfig = defineConfig({
-  entry: { main: "src/cli/main.ts" },
+  // build-plugin writes the Claude Code plugin from the same sources; it isn't published (FR-PLUG-012).
+  entry: { main: "src/cli/main.ts", "build-plugin": "src/cli/build-plugin.ts" },
   format: ["esm"],
   target: "node22",
   outDir: "dist",
