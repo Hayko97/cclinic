@@ -43,8 +43,8 @@ const said = (text: string) => ({ type: "assistant", message: { content: [{ type
 
 function project(): string {
   const root = makeTempFolder();
-  mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Payments", goal: "Card checkout" },
@@ -83,7 +83,7 @@ function withRun(
   mkdirSync(projects, { recursive: true });
   const file = (sessionId: string) => path.join(projects, `${sessionId}.jsonl`);
   for (const [n, text] of Object.entries(options.transcripts ?? {})) writeFileSync(file(id(Number(n))), text);
-  const folder = path.join(root, ".cclinic/auto", RUN_ID);
+  const folder = path.join(root, ".luseen/auto", RUN_ID);
   mkdirSync(path.join(folder, "sessions"), { recursive: true });
   for (const item of sessions) {
     const session: AgentSession = {
@@ -104,7 +104,7 @@ function withRun(
     runId: RUN_ID,
     roadmapId: 1,
     roadmapTitle: "Payments",
-    runBranch: `cclinic/auto/${RUN_ID}/run`,
+    runBranch: `luseen/auto/${RUN_ID}/run`,
     startedAt: minutesAgo(60),
     finishedAt: options.isLive ? null : minutesAgo(1),
     outcome: options.isLive ? null : "partial",
@@ -131,7 +131,7 @@ function withRun(
   };
   writeFileSync(path.join(folder, "run.json"), JSON.stringify(state));
   if (options.isLive)
-    writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: RUN_ID }));
+    writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId: RUN_ID }));
   return { root, home, file };
 }
 

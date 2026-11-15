@@ -42,8 +42,8 @@ const toolResult = (content: string) => ({ type: "user", message: { content: [{ 
 /** Roadmap 1 "Payments" with tasks 1 to 5, of which 4 and 5 are done. */
 function project(): string {
   const root = makeTempFolder();
-  mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Payments", goal: "Card checkout" },
@@ -112,7 +112,7 @@ function withRun(root: string, home: string, transcript: readonly unknown[]): vo
     runId: RUN_ID,
     roadmapId: 1,
     roadmapTitle: "Payments",
-    runBranch: `cclinic/auto/${RUN_ID}/run`,
+    runBranch: `luseen/auto/${RUN_ID}/run`,
     startedAt: minutesAgo(45),
     finishedAt: null,
     outcome: null,
@@ -135,12 +135,12 @@ function withRun(root: string, home: string, transcript: readonly unknown[]): vo
     })),
     skippedInProgress: [],
   };
-  const folder = path.join(root, ".cclinic/auto", RUN_ID);
+  const folder = path.join(root, ".luseen/auto", RUN_ID);
   mkdirSync(path.join(folder, "sessions"), { recursive: true });
   writeFileSync(path.join(folder, "run.json"), JSON.stringify(state));
   for (const item of sessions)
     writeFileSync(path.join(folder, "sessions", `${item.sessionId}.json`), JSON.stringify(item));
-  writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: RUN_ID }));
+  writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId: RUN_ID }));
 }
 
 const QA_TRANSCRIPT = [

@@ -1,4 +1,4 @@
-/** The files of an automated run in `.cclinic/auto/<run-id>`, and the lock that allows one run at a time. */
+/** The files of an automated run in `.luseen/auto/<run-id>`, and the lock that allows one run at a time. */
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";

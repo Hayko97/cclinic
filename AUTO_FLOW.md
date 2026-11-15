@@ -1,21 +1,21 @@
-# How automated mode works with `cclinic`
+# How automated mode works with `luseen`
 
-How `cclinic auto` hands a whole roadmap to a team of Claude CLI agents that build it with no human in the loop, and what you get back when it finishes.
+How `luseen auto` hands a whole roadmap to a team of Claude CLI agents that build it with no human in the loop, and what you get back when it finishes.
 
-Source of truth: the automated-mode spec in [`.cclinic/sdd/specs/automated-mode/`](.cclinic/sdd/specs/automated-mode/spec.md), roadmap planning in [`.cclinic/sdd/specs/roadmap-planning/`](.cclinic/sdd/specs/roadmap-planning/spec.md), and task storage in [`.cclinic/sdd/specs/task-tracking/`](.cclinic/sdd/specs/task-tracking/spec.md). For how roadmaps are planned, see [PLANNING_FLOW.md](PLANNING_FLOW.md). For the normal, human-approved lifecycle, see [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md). To start, watch, stop and continue runs from a web page, see [GUI_FLOW.md](GUI_FLOW.md).
+Source of truth: the automated-mode spec in [`.luseen/sdd/specs/automated-mode/`](.luseen/sdd/specs/automated-mode/spec.md), roadmap planning in [`.luseen/sdd/specs/roadmap-planning/`](.luseen/sdd/specs/roadmap-planning/spec.md), and task storage in [`.luseen/sdd/specs/task-tracking/`](.luseen/sdd/specs/task-tracking/spec.md). For how roadmaps are planned, see [PLANNING_FLOW.md](PLANNING_FLOW.md). For the normal, human-approved lifecycle, see [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md). To start, watch, stop and continue runs from a web page, see [GUI_FLOW.md](GUI_FLOW.md).
 
 ---
 
 ## 1. The big picture
 
-You plan a roadmap with the PM agent, then hand it to `cclinic auto`. Developer, PM and QA agents build each task on their own branches. You get a notification and a report, and you decide whether to merge.
+You plan a roadmap with the PM agent, then hand it to `luseen auto`. Developer, PM and QA agents build each task on their own branches. You get a notification and a report, and you decide whether to merge.
 
 ```mermaid
 flowchart LR
-    P([cclinic plan]) --> R[(Roadmap in<br/>.cclinic/tasks.db)]
-    R --> A[cclinic auto<br/>--roadmap id]
+    P([luseen plan]) --> R[(Roadmap in<br/>.luseen/tasks.db)]
+    R --> A[luseen auto<br/>--roadmap id]
     A --> T[Agents build tasks<br/>in dependency order]
-    T --> B[Run branch<br/>cclinic/auto/run-id/run]
+    T --> B[Run branch<br/>luseen/auto/run-id/run]
     B --> N([Notification<br/>+ report.md])
     N --> M{You review<br/>and merge}
 ```
@@ -28,18 +28,18 @@ Automated mode only runs a **whole roadmap**. It never pushes, never opens pull 
 
 ```mermaid
 flowchart LR
-    S1[1. Plan a roadmap<br/>cclinic plan] --> S2[2. Check it<br/>cclinic tasks roadmaps]
+    S1[1. Plan a roadmap<br/>luseen plan] --> S2[2. Check it<br/>luseen tasks roadmaps]
     S2 --> S3[3. Commit skills<br/>and specs]
-    S3 --> S4[4. Run it<br/>cclinic auto]
+    S3 --> S4[4. Run it<br/>luseen auto]
 ```
 
-1. **Plan a roadmap.** Only the PM agent creates roadmaps: run `cclinic plan`, answer its questions, and approve its proposal. `cclinic plan --roadmap <id>` adds to an existing one.
-2. **Pick it.** `cclinic tasks roadmaps` lists them; `cclinic tasks roadmap show <id>` shows one with its milestones, tasks and dependencies.
-3. **Commit.** Agents work from the last commit, in their own worktrees. Commit the cclinic skills (`.agents/skills/`, `.claude/skills/`) and your specs, or the agents won't see them.
+1. **Plan a roadmap.** Only the PM agent creates roadmaps: run `luseen plan`, answer its questions, and approve its proposal. `luseen plan --roadmap <id>` adds to an existing one.
+2. **Pick it.** `luseen tasks roadmaps` lists them; `luseen tasks roadmap show <id>` shows one with its milestones, tasks and dependencies.
+3. **Commit.** Agents work from the last commit, in their own worktrees. Commit the luseen skills (`.agents/skills/`, `.claude/skills/`) and your specs, or the agents won't see them.
 4. **Run it:**
 
 ```bash
-cclinic auto --roadmap 1
+luseen auto --roadmap 1
 ```
 
 ### Options
@@ -62,7 +62,7 @@ Each failed check exits 2, says how to fix it, and changes nothing.
 
 ```mermaid
 flowchart TD
-    S([cclinic auto]) --> C1{Claude CLI<br/>installed?}
+    S([luseen auto]) --> C1{Claude CLI<br/>installed?}
     C1 -- yes --> C2{Git repo with<br/>a commit?}
     C2 -- yes --> C3{No uncommitted changes<br/>to tracked files?}
     C3 -- yes --> C4{Skills committed?}
@@ -73,7 +73,7 @@ flowchart TD
     C1 & C2 & C3 & C4 & C5 & C6 & C7 -- no --> X([Exit 2, nothing changed])
 ```
 
-- New untracked files are fine, and so are changes to `.cclinic/tasks.db`, which cclinic updates itself.
+- New untracked files are fine, and so are changes to `.luseen/tasks.db`, which luseen updates itself.
 - Only one run may work on a project at a time. A lock left by a crashed run is replaced.
 
 ### Which tasks run
@@ -91,7 +91,7 @@ A task that depends on a task that's neither `done` nor in this run is reported 
 
 ```text
 Roadmap #1: Launch
-Run branch: cclinic/auto/20261109-080503/run
+Run branch: luseen/auto/20261109-080503/run
 Developers: 2
 
 Tasks in run order:
@@ -111,12 +111,12 @@ Won't run:
 
 | Role             | Runs as                                       | Can                                                                                                                     |
 | ---------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Orchestrator** | cclinic itself, no LLM                        | Picks tasks, makes every branch, commit and merge, updates `tasks.db`, enforces limits, writes the report, notifies you |
+| **Orchestrator** | luseen itself, no LLM                         | Picks tasks, makes every branch, commit and merge, updates `tasks.db`, enforces limits, writes the report, notifies you |
 | **Developer**    | `claude -p` in the task's worktree            | Writes the spec, then the code and tests; fixes what QA or the PM reports                                               |
 | **PM**           | A separate `claude -p`, read-only             | Approves or sends back the spec, then the finished work                                                                 |
 | **QA**           | A separate `claude -p` in the task's worktree | Tests the change against the spec with `test-spec`, including end-to-end tests                                          |
 
-Every agent runs with `--permission-mode dontAsk`, `--safe-mode` and its own `--session-id`, recorded in `.cclinic/auto/<run-id>/sessions/`, so `cclinic gui` can show each agent's transcript live. No agent may run `git` or `sudo`, or read `.env` and other secret files. The PM can only read files (Read, Glob, Grep). Only cclinic commits.
+Every agent runs with `--permission-mode dontAsk`, `--safe-mode` and its own `--session-id`, recorded in `.luseen/auto/<run-id>/sessions/`, so `luseen gui` can show each agent's transcript live. No agent may run `git` or `sudo`, or read `.env` and other secret files. The PM can only read files (Read, Glob, Grep). Only luseen commits.
 
 ---
 
@@ -135,8 +135,8 @@ flowchart TD
     QA -- pass --> PM2{PM: implementation<br/>review of diff + QA result}
     PM2 -- changes + feedback --> D4[Developer: fix]
     D4 --> QA
-    PM2 -- approve + requirement IDs --> C[cclinic commits<br/>to the task branch]
-    C --> M[cclinic merges into<br/>the run branch, --no-ff]
+    PM2 -- approve + requirement IDs --> C[luseen commits<br/>to the task branch]
+    C --> M[luseen merges into<br/>the run branch, --no-ff]
     M --> Dn([status: done])
 ```
 
@@ -192,34 +192,34 @@ Everything that depends on a blocked task, directly or not, is skipped and repor
 ```mermaid
 gitGraph
     commit id: "your HEAD"
-    branch "cclinic/auto/<run-id>/run"
-    branch "cclinic/auto/<run-id>/task-1"
+    branch "luseen/auto/<run-id>/run"
+    branch "luseen/auto/<run-id>/task-1"
     commit id: "#1 Lock account"
-    checkout "cclinic/auto/<run-id>/run"
-    merge "cclinic/auto/<run-id>/task-1"
-    branch "cclinic/auto/<run-id>/task-2"
+    checkout "luseen/auto/<run-id>/run"
+    merge "luseen/auto/<run-id>/task-1"
+    branch "luseen/auto/<run-id>/task-2"
     commit id: "#2 Email when locked"
-    checkout "cclinic/auto/<run-id>/run"
-    merge "cclinic/auto/<run-id>/task-2"
+    checkout "luseen/auto/<run-id>/run"
+    merge "luseen/auto/<run-id>/task-2"
 ```
 
-| What          | Where                                                                    |
-| ------------- | ------------------------------------------------------------------------ |
-| Run branch    | `cclinic/auto/<run-id>/run`, from your `HEAD`                            |
-| Task branch   | `cclinic/auto/<run-id>/task-<id>`, kept after the run                    |
-| Task worktree | `.cclinic/auto/<run-id>/worktrees/task-<id>`, removed when the task ends |
-| Run state     | `.cclinic/auto/<run-id>/run.json`, updated after every step              |
-| Agent logs    | `.cclinic/auto/<run-id>/logs/`                                           |
-| Report        | `.cclinic/auto/<run-id>/report.md`                                       |
+| What          | Where                                                                   |
+| ------------- | ----------------------------------------------------------------------- |
+| Run branch    | `luseen/auto/<run-id>/run`, from your `HEAD`                            |
+| Task branch   | `luseen/auto/<run-id>/task-<id>`, kept after the run                    |
+| Task worktree | `.luseen/auto/<run-id>/worktrees/task-<id>`, removed when the task ends |
+| Run state     | `.luseen/auto/<run-id>/run.json`, updated after every step              |
+| Agent logs    | `.luseen/auto/<run-id>/logs/`                                           |
+| Report        | `.luseen/auto/<run-id>/report.md`                                       |
 
 - The run ID is the UTC start time, `YYYYMMDD-HHMMSS`, with a suffix if it's taken.
-- Your branch, index and working tree are never changed, apart from `.cclinic/tasks.db` and `.cclinic/auto/`. `/.cclinic/auto/` is added to `.git/info/exclude`, so worktrees don't show in `git status`.
-- cclinic's own commits and merges use `--no-verify`, so your commit hooks don't reject its messages. They still run when you merge the run branch yourself.
+- Your branch, index and working tree are never changed, apart from `.luseen/tasks.db` and `.luseen/auto/`. `/.luseen/auto/` is added to `.git/info/exclude`, so worktrees don't show in `git status`.
+- luseen's own commits and merges use `--no-verify`, so your commit hooks don't reject its messages. They still run when you merge the run branch yourself.
 - Secrets are redacted from `run.json` and the logs.
 
 ### Merge conflicts
 
-If a task branch conflicts with the run branch, cclinic aborts the merge, leaves the run branch as it was, keeps the task branch, and blocks the task with the conflicting files as the reason. Agents never resolve conflicts.
+If a task branch conflicts with the run branch, luseen aborts the merge, leaves the run branch as it was, keeps the task branch, and blocks the task with the conflicting files as the reason. Agents never resolve conflicts.
 
 ### Unfinished work
 
@@ -240,16 +240,16 @@ flowchart TD
     Open --> End([Outcome: limit-reached,<br/>with when it resets])
 ```
 
-- Each agent call saves Claude's newest plan limits (session and weekly use, and when they reset), which `cclinic gui` shows in its top bar.
+- Each agent call saves Claude's newest plan limits (session and weekly use, and when they reset), which `luseen gui` shows in its top bar.
 - Each agent call stops after `--timeout-minutes` (default 30).
 
 ---
 
 ## 9. Ctrl+C or SIGTERM
 
-cclinic stops every agent, commits nothing unapproved to the run branch, sets in-progress tasks back to `open`, removes the worktrees, keeps the branches, writes the report with outcome `interrupted`, notifies you, and exits 130 (Ctrl+C) or 143 (SIGTERM).
+luseen stops every agent, commits nothing unapproved to the run branch, sets in-progress tasks back to `open`, removes the worktrees, keeps the branches, writes the report with outcome `interrupted`, notifies you, and exits 130 (Ctrl+C) or 143 (SIGTERM).
 
-A run isn't resumed in place. Continue it with a new run (Continue on the roadmap in `cclinic gui`, with the same settings): it picks up the tasks that are still `open` or `blocked`.
+A run isn't resumed in place. Continue it with a new run (Continue on the roadmap in `luseen gui`, with the same settings): it picks up the tasks that are still `open` or `blocked`.
 
 ---
 
@@ -259,7 +259,7 @@ A run isn't resumed in place. Continue it with a new run (Continue on the roadma
 
 ```mermaid
 stateDiagram-v2
-    [*] --> open: cclinic plan
+    [*] --> open: luseen plan
     open --> in_progress: task starts
     blocked --> in_progress: next run
     in_progress --> done: merged into run branch
@@ -277,13 +277,13 @@ stateDiagram-v2
 | `interrupted`   | Ctrl+C or SIGTERM                     | 130 / 143 |
 | —               | A usage or precondition error         | 2         |
 
-You get a desktop notification for any outcome, such as **"cclinic: Launch — Run partial: 2 done, 1 blocked."** It uses `osascript` on macOS, `notify-send` on Linux, and otherwise a terminal bell and a printed message.
+You get a desktop notification for any outcome, such as **"luseen: Launch — Run partial: 2 done, 1 blocked."** It uses `osascript` on macOS, `notify-send` on Linux, and otherwise a terminal bell and a printed message.
 
 With `--json`, stdout is one JSON document with the outcome, the run branch, the report path and each task's result.
 
 ### The report
 
-`.cclinic/auto/<run-id>/report.md` lists:
+`.luseen/auto/<run-id>/report.md` lists:
 
 - the roadmap, run branch and outcome;
 - each task with its result, branch and rounds;
@@ -299,19 +299,19 @@ With `--json`, stdout is one JSON document with the outcome, the run branch, the
 Nothing reaches your branch until you merge it:
 
 ```bash
-cat .cclinic/auto/<run-id>/report.md
-git log --oneline cclinic/auto/<run-id>/run
-git diff HEAD...cclinic/auto/<run-id>/run
-git merge cclinic/auto/<run-id>/run
+cat .luseen/auto/<run-id>/report.md
+git log --oneline luseen/auto/<run-id>/run
+git diff HEAD...luseen/auto/<run-id>/run
+git merge luseen/auto/<run-id>/run
 ```
 
-For a blocked task, inspect its branch `cclinic/auto/<run-id>/task-<id>`, fix it yourself through the normal [development flow](DEVELOPMENT_FLOW.md), or run `cclinic auto` again to retry it.
+For a blocked task, inspect its branch `luseen/auto/<run-id>/task-<id>`, fix it yourself through the normal [development flow](DEVELOPMENT_FLOW.md), or run `luseen auto` again to retry it.
 
 ---
 
 ## 12. Runs in the GUI
 
-`cclinic gui` does all of this from a roadmap's frame ([GUI_FLOW.md](GUI_FLOW.md)):
+`luseen gui` does all of this from a roadmap's frame ([GUI_FLOW.md](GUI_FLOW.md)):
 
 ```mermaid
 flowchart LR
@@ -333,23 +333,23 @@ flowchart LR
 
 ## 13. Commands you can run yourself
 
-| Command                                            | What it does                                        |
-| -------------------------------------------------- | --------------------------------------------------- |
-| `cclinic plan`                                     | Plan a new roadmap with the PM agent                |
-| `cclinic plan --roadmap <id>`                      | Add to an existing roadmap                          |
-| `cclinic plan --task`                              | Plan one task, standalone or in a roadmap           |
-| `cclinic tasks roadmaps`                           | List roadmaps with their status and task counts     |
-| `cclinic tasks roadmap show <id>`                  | One roadmap with milestones, tasks and dependencies |
-| `cclinic tasks depend <id> --on <id>` / `undepend` | Add or remove a dependency                          |
-| `cclinic auto --roadmap <id>`                      | Run a roadmap with agents                           |
-| `cclinic auto --roadmap <id> --dry-run`            | Show the plan only, without starting anything       |
-| `cclinic gui`                                      | Start, watch, stop and continue runs in a web page  |
+| Command                                           | What it does                                        |
+| ------------------------------------------------- | --------------------------------------------------- |
+| `luseen plan`                                     | Plan a new roadmap with the PM agent                |
+| `luseen plan --roadmap <id>`                      | Add to an existing roadmap                          |
+| `luseen plan --task`                              | Plan one task, standalone or in a roadmap           |
+| `luseen tasks roadmaps`                           | List roadmaps with their status and task counts     |
+| `luseen tasks roadmap show <id>`                  | One roadmap with milestones, tasks and dependencies |
+| `luseen tasks depend <id> --on <id>` / `undepend` | Add or remove a dependency                          |
+| `luseen auto --roadmap <id>`                      | Run a roadmap with agents                           |
+| `luseen auto --roadmap <id> --dry-run`            | Show the plan only, without starting anything       |
+| `luseen gui`                                      | Start, watch, stop and continue runs in a web page  |
 
 ## 14. Rules to remember
 
 - Only the PM agent creates roadmaps, and auto mode only runs roadmaps.
 - No spec is implemented before the PM approves it, and no task is merged before QA passes and the PM approves.
-- Only cclinic commits and merges, and only on `cclinic/auto/<run-id>/` branches. Nothing is pushed.
+- Only luseen commits and merges, and only on `luseen/auto/<run-id>/` branches. Nothing is pushed.
 - Each stage gets at most 3 rounds, then the task is blocked.
 - Claude's usage limit stops a run cleanly, and you continue it once the limit resets.
 - You decide what gets merged into your branch.

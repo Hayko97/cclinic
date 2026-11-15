@@ -1,4 +1,4 @@
-/** `cclinic gui` through the built binary (spec: gui, cli-commands). */
+/** `luseen gui` through the built binary (spec: gui, cli-commands). */
 import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, copyFileSync, existsSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeTempFolder, writeProject } from "../support/helpers.js";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
-const BIN = path.join(REPO, "bin/cclinic.js");
+const BIN = path.join(REPO, "bin/luseen.js");
 
 function environment(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const bin = makeTempFolder();
@@ -18,7 +18,7 @@ function environment(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return { PATH: `${bin}:/usr/bin:/bin`, HOME: home, XDG_CONFIG_HOME: path.join(home, "c"), ...extra };
 }
 
-function cclinic(args: readonly string[]) {
+function luseen(args: readonly string[]) {
   const result = spawnSync(process.execPath, [BIN, ...args], { encoding: "utf8", env: environment(), input: "" });
   return { code: result.status, stdout: result.stdout, stderr: result.stderr };
 }
@@ -66,7 +66,7 @@ function isRunning(pid: number): boolean {
   }
 }
 
-describe("cclinic gui", () => {
+describe("luseen gui", () => {
   it("TC-GUI-001: prints one JSON document with the link and port, and the link serves the page", async () => {
     const gui = await startGui(makeTempFolder(), environment());
     expect(gui.stdout().trim().split("\n")).toHaveLength(1);
@@ -80,20 +80,20 @@ describe("cclinic gui", () => {
   });
 
   it("TC-GUI-004, TC-CLI-061: a port out of range, a port that isn't a number, or a file as the path exits 2", () => {
-    expect(cclinic(["gui", "--no-open", "--port", "70000"]).code).toBe(2);
-    expect(cclinic(["gui", "--no-open", "--port", "abc"]).code).toBe(2);
+    expect(luseen(["gui", "--no-open", "--port", "70000"]).code).toBe(2);
+    expect(luseen(["gui", "--no-open", "--port", "abc"]).code).toBe(2);
     const root = makeTempFolder();
     writeProject(root, { "file.txt": "x" });
-    const result = cclinic(["gui", path.join(root, "file.txt"), "--no-open", "--port", "0"]);
+    const result = luseen(["gui", path.join(root, "file.txt"), "--no-open", "--port", "0"]);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("isn't a folder");
   });
 
   it("TC-CLI-060: the help lists the GUI's options", () => {
-    const result = cclinic(["gui", "--help"]);
+    const result = luseen(["gui", "--help"]);
     expect(result.code).toBe(0);
     for (const option of ["-C, --dir", "--port", "--no-open", "--json"]) expect(result.stdout).toContain(option);
-    expect(cclinic(["--help"]).stdout).toContain("gui [options] [path]");
+    expect(luseen(["--help"]).stdout).toContain("gui [options] [path]");
   });
 
   it.each([
@@ -110,11 +110,11 @@ describe("cclinic gui", () => {
       const pids = path.join(work, "pids.txt");
       const script = path.join(work, "script.json");
       writeFileSync(script, JSON.stringify([{ hang: true, times: 0 }]));
-      const env = environment({ FAKE_CLAUDE_SCRIPT: script, FAKE_CLAUDE_PIDS: pids, CCLINIC_PROVIDER: "claude-cli" });
+      const env = environment({ FAKE_CLAUDE_SCRIPT: script, FAKE_CLAUDE_PIDS: pids, LUSEEN_PROVIDER: "claude-cli" });
       const gui = await startGui(root, env);
       const started = await fetch(`http://127.0.0.1:${gui.port}/api/jobs`, {
         method: "POST",
-        headers: { "x-cclinic-token": gui.token, "content-type": "application/json" },
+        headers: { "x-luseen-token": gui.token, "content-type": "application/json" },
         body: JSON.stringify({
           command: "generate",
           confirmed: true,
@@ -154,7 +154,7 @@ describe("cclinic gui", () => {
     const run = async (body: Record<string, unknown>) => {
       const started = await fetch(`http://127.0.0.1:${gui.port}/api/jobs`, {
         method: "POST",
-        headers: { "x-cclinic-token": gui.token, "content-type": "application/json" },
+        headers: { "x-luseen-token": gui.token, "content-type": "application/json" },
         body: JSON.stringify(body),
       });
       expect(started.status).toBe(201);
@@ -162,7 +162,7 @@ describe("cclinic gui", () => {
       return vi.waitFor(
         async () => {
           const reply = await fetch(`http://127.0.0.1:${gui.port}/api/jobs/${job.id}`, {
-            headers: { "x-cclinic-token": gui.token },
+            headers: { "x-luseen-token": gui.token },
           });
           const { job: done } = (await reply.json()) as {
             job: { isRunning: boolean; exitCode: number; output: { lines: { text: string }[] } };

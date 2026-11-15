@@ -77,7 +77,7 @@ function runState(runId: string, change: Partial<RunState>): RunState {
     runId,
     roadmapId: 1,
     roadmapTitle: "Payments",
-    runBranch: `cclinic/auto/${runId}/run`,
+    runBranch: `luseen/auto/${runId}/run`,
     startedAt: new Date(Date.now() - 3_600_000).toISOString(),
     finishedAt: new Date(Date.now() - 1_800_000).toISOString(),
     outcome: "interrupted",
@@ -119,8 +119,8 @@ function runState(runId: string, change: Partial<RunState>): RunState {
 /** Roadmap 1 "Payments" with task 1 done and task 2 open, its newest run as given, and a config folder. */
 async function project(newest: Partial<RunState>): Promise<{ root: string; config: string; home: string }> {
   const root = makeTempFolder();
-  mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Payments", goal: "Card checkout" },
@@ -141,7 +141,7 @@ async function project(newest: Partial<RunState>): Promise<{ root: string; confi
   store.setStatus(1, "done");
   store.close();
   for (const state of [runState(DONE_RUN, { outcome: "completed" }), runState(STOPPED_RUN, newest)]) {
-    const folder = path.join(root, ".cclinic/auto", state.runId);
+    const folder = path.join(root, ".luseen/auto", state.runId);
     mkdirSync(path.join(folder, "sessions"), { recursive: true });
     writeFileSync(path.join(folder, "run.json"), JSON.stringify(state));
     const session: AgentSession = {
@@ -165,11 +165,11 @@ async function project(newest: Partial<RunState>): Promise<{ root: string; confi
   await openWorkflowStore(root).save({ ...change, costUsd: 1.2 });
   const home = makeTempFolder();
   const config = path.join(home, "config");
-  mkdirSync(path.join(config, "cclinic"), { recursive: true });
+  mkdirSync(path.join(config, "luseen"), { recursive: true });
   return { root, config, home };
 }
 
-const limitsFile = (config: string) => path.join(config, "cclinic", "limits.json");
+const limitsFile = (config: string) => path.join(config, "luseen", "limits.json");
 const inHours = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
 
 function limits(change: Partial<PlanLimits> = {}): PlanLimits {

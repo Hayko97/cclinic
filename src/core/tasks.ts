@@ -58,7 +58,7 @@ export const taskInputSchema = z.object({
 });
 export type TaskInput = z.input<typeof taskInputSchema> & { readonly milestoneId?: number };
 
-/** A whole approved plan, saved by `cclinic plan` in one transaction (FR-TASK-027). */
+/** A whole approved plan, saved by `luseen plan` in one transaction (FR-TASK-027). */
 export interface PlannedTask {
   readonly key: string;
   readonly title: string;
@@ -233,7 +233,7 @@ export function summarizeRoadmap(roadmap: Roadmap): RoadmapSummary {
 
 /** FR-TASK-024 */
 export function renderRoadmapList(summaries: readonly RoadmapSummary[]): string {
-  if (summaries.length === 0) return "No roadmaps. Create one with: cclinic plan";
+  if (summaries.length === 0) return "No roadmaps. Create one with: luseen plan";
   return summaries
     .map((summary) => {
       const counts = TASK_STATUSES.map((status) => `${summary.taskCounts[status]} ${status}`).join(", ");
@@ -248,4 +248,4 @@ export function renderRoadmapList(summaries: readonly RoadmapSummary[]): string 
 }
 
 export const PLAN_HINT =
-  "Roadmaps and milestones are created by the PM agent: run cclinic plan (or cclinic plan --task for one task).";
+  "Roadmaps and milestones are created by the PM agent: run luseen plan (or luseen plan --task for one task).";

@@ -2,8 +2,8 @@
 name: review-code
 description: "Reviews a change against the project's coding rules and developer guidelines, and reports findings by severity with a verdict, without changing code. Use when QA has passed and before the preview, or when the user asks to review code before it's committed."
 metadata:
-  generated-by: cclinic
-  content-hash: "699a158b4b593656bdd88a9f6631f7ff5833adfc0b13c750ce8c792b7c8637dc"
+  generated-by: luseen
+  content-hash: "6500a8844236b9e42eafcea0f5f1fde712b68a0cad8b09854e7700f0af9f5d75"
 ---
 
 # Review code
@@ -23,13 +23,13 @@ Review a change the way a careful senior maintainer of this project would, befor
 When two conflict, the earlier one wins:
 
 1. **The project's own rules:** such as `CONTRIBUTING.md`, the user's own part of `AGENTS.md` or `CLAUDE.md`, and the linter and formatter configuration.
-2. **`.cclinic/sdd/developer-guidelines.md`.** If it's missing, say so in the report.
+2. **`.luseen/sdd/developer-guidelines.md`.** If it's missing, say so in the report.
 3. **The checklist below.**
 
 ## Steps
 
-1. **Read the change.** Read the diff of the changed files, such as with `git diff`, and read new files in full. If a spec covers the change, read its `spec.md` in `.cclinic/sdd/specs/<name>/`, so you can judge whether the code does what it says. If no spec covers it, such as a refactor, check that behaviour didn't change.
-2. **Run the checks first.** Run the project's formatter, linter, type checker and tests, using the commands in `.cclinic/sdd/stack.md` or the project's own scripts, and record the real results. Each failure in the changed files, or caused by them, is a `blocking` finding. A failure only in other files is a follow-up. Don't review by hand what these tools already check.
+1. **Read the change.** Read the diff of the changed files, such as with `git diff`, and read new files in full. If a spec covers the change, read its `spec.md` in `.luseen/sdd/specs/<name>/`, so you can judge whether the code does what it says. If no spec covers it, such as a refactor, check that behaviour didn't change.
+2. **Run the checks first.** Run the project's formatter, linter, type checker and tests, using the commands in `.luseen/sdd/stack.md` or the project's own scripts, and record the real results. Each failure in the changed files, or caused by them, is a `blocking` finding. A failure only in other files is a follow-up. Don't review by hand what these tools already check.
 3. **Review against the rules.** Go through each changed file with the rules above and the checklist.
 4. **Run Claude Code's review, if you can.** If you're running in Claude Code and its built-in `code-review` skill or command is available, run it on the current change at the level `medium`, passing it explicitly, because with no level, it reuses the last level the user typed. Don't pass `--fix`, `--comment`, `max` or `ultra` unless the user asks. Add the findings you confirm, marked `(claude-code)`, and say in the report whether it ran. If it isn't available, say so in the report.
 5. **Confirm every finding.** Confirm each finding in the code, and drop any you can't confirm, rather than report a guess.

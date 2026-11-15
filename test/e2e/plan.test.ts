@@ -1,4 +1,4 @@
-/** `cclinic plan` through the built binary, for what doesn't need a terminal. */
+/** `luseen plan` through the built binary, for what doesn't need a terminal. */
 import { spawnSync } from "node:child_process";
 import { chmodSync, copyFileSync, existsSync, symlinkSync } from "node:fs";
 import path from "node:path";
@@ -8,7 +8,7 @@ import { makeTempFolder, writeProject } from "../support/helpers.js";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 
-function cclinic(args: readonly string[], options: { withClaude?: boolean; env?: NodeJS.ProcessEnv } = {}) {
+function luseen(args: readonly string[], options: { withClaude?: boolean; env?: NodeJS.ProcessEnv } = {}) {
   const bin = makeTempFolder();
   symlinkSync(process.execPath, path.join(bin, "node"));
   if (options.withClaude !== false) {
@@ -17,7 +17,7 @@ function cclinic(args: readonly string[], options: { withClaude?: boolean; env?:
   }
   const home = makeTempFolder();
   const record = path.join(makeTempFolder(), "calls.jsonl");
-  const result = spawnSync(process.execPath, [path.join(REPO, "bin/cclinic.js"), ...args], {
+  const result = spawnSync(process.execPath, [path.join(REPO, "bin/luseen.js"), ...args], {
     encoding: "utf8",
     env: { PATH: bin, HOME: home, XDG_CONFIG_HOME: path.join(home, "c"), FAKE_CLAUDE_RECORD: record, ...options.env },
     input: "",
@@ -27,11 +27,11 @@ function cclinic(args: readonly string[], options: { withClaude?: boolean; env?:
 
 function project(): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n" });
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n" });
   return root;
 }
 
-describe("cclinic plan", () => {
+describe("luseen plan", () => {
   it("TC-PLAN-001: invalid options exit 2 and call no Claude", () => {
     const root = project();
     writeProject(root, { "song.mp3": "x", "notes.md": "n" });
@@ -46,7 +46,7 @@ describe("cclinic plan", () => {
       [["--resume", "plan-1", "--attach", "notes.md"], "--resume"],
       [["--resume", "seven"], "--resume"],
     ] as const) {
-      const result = cclinic(["plan", "-C", root, ...args]);
+      const result = luseen(["plan", "-C", root, ...args]);
       expect(result.code, args.join(" ")).toBe(2);
       expect(result.stderr, args.join(" ")).toContain(named);
       expect(result.called).toBe(false);
@@ -55,23 +55,23 @@ describe("cclinic plan", () => {
 
   it("TC-PLAN-002: with no terminal it exits 2 and creates no database", () => {
     const root = project();
-    const result = cclinic(["plan", "-C", root]);
+    const result = luseen(["plan", "-C", root]);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("interactive terminal");
-    expect(existsSync(path.join(root, ".cclinic/tasks.db"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/tasks.db"))).toBe(false);
   });
 
   it("TC-PLAN-003: the provider, claude and the documents are checked, naming the fix", () => {
     const root = project();
-    const api = cclinic(["plan", "-C", root], { env: { CCLINIC_PROVIDER: "anthropic-api" } });
+    const api = luseen(["plan", "-C", root], { env: { LUSEEN_PROVIDER: "anthropic-api" } });
     expect(api).toMatchObject({ code: 2 });
-    expect(api.stderr).toContain("CCLINIC_PROVIDER");
-    const noClaude = cclinic(["plan", "-C", root], { withClaude: false });
+    expect(api.stderr).toContain("LUSEEN_PROVIDER");
+    const noClaude = luseen(["plan", "-C", root], { withClaude: false });
     expect(noClaude.code).toBe(2);
     expect(noClaude.stderr).toContain("Install Claude Code");
-    const noDocs = cclinic(["plan", "-C", makeTempFolder()]);
+    const noDocs = luseen(["plan", "-C", makeTempFolder()]);
     expect(noDocs.code).toBe(2);
-    expect(noDocs.stderr).toContain("Run cclinic in the project folder first");
+    expect(noDocs.stderr).toContain("Run luseen in the project folder first");
   });
 
   it("TC-PLAN-025: roadmaps, milestones and milestone tasks can't be created by hand", () => {
@@ -81,10 +81,10 @@ describe("cclinic plan", () => {
       ["milestone", "add", "--title", "M"],
       ["add", "--title", "T", "--milestone", "1"],
     ]) {
-      const result = cclinic(["tasks", ...args, "-C", root]);
+      const result = luseen(["tasks", ...args, "-C", root]);
       expect(result.code, args.join(" ")).toBe(2);
-      expect(result.stderr).toContain("cclinic plan");
+      expect(result.stderr).toContain("luseen plan");
     }
-    expect(existsSync(path.join(root, ".cclinic/tasks.db"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/tasks.db"))).toBe(false);
   });
 });

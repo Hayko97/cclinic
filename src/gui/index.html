@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>cclinic</title>
+    <title>luseen</title>
     <link rel="stylesheet" href="/assets/styles.css" />
     <script type="module" src="/assets/app.js"></script>
   </head>
@@ -11,7 +11,7 @@
     <header class="top-bar">
       <span class="logo" aria-hidden="true">c</span>
       <div class="project">
-        <strong id="project-name">cclinic</strong>
+        <strong id="project-name">luseen</strong>
         <div id="project-folder" class="muted"></div>
       </div>
       <div class="top-status">
@@ -98,11 +98,11 @@
 
       <section id="view-setup" aria-labelledby="setup-title" hidden>
         <h1 id="setup-title">Setup</h1>
-        <p id="setup-status" class="muted">Check that cclinic can run in this project.</p>
+        <p id="setup-status" class="muted">Check that luseen can run in this project.</p>
         <div class="setup-grid">
           <article class="setup-card setup-wide" aria-labelledby="generate-title">
             <h2 id="generate-title">Generate documents</h2>
-            <p class="muted">Analyse the project with Claude and write the specs and documents in .cclinic/sdd.</p>
+            <p class="muted">Analyse the project with Claude and write the specs and documents in .luseen/sdd.</p>
             <form id="generate-form" novalidate>
               <div class="field-row">
                 <label
@@ -175,7 +175,7 @@
 
           <article class="setup-card" aria-labelledby="check-title">
             <h2 id="check-title">Check</h2>
-            <p class="muted">cclinic doctor checks Node.js, Claude, Git and the output folder, with no Claude usage.</p>
+            <p class="muted">luseen doctor checks Node.js, Claude, Git and the output folder, with no Claude usage.</p>
             <ul id="doctor-result" class="plain checks"></ul>
             <div class="actions">
               <button id="run-doctor" type="button" class="primary">Run doctor</button>
@@ -207,7 +207,7 @@
               Install the skills and AGENTS.md section your coding agent works from, with no Claude usage.
             </p>
             <label class="switch"
-              ><input id="skills-force" type="checkbox" /> Replace edited cclinic skills (--force)</label
+              ><input id="skills-force" type="checkbox" /> Replace edited luseen skills (--force)</label
             >
             <div class="actions"><button id="skills-run" type="button">Install skills</button></div>
           </article>
@@ -239,7 +239,7 @@
           <article class="setup-card" aria-labelledby="mcp-title">
             <h2 id="mcp-title">Connect your coding agent</h2>
             <p class="muted">
-              Host agents such as Claude Code start <code>cclinic mcp</code> themselves from <code>.mcp.json</code>.
+              Host agents such as Claude Code start <code>luseen mcp</code> themselves from <code>.mcp.json</code>.
               Installing the skills adds it.
             </p>
             <p id="mcp-status"></p>

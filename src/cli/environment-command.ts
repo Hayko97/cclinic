@@ -1,4 +1,4 @@
-/** The `cclinic environment` command. */
+/** The `luseen environment` command. */
 import { probeClaude } from "../adapters/llm/select-provider.js";
 import { acquireLock, projectPaths } from "../adapters/storage/document-store.js";
 import { installSkills, summarizeInstall } from "../adapters/storage/skill-installer.js";

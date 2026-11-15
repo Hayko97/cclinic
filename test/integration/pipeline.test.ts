@@ -48,7 +48,7 @@ async function run(
     effort: "medium",
     concurrency: 4,
     noCache: false,
-    cclinicVersion: "0.1.0",
+    luseenVersion: "0.1.0",
     ...overrides.settings,
   };
   const files = overrides.files ?? FILES;
@@ -76,7 +76,7 @@ async function run(
 }
 
 function read(root: string, relative: string): string {
-  return readFileSync(path.join(root, ".cclinic", "sdd", relative), "utf8");
+  return readFileSync(path.join(root, ".luseen", "sdd", relative), "utf8");
 }
 
 const isSpecCall = (request: LlmRequest<unknown>): boolean => request.schema === specContentSchema;
@@ -236,8 +236,8 @@ describe("analysis pipeline", () => {
     });
     const { result } = await run(root, llm);
     expect(result.specCount).toBe(3);
-    expect(existsSync(path.join(root, ".cclinic/sdd/specs/alpha-a/spec.md"))).toBe(true);
-    expect(existsSync(path.join(root, ".cclinic/sdd/specs/alpha-b/spec.md"))).toBe(true);
+    expect(existsSync(path.join(root, ".luseen/sdd/specs/alpha-a/spec.md"))).toBe(true);
+    expect(existsSync(path.join(root, ".luseen/sdd/specs/alpha-b/spec.md"))).toBe(true);
   });
 
   it("TC-ANA-033: a second cut-off stops the run and names the spec", async () => {
@@ -338,7 +338,7 @@ describe("generated output", () => {
   it("TC-OUT-001: all files exist, and TC-OUT-003: no questions is stated", async () => {
     const root = makeTempFolder();
     await run(root, new FakeLlm());
-    for (const file of PROJECT_FILES) expect(existsSync(path.join(root, ".cclinic/sdd", file))).toBe(true);
+    for (const file of PROJECT_FILES) expect(existsSync(path.join(root, ".luseen/sdd", file))).toBe(true);
     expect(read(root, "open-questions.md")).toContain("There are no open questions.");
   });
 
@@ -440,14 +440,14 @@ describe("generated output", () => {
       cwd: root,
       encoding: "utf8",
     });
-    expect(status).not.toContain(".cclinic/cache");
-    expect(status).not.toContain(".cclinic/failed");
+    expect(status).not.toContain(".luseen/cache");
+    expect(status).not.toContain(".luseen/failed");
   });
 
   it("TC-OUT-012: one folder per spec, with exactly three files", async () => {
     const root = makeTempFolder();
     await run(root, new FakeLlm());
-    const specs = path.join(root, ".cclinic/sdd/specs");
+    const specs = path.join(root, ".luseen/sdd/specs");
     expect(readdirSync(specs).sort()).toEqual(["alpha", "beta"]);
     expect(readdirSync(path.join(specs, "alpha")).sort()).toEqual(["spec.md", "validation.md", "verification.md"]);
   });
@@ -488,7 +488,7 @@ describe("generated output", () => {
     expect(error).toBeInstanceOf(ValidationFailedError);
     expect((error as ValidationFailedError).problems.join()).toContain("malformed ID");
     expect(read(root, "README.md")).toBe(before);
-    const failed = path.join(root, ".cclinic/failed");
+    const failed = path.join(root, ".luseen/failed");
     expect(readdirSync(failed).filter((name) => name !== ".gitignore")).toHaveLength(1);
   });
 
@@ -496,10 +496,10 @@ describe("generated output", () => {
     const root = makeTempFolder();
     const { paths } = await run(root, new FakeLlm());
     const { renameSync, mkdirSync } = await import("node:fs");
-    mkdirSync(`${paths.out}.cclinic-tmp-999`);
+    mkdirSync(`${paths.out}.luseen-tmp-999`);
     await recoverInterruptedWrite(paths.out);
-    expect(existsSync(`${paths.out}.cclinic-tmp-999`)).toBe(false);
-    renameSync(paths.out, `${paths.out}.cclinic-old-999`);
+    expect(existsSync(`${paths.out}.luseen-tmp-999`)).toBe(false);
+    renameSync(paths.out, `${paths.out}.luseen-old-999`);
     await recoverInterruptedWrite(paths.out);
     expect(existsSync(path.join(paths.out, "README.md"))).toBe(true);
   });
@@ -516,7 +516,7 @@ describe("generated output", () => {
   it("TC-OUT-023: an unrelated folder needs --force", async () => {
     const root = makeTempFolder();
     writeFileSync(path.join(root, "notes.txt"), "mine");
-    await expect(checkOutputFolder(root, false)).rejects.toThrow("no cclinic manifest");
+    await expect(checkOutputFolder(root, false)).rejects.toThrow("no luseen manifest");
     expect(readFileSync(path.join(root, "notes.txt"), "utf8")).toBe("mine");
     await expect(checkOutputFolder(root, true)).resolves.toEqual({ overwritten: ["notes.txt"] });
   });

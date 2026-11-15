@@ -1,5 +1,5 @@
 {
-  "name": "cclinic",
+  "name": "luseen",
   "version": "0.1.1",
   "description": "Generate spec-driven development documents for an existing project, using Claude",
   "keywords": [
@@ -22,7 +22,7 @@
   },
   "type": "module",
   "bin": {
-    "cclinic": "bin/cclinic.js"
+    "luseen": "bin/luseen.js"
   },
   "files": [
     "bin",

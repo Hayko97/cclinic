@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 export function makeTempFolder(): string {
-  const folder = mkdtempSync(path.join(tmpdir(), "cclinic-test-"));
+  const folder = mkdtempSync(path.join(tmpdir(), "luseen-test-"));
   temporaryFolders.push(folder);
   return folder;
 }

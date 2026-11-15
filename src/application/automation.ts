@@ -21,7 +21,7 @@ import {
   type TaskRun,
 } from "../core/automation.js";
 import { AUTO_LIMITS } from "../core/constants/agents.js";
-import { AgentCallError, CancelledError, CclinicError } from "../core/errors.js";
+import { AgentCallError, CancelledError, LuseenError } from "../core/errors.js";
 import type { Task, TaskStatus } from "../core/tasks.js";
 
 export type AgentRole = "developer" | "qa" | "pm";
@@ -67,7 +67,7 @@ export interface AutomationPorts {
   readonly saveLog: (name: string, text: string) => Promise<void>;
   readonly now: () => Date;
   readonly signal: AbortSignal;
-  /** The documents folder, relative to the project, such as `.cclinic/sdd`. */
+  /** The documents folder, relative to the project, such as `.luseen/sdd`. */
   readonly docsPath: string;
 }
 
@@ -78,7 +78,7 @@ export interface AutomationInput {
 }
 
 /** Why a task stopped early. The stage limit and merge conflicts block it; a plan usage limit and Ctrl+C put it back. */
-class TaskStop extends CclinicError {
+class TaskStop extends LuseenError {
   constructor(
     readonly status: "blocked" | "open",
     readonly reason: string,

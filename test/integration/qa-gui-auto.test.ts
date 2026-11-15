@@ -47,7 +47,7 @@ function repository(title = "Launch"): string {
   writeProject(root, {
     "README.md": "# App\n",
     "src/shared.txt": "base\n",
-    ".cclinic/sdd/README.md": "# Specs\n",
+    ".luseen/sdd/README.md": "# Specs\n",
     ...Object.fromEntries(AUTO_REQUIRED_SKILLS.map((skill) => [`.claude/skills/${skill}/SKILL.md`, `# ${skill}\n`])),
   });
   git(root, "init", "-q", "-b", "main");
@@ -55,7 +55,7 @@ function repository(title = "Launch"): string {
   git(root, "config", "user.name", "Dev");
   git(root, "add", "-A");
   git(root, "commit", "-q", "-m", "start");
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title, goal: "Ship" },
@@ -85,15 +85,15 @@ function repository(title = "Launch"): string {
 }
 
 function changeStore(root: string, change: (store: NonNullable<ReturnType<typeof openTaskStore>>) => void): void {
-  const store = openTaskStore(path.join(root, ".cclinic"), "update");
+  const store = openTaskStore(path.join(root, ".luseen"), "update");
   if (store === undefined) throw new Error("No store");
   change(store);
   store.close();
 }
 
-/** Runs the real `cclinic` program, with the fake `claude` first on PATH and no terminal. */
+/** Runs the real `luseen` program, with the fake `claude` first on PATH and no terminal. */
 function cli(root: string, harness: ReturnType<typeof agentHarness>, ...args: string[]) {
-  const result = spawnSync(process.execPath, [path.join(REPO_ROOT, "bin/cclinic.js"), ...args], {
+  const result = spawnSync(process.execPath, [path.join(REPO_ROOT, "bin/luseen.js"), ...args], {
     cwd: root,
     env: harness.environment,
     encoding: "utf8",
@@ -120,7 +120,7 @@ function runState(runId: string, change: Partial<RunState> = {}): RunState {
     runId,
     roadmapId: 1,
     roadmapTitle: "Launch",
-    runBranch: `cclinic/auto/${runId}/run`,
+    runBranch: `luseen/auto/${runId}/run`,
     startedAt: new Date(Date.now() - 600_000).toISOString(),
     finishedAt: null,
     outcome: null,
@@ -136,7 +136,7 @@ function runState(runId: string, change: Partial<RunState> = {}): RunState {
         title: "Task a",
         dependsOn: [],
         status: "running",
-        branch: `cclinic/auto/${runId}/task-1`,
+        branch: `luseen/auto/${runId}/task-1`,
         rounds: { specReviews: 1, qaRuns: 2, implementationReviews: 0 },
         costUsd: 1.25,
         reason: null,
@@ -149,7 +149,7 @@ function runState(runId: string, change: Partial<RunState> = {}): RunState {
 }
 
 function writeRun(root: string, state: RunState, files: { report?: string; logs?: Record<string, string> } = {}) {
-  const folder = path.join(root, ".cclinic/auto", state.runId);
+  const folder = path.join(root, ".luseen/auto", state.runId);
   mkdirSync(path.join(folder, "logs"), { recursive: true });
   writeFileSync(path.join(folder, "run.json"), JSON.stringify(state));
   if (files.report !== undefined) writeFileSync(path.join(folder, "report.md"), files.report);
@@ -215,7 +215,7 @@ async function openPage(gui: TestGui, viewport = { width: 1280, height: 900 }, t
   return page;
 }
 
-describe("QA: cclinic auto --dry-run as a program", () => {
+describe("QA: luseen auto --dry-run as a program", () => {
   it("TC-AUTO-061: text output is the plan, exit 0, no prompt, no claude, and nothing created", () => {
     const root = repository();
     const harness = agentHarness();
@@ -237,7 +237,7 @@ describe("QA: cclinic auto --dry-run as a program", () => {
     const withoutRunId = (plan: string) => plan.replace(/\d{8}-\d{6}(-\d+)?/g, "<run>");
     expect(withoutRunId(text.out.trim())).toBe(withoutRunId(result.plan));
     expect(harness.calls()).toEqual([]);
-    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/auto"))).toBe(false);
     expect(git(root, "branch", "--list")).toBe(branches);
     expect(git(root, "status", "--porcelain", "--ignored")).toBe(status);
   });
@@ -265,7 +265,7 @@ describe("QA: cclinic auto --dry-run as a program", () => {
     const text = cli(root, harness, "auto", "--roadmap", "1", "--dry-run");
     expect(text.code).toBe(2);
     expect(text.err).toContain("Roadmap 1 has no open or blocked tasks to run.");
-    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/auto"))).toBe(false);
   });
 
   it("FR-AUTO-040, TC-AUTO-064: a dry run needs no budget, refuses the removed --max-budget-usd, and never opens a menu", () => {
@@ -277,12 +277,12 @@ describe("QA: cclinic auto --dry-run as a program", () => {
     const removed = cli(root, harness, "auto", "--roadmap", "1", "--max-budget-usd", "5", "--dry-run");
     expect(removed.code).toBe(2);
     expect(removed.err).toContain("--max-budget-usd");
-    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/auto"))).toBe(false);
   });
 });
 
 describe("QA: Run with AI through the API", () => {
-  it("TC-GUI-037: the plan from the real CLI is the text cclinic auto prints, and nothing starts", async () => {
+  it("TC-GUI-037: the plan from the real CLI is the text luseen auto prints, and nothing starts", async () => {
     const root = repository();
     const gui = await startReal(root);
     const reply = await postJob(gui, { command: "auto", options: { roadmap: 1, developers: 2 } });
@@ -292,7 +292,7 @@ describe("QA: Run with AI through the API", () => {
     const withoutRunId = (text: string) => text.replace(/\d{8}-\d{6}(-\d+)?/g, "<run>");
     expect(withoutRunId(plan.plan)).toBe(withoutRunId(printed.out.trim()));
     expect(plan.runnable).toEqual([1, 2]);
-    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/auto"))).toBe(false);
     const jobs = JSON.parse((await sendTo(gui, "GET", "/api/jobs")).body) as { jobs: { kind: string }[] };
     expect(jobs.jobs.map((job) => job.kind)).toEqual(["auto-preview"]);
   });
@@ -368,17 +368,17 @@ describe("QA: Run with AI through the API", () => {
       { timeout: 20_000, interval: 200 },
     );
     await running.splice(running.indexOf(gui), 1)[0]?.stop();
-    const state = JSON.parse(readFileSync(path.join(root, ".cclinic/auto", runId, "run.json"), "utf8")) as RunState;
+    const state = JSON.parse(readFileSync(path.join(root, ".luseen/auto", runId, "run.json"), "utf8")) as RunState;
     expect(state.outcome).toBe("interrupted");
-    expect(existsSync(path.join(root, ".cclinic/auto/.lock"))).toBe(false);
-    const store = openTaskStore(path.join(root, ".cclinic"), "read");
+    expect(existsSync(path.join(root, ".luseen/auto/.lock"))).toBe(false);
+    const store = openTaskStore(path.join(root, ".luseen"), "read");
     expect(store?.getTask(1)?.status).toBe("open");
     store?.close();
   }, 60_000);
 
   it("FR-GUI-032: a run with no report and no logs folder shows a null report and no logs", async () => {
     const root = repository();
-    const folder = path.join(root, ".cclinic/auto", OLD_RUN);
+    const folder = path.join(root, ".luseen/auto", OLD_RUN);
     mkdirSync(folder, { recursive: true });
     writeFileSync(path.join(folder, "run.json"), JSON.stringify(runState(OLD_RUN, finished)));
     const gui = await startReal(root);
@@ -418,7 +418,7 @@ describe("QA: Run with AI through the API", () => {
   it("FR-GUI-014: an unreadable logs folder or log file is reported, not a server error", async () => {
     const root = repository();
     writeRun(root, runState(OLD_RUN, finished), { report: "# R\n", logs: { "a.txt": "x\n" } });
-    const logs = path.join(root, ".cclinic/auto", OLD_RUN, "logs");
+    const logs = path.join(root, ".luseen/auto", OLD_RUN, "logs");
     chmodSync(logs, 0o000);
     locked.push(logs);
     const gui = await startReal(root);
@@ -435,7 +435,7 @@ describe("QA: Run with AI through the API", () => {
   it("FR-GUI-014: a folder inside the logs folder is skipped or reported, not a server error", async () => {
     const root = repository();
     writeRun(root, runState(OLD_RUN, finished), { report: "# R\n", logs: { "a.txt": "x\n" } });
-    mkdirSync(path.join(root, ".cclinic/auto", OLD_RUN, "logs", "subfolder"));
+    mkdirSync(path.join(root, ".luseen/auto", OLD_RUN, "logs", "subfolder"));
     const gui = await startReal(root);
     const nested = await sendTo(gui, "GET", `/api/runs/${OLD_RUN}`);
     expect(nested.status, nested.body).not.toBe(500);
@@ -444,7 +444,7 @@ describe("QA: Run with AI through the API", () => {
   it("FR-GUI-032: run IDs that name other folders are refused and read nothing", async () => {
     const root = repository();
     writeRun(root, runState(OLD_RUN, finished), { report: "# R\n" });
-    mkdirSync(path.join(root, ".cclinic/auto/20261111-000000"), { recursive: true });
+    mkdirSync(path.join(root, ".luseen/auto/20261111-000000"), { recursive: true });
     const gui = await startReal(root);
     for (const tricky of [
       `/api/runs/${OLD_RUN}/..`,
@@ -591,7 +591,7 @@ describe("QA: Run with AI in the browser", () => {
         reason: `<b>bold</b> failed with ${key}`,
       })),
     });
-    writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
+    writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
     const gui = await startReal(root);
     const page = await openPage(gui, { width: 1280, height: 900 }, "dark");
     await page.locator('[data-frame="roadmap-1"] button[data-action="open-roadmap"]').click();
@@ -607,7 +607,7 @@ describe("QA: Run with AI in the browser", () => {
   it("FR-GUI-031: a terminal run's Stop names the PID; another roadmap's frame offers Run with AI, refused with the run", async () => {
     const root = repository();
     writeRun(root, runState(LIVE_RUN));
-    writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
+    writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
     const gui = await startReal(root);
     const page = await openPage(gui);
     const first = page.locator('[data-frame="roadmap-1"]');
@@ -657,7 +657,7 @@ describe("QA run 2: the run 1 fixes", () => {
   it("DEF-2: an unreadable log file is a 409 naming the file, not a 500", async () => {
     const root = repository();
     writeRun(root, runState(OLD_RUN, finished), { report: "# R\n", logs: { "a.txt": "x\n" } });
-    const file = path.join(root, ".cclinic/auto", OLD_RUN, "logs", "a.txt");
+    const file = path.join(root, ".luseen/auto", OLD_RUN, "logs", "a.txt");
     chmodSync(file, 0o000);
     locked.push(file);
     const gui = await startReal(root);
@@ -669,7 +669,7 @@ describe("QA run 2: the run 1 fixes", () => {
   it("DEF-3: a folder inside logs/ isn't listed as a log, and the files still are", async () => {
     const root = repository();
     writeRun(root, runState(OLD_RUN, finished), { report: "# R\n", logs: { "a.txt": "x\n", "c.txt": "y\n" } });
-    mkdirSync(path.join(root, ".cclinic/auto", OLD_RUN, "logs", "b-folder"));
+    mkdirSync(path.join(root, ".luseen/auto", OLD_RUN, "logs", "b-folder"));
     const gui = await startReal(root);
     const reply = await sendTo(gui, "GET", `/api/runs/${OLD_RUN}`);
     expect(reply.status, reply.body).toBe(200);
@@ -736,10 +736,10 @@ describe("QA run 3: the code-review fixes", () => {
       expect(result.out).toContain("Roadmap #1: Launch");
     }
     expect(harness.calls()).toEqual([]);
-    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/auto"))).toBe(false);
   });
 
-  it("TC-AUTO-062: a dry run refuses a wrong --model, --effort or CCLINIC_EFFORT with exit 2, creating nothing", () => {
+  it("TC-AUTO-062: a dry run refuses a wrong --model, --effort or LUSEEN_EFFORT with exit 2, creating nothing", () => {
     const root = repository();
     const harness = agentHarness();
     const base = ["auto", "--roadmap", "1", "--dry-run"];
@@ -749,10 +749,10 @@ describe("QA run 3: the code-review fixes", () => {
     const effort = cli(root, harness, ...base, "--effort", "huge");
     expect(effort.code).toBe(2);
     expect(effort.err).toContain("--effort");
-    const env = cli(root, agentHarness({ env: { CCLINIC_EFFORT: "huge" } }), ...base, "--json");
+    const env = cli(root, agentHarness({ env: { LUSEEN_EFFORT: "huge" } }), ...base, "--json");
     expect(env.code).toBe(2);
-    expect(env.out + env.err).toContain("CCLINIC_EFFORT");
-    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+    expect(env.out + env.err).toContain("LUSEEN_EFFORT");
+    expect(existsSync(path.join(root, ".luseen/auto"))).toBe(false);
   });
 
   it("FR-GUI-032: runs with a -2 or 6-digit suffix open; the files are 409 when run.json or report.md can't be read", async () => {
@@ -769,7 +769,7 @@ describe("QA run 3: the code-review fixes", () => {
     expect(canvas).toContain(`${OLD_RUN}-2`);
     expect(canvas).toContain(`${OLD_RUN}-123456`);
 
-    const folder = path.join(root, ".cclinic/auto/20261109-090000");
+    const folder = path.join(root, ".luseen/auto/20261109-090000");
     chmodSync(path.join(folder, "report.md"), 0o000);
     const report = await sendTo(gui, "GET", "/api/runs/20261109-090000");
     chmodSync(path.join(folder, "report.md"), 0o644);
@@ -789,7 +789,7 @@ describe("QA run 3: the code-review fixes", () => {
     writeRun(root, runState(live));
     writeRun(root, runState(`${OLD_RUN}-10`, finished));
     writeRun(root, runState(OLD_RUN, finished));
-    writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: live }));
+    writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId: live }));
     expect(await findRunHoldingTask(root, 1)).toBe(live);
     expect(await findRunHoldingTask(root, 2)).toBeUndefined();
     const listing = await createRunLister(root)();

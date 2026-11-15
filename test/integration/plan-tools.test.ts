@@ -64,8 +64,8 @@ const roadmap = (extra: Partial<RoadmapProposal> = {}): RoadmapProposal => ({
 /** A project with documents, and roadmap 1 with milestone 1 and task 1. */
 function project(): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   store?.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
     milestones: [{ title: "One", goal: "", tasks: [planned("x")] }],
@@ -117,7 +117,7 @@ async function begin(call: Awaited<ReturnType<typeof connect>>["call"], target: 
   return String(begun["planId"]);
 }
 
-/** A session cclinic drives, held by this test's process. */
+/** A session luseen drives, held by this test's process. */
 async function drivenSession(root: string, target: PlanTarget = { kind: "new-roadmap" }, pid = process.ppid) {
   return openPlanStore(root).create((id) =>
     newPlanSession({
@@ -159,8 +159,8 @@ describe("planning tools in Claude Code", () => {
     });
     expect(begun).toMatchObject({ status: "ok", planId: "plan-1", isError: false });
     for (const part of [
-      ".cclinic/sdd/overview.md",
-      ".cclinic/sdd/README.md",
+      ".luseen/sdd/overview.md",
+      ".luseen/sdd/README.md",
       '"title":"Launch"',
       '"status":"open"',
       "plan-1",
@@ -250,12 +250,12 @@ describe("planning tools in Claude Code", () => {
     expect(kept).toMatchObject({ status: "waiting", isError: false });
     expect(asked[0]?.answers).toEqual(["approve", "keep chatting", "cancel"]);
     expect(asked[0]?.message).toContain("Roadmap: Portal");
-    const store = () => openTaskStore(path.join(root, ".cclinic"), "read");
+    const store = () => openTaskStore(path.join(root, ".luseen"), "read");
     expect(store()?.listRoadmaps()).toHaveLength(1);
     const approved = await call("plan_propose", { planId, proposal: roadmap() });
     expect(approved).toMatchObject({
       status: "approved",
-      message: "Saved roadmap #2. Run it with: cclinic auto --roadmap 2",
+      message: "Saved roadmap #2. Run it with: luseen auto --roadmap 2",
     });
     expect(
       store()
@@ -273,20 +273,20 @@ describe("planning tools in Claude Code", () => {
     expect(store()?.listRoadmaps()).toHaveLength(2);
   });
 
-  it("TC-PLAN-066: without elicitation the proposal waits, and cclinic approve saves it while Claude Code holds the session", async () => {
+  it("TC-PLAN-066: without elicitation the proposal waits, and luseen approve saves it while Claude Code holds the session", async () => {
     const root = project();
     const { call } = await connect(root);
     const planId = await begin(call);
     const waiting = await call("plan_propose", { planId, proposal: roadmap() });
     expect(waiting).toMatchObject({ status: "waiting-for-approval", isError: false });
     expect(String(waiting["message"])).toContain("Needs you");
-    expect(String(waiting["message"])).toContain("cclinic approve");
+    expect(String(waiting["message"])).toContain("luseen approve");
     selectMock.mockResolvedValueOnce("approve");
     await runApproveCommand(root, context);
-    expect(output.out).toBe("Saved roadmap #2. Run it with: cclinic auto --roadmap 2\n");
+    expect(output.out).toBe("Saved roadmap #2. Run it with: luseen auto --roadmap 2\n");
     expect(await call("plan_status", { planId })).toMatchObject({
       sessionStatus: "approved",
-      outcome: "Saved roadmap #2. Run it with: cclinic auto --roadmap 2",
+      outcome: "Saved roadmap #2. Run it with: luseen auto --roadmap 2",
     });
   });
 
@@ -301,7 +301,7 @@ describe("planning tools in Claude Code", () => {
   });
 });
 
-describe("cclinic mcp --plan", () => {
+describe("luseen mcp --plan", () => {
   it("TC-MCP-075: serves only the planning tools of its session, never asks, and refuses others", async () => {
     const root = project();
     const session = await drivenSession(root);
@@ -323,13 +323,13 @@ describe("cclinic mcp --plan", () => {
     );
   });
 
-  it("TC-MCP-076: only .cclinic/plans changes until approval, then the task database too", async () => {
+  it("TC-MCP-076: only .luseen/plans changes until approval, then the task database too", async () => {
     const root = project();
-    const database = tasksDatabaseFile(path.join(root, ".cclinic"));
+    const database = tasksDatabaseFile(path.join(root, ".luseen"));
     const before = readFileSync(database);
     const listing = () =>
       readdirSync(root, { recursive: true, withFileTypes: true })
-        .filter((entry) => entry.isFile() && !entry.parentPath.includes(".cclinic"))
+        .filter((entry) => entry.isFile() && !entry.parentPath.includes(".luseen"))
         .map((entry) => path.join(entry.parentPath, entry.name));
     const outside = listing();
     const { call } = await connect(root, { answers: ["keep chatting", "approve"] });
@@ -341,7 +341,7 @@ describe("cclinic mcp --plan", () => {
     await call("plan_propose", { planId, proposal: roadmap() });
     expect(readFileSync(database).equals(before)).toBe(false);
     expect(listing()).toEqual(outside);
-    expect(statSync(path.join(root, ".cclinic/plans", planId, "session.json")).isFile()).toBe(true);
+    expect(statSync(path.join(root, ".luseen/plans", planId, "session.json")).isFile()).toBe(true);
   });
 });
 
@@ -362,7 +362,7 @@ describe("session-link for planning tools", () => {
         {},
       );
     await hook({
-      tool_name: "mcp__cclinic__plan_begin",
+      tool_name: "mcp__luseen__plan_begin",
       tool_input: {},
       tool_response: [{ type: "text", text: JSON.stringify({ status: "ok", planId: session.id }) }],
     });
@@ -371,7 +371,7 @@ describe("session-link for planning tools", () => {
       transcriptPath: "/c/projects/p/s1.jsonl",
       lastPlace: "claude-code",
     });
-    await hook({ tool_name: "mcp__cclinic__plan_suggest", tool_input: { planId: "plan-9" }, session_id: "s2" });
+    await hook({ tool_name: "mcp__luseen__plan_suggest", tool_input: { planId: "plan-9" }, session_id: "s2" });
     expect((await openPlanStore(root).read(session.id))?.claudeSessionId).toBe("s1");
   });
 });

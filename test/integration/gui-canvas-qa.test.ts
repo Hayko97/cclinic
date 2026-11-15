@@ -17,7 +17,7 @@ afterEach(async () => {
 
 function project(): string {
   const root = makeTempFolder();
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Payments", goal: "Card checkout" },
@@ -49,11 +49,11 @@ async function start(root: string): Promise<TestGui> {
 }
 
 describe("QA: canvas data", () => {
-  it("TC-GUI-027: the canvas's roadmaps, milestones and tasks equal what cclinic tasks roadmap --json shows", async () => {
+  it("TC-GUI-027: the canvas's roadmaps, milestones and tasks equal what luseen tasks roadmap --json shows", async () => {
     const root = project();
     const gui = await start(root);
     const { canvas } = JSON.parse((await sendTo(gui, "GET", "/api/canvas")).body) as { canvas: CanvasView };
-    const store = openTaskStore(path.join(root, ".cclinic"), "read");
+    const store = openTaskStore(path.join(root, ".luseen"), "read");
     const overview = readOverview(store);
     store?.close();
     expect(
@@ -117,7 +117,7 @@ describe("QA: sessions on the canvas (run 2)", () => {
   it("TC-GUI-054: a task's sessions come newest first, a live agent first, and its step is the task's step", async () => {
     const root = project();
     const runId = "20261111-120000";
-    const folder = path.join(root, ".cclinic/auto", runId);
+    const folder = path.join(root, ".luseen/auto", runId);
     mkdirSync(path.join(folder, "sessions"), { recursive: true });
     const at = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
     writeFileSync(
@@ -126,7 +126,7 @@ describe("QA: sessions on the canvas (run 2)", () => {
         runId,
         roadmapId: 1,
         roadmapTitle: "Payments",
-        runBranch: `cclinic/auto/${runId}/run`,
+        runBranch: `luseen/auto/${runId}/run`,
         startedAt: at(3_600_000),
         finishedAt: null,
         outcome: null,
@@ -171,7 +171,7 @@ describe("QA: sessions on the canvas (run 2)", () => {
       path.join(folder, "sessions", `${ended}.json`),
       JSON.stringify(session(ended, "qa", "qa-1", 200_000, 10_000)),
     );
-    writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId }));
+    writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId }));
     const gui = await start(root);
     const { canvas } = JSON.parse((await sendTo(gui, "GET", "/api/canvas")).body) as { canvas: CanvasView };
     const task = canvas.tasks.find((item) => item.id === 2);
@@ -246,7 +246,7 @@ function manualClock() {
 }
 
 const layoutOf = (root: string) =>
-  JSON.parse(readFileSync(path.join(root, ".cclinic/gui/layout.json"), "utf8")) as Layout;
+  JSON.parse(readFileSync(path.join(root, ".luseen/gui/layout.json"), "utf8")) as Layout;
 
 async function canvasOf(gui: TestGui): Promise<{ canvas: CanvasView; layout: Layout }> {
   return JSON.parse((await sendTo(gui, "GET", "/api/canvas")).body) as { canvas: CanvasView; layout: Layout };
@@ -273,7 +273,7 @@ describe("QA run 3: saved positions survive an incomplete read (FR-GUI-075)", ()
       cards: { "task-1": { x: 1, y: 1 }, "task-4": { x: 4, y: 4 }, "change-branch-fix-x": { x: 7, y: 7 } },
     };
     expect((await sendTo(gui, "PUT", "/api/layout", saved)).status).toBe(200);
-    const database = path.join(root, ".cclinic/tasks.db");
+    const database = path.join(root, ".luseen/tasks.db");
     const bytes = readFileSync(database);
     writeFileSync(database, "not a database");
     // Its roadmap frame isn't on the canvas while the database can't be read.
@@ -288,7 +288,7 @@ describe("QA run 3: saved positions survive an incomplete read (FR-GUI-075)", ()
     });
     // Readable again, with task 4 removed: its position goes with the next save, the others stay.
     writeFileSync(database, bytes);
-    const store = openTaskStore(path.join(root, ".cclinic"), "update");
+    const store = openTaskStore(path.join(root, ".luseen"), "update");
     store?.removeTask(4);
     store?.close();
     expect((await sendTo(gui, "PUT", "/api/layout", saved)).status).toBe(200);
@@ -308,7 +308,7 @@ describe("QA run 3: saved positions survive an incomplete read (FR-GUI-075)", ()
       cards: { "task-1": { x: 1, y: 1 }, "change-branch-fix-x": { x: 7, y: 7 } },
     };
     await sendTo(gui, "PUT", "/api/layout", saved);
-    const file = path.join(root, ".cclinic/workflow/branch-fix-x.json");
+    const file = path.join(root, ".luseen/workflow/branch-fix-x.json");
     const text = readFileSync(file, "utf8");
     writeFileSync(file, "{broken");
     const during = await canvasOf(gui);
@@ -329,7 +329,7 @@ function runState(runId: string, finishedAt: string | null, costUsd: number) {
     runId,
     roadmapId: 1,
     roadmapTitle: "Payments",
-    runBranch: `cclinic/auto/${runId}/run`,
+    runBranch: `luseen/auto/${runId}/run`,
     startedAt: "2026-11-11T10:00:00.000Z",
     finishedAt,
     outcome: finishedAt === null ? null : "done",
@@ -370,7 +370,7 @@ function agentSession(index: number, ended: boolean) {
 }
 
 function writeRunFiles(root: string, runId: string, state: string, sessions: Record<string, string> = {}) {
-  const folder = path.join(root, ".cclinic/auto", runId);
+  const folder = path.join(root, ".luseen/auto", runId);
   mkdirSync(path.join(folder, "sessions"), { recursive: true });
   writeFileSync(path.join(folder, "run.json"), state);
   for (const [name, text] of Object.entries(sessions)) writeFileSync(path.join(folder, "sessions", name), text);
@@ -407,7 +407,7 @@ describe("QA run 3: every run is read, and finished ones are kept (FR-GUI-068, F
     const before = (await canvasOf(gui)).canvas;
     expect(before.problems).toHaveLength(1);
     expect(before.tasks.find((task) => task.id === 1)?.sessions.map((session) => session.id)).toEqual([agentId(1)]);
-    writeFileSync(path.join(root, ".cclinic/auto", runId, "sessions", name), JSON.stringify(agentSession(2, true)));
+    writeFileSync(path.join(root, ".luseen/auto", runId, "sessions", name), JSON.stringify(agentSession(2, true)));
     const after = (await canvasOf(gui)).canvas;
     expect(after.problems).toEqual([]);
     expect(new Set(after.tasks.find((task) => task.id === 1)?.sessions.map((session) => session.id))).toEqual(
@@ -418,7 +418,7 @@ describe("QA run 3: every run is read, and finished ones are kept (FR-GUI-068, F
   it("TC-GUI-102, TC-GUI-103: a live run that finishes shows as finished at the next check, with its ended agent and final cost", async () => {
     const root = project();
     const runId = "20261111-100000";
-    const lock = path.join(root, ".cclinic/auto/.lock");
+    const lock = path.join(root, ".luseen/auto/.lock");
     writeRunFiles(root, runId, JSON.stringify(runState(runId, null, 0.2)), {
       [`${agentId(1)}.json`]: JSON.stringify(agentSession(1, false)),
     });
@@ -457,7 +457,7 @@ describe("QA run 3: every run is read, and finished ones are kept (FR-GUI-068, F
     const count = canvases().length;
     await clock.tick();
     await clock.tick();
-    const store = openTaskStore(path.join(root, ".cclinic"), "update");
+    const store = openTaskStore(path.join(root, ".luseen"), "update");
     store?.addTask({ title: "Later", dependsOn: [] });
     store?.close();
     await clock.tick();

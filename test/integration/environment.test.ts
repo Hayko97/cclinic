@@ -20,7 +20,7 @@ vi.mock("@inquirer/prompts", () => ({ confirm: vi.fn(), select: vi.fn() }));
 const confirmMock = vi.mocked(confirm);
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
-const ENVIRONMENT_FILE = ".cclinic/environment/environment.json";
+const ENVIRONMENT_FILE = ".luseen/environment/environment.json";
 const VALID = JSON.stringify({
   version: 1,
   alias: "tool",
@@ -75,7 +75,7 @@ function project(files: Readonly<Record<string, string>> = {}): string {
 function afterGenerate(root: string, overrides: Partial<AfterGenerateInput> = {}): AfterGenerateInput {
   return {
     target: root,
-    out: path.join(root, ".cclinic/sdd"),
+    out: path.join(root, ".luseen/sdd"),
     model: "sonnet",
     effort: "medium",
     isClaudeCli: true,
@@ -95,7 +95,7 @@ afterEach(() => {
   process.stdin.isTTY = originalIsTty;
 });
 
-describe("cclinic environment", () => {
+describe("luseen environment", () => {
   it("TC-ENV-009: asks first, and declining starts nothing", async () => {
     confirmMock.mockResolvedValueOnce(false);
     const root = project();
@@ -123,7 +123,7 @@ describe("cclinic environment", () => {
   });
 
   it("TC-ENV-011: with the API provider, or no login, nothing starts", async () => {
-    for (const test of [harness({ CCLINIC_PROVIDER: "anthropic-api" }), harness({ FAKE_CLAUDE_LOGGED_OUT: "1" })]) {
+    for (const test of [harness({ LUSEEN_PROVIDER: "anthropic-api" }), harness({ FAKE_CLAUDE_LOGGED_OUT: "1" })]) {
       await runEnvironmentCommand(project(), { yes: true }, test.context);
       expect(test.agentCalls()).toBe(0);
       expect(test.stdout()).toContain("Use the local-env skill");
@@ -228,7 +228,7 @@ describe("at the end of a generation run", () => {
     confirmMock.mockResolvedValueOnce(false);
     const outcome = await setUpAfterGenerate(afterGenerate(project()), harness().context);
     expect(outcome.status).toBe("declined");
-    expect(formatEnvironmentOutcome(outcome)).toContain("cclinic environment");
+    expect(formatEnvironmentOutcome(outcome)).toContain("luseen environment");
   });
 
   it.each(["fail", "invalid", "none"])("TC-ENV-019: %s only warns", async (mode) => {
@@ -275,9 +275,9 @@ describe("the environment store", () => {
     const root = project({
       ".git/config": "x",
       "node_modules/a/index.js": "x",
-      ".cclinic/environment/compose.yaml": "x",
-      ".cclinic/sdd/overview.md": "x",
+      ".luseen/environment/compose.yaml": "x",
+      ".luseen/sdd/overview.md": "x",
     });
-    expect([...(await snapshotFiles(root)).keys()].sort()).toEqual([".cclinic/sdd/overview.md", "src/a.ts"]);
+    expect([...(await snapshotFiles(root)).keys()].sort()).toEqual([".luseen/sdd/overview.md", "src/a.ts"]);
   });
 });

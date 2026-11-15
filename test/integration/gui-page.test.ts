@@ -48,7 +48,7 @@ const planned = (key: string, dependsOn: string[] = [], extra: { spec?: string; 
  */
 function project(): string {
   const root = makeTempFolder();
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Payments", goal: "Card checkout" },
@@ -148,7 +148,7 @@ async function open(
 ): Promise<Opened> {
   const root = options.root ?? project();
   // A set-up project opens on the canvas; one with no documents opens on Setup (FR-GUI-014).
-  if (options.isSetUp !== false) mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+  if (options.isSetUp !== false) mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
   const home = options.home ?? makeTempFolder();
   if (options.withSessions === true) await withSessions(root, home);
   const jobs = fakeJobs();
@@ -167,7 +167,7 @@ async function open(
   return { gui, page, root, started: jobs.started };
 }
 
-const layoutFile = (root: string) => path.join(root, ".cclinic/gui/layout.json");
+const layoutFile = (root: string) => path.join(root, ".luseen/gui/layout.json");
 const savedLayout = (root: string) => JSON.parse(readFileSync(layoutFile(root), "utf8")) as Layout;
 
 async function centre(page: Page, selector: string): Promise<{ x: number; y: number }> {
@@ -344,7 +344,7 @@ describe("canvas page", () => {
 
   it("TC-GUI-098: a card moves within its frame, snaps back when dropped outside it, a frame moves with its cards", async () => {
     const { page, root } = await open();
-    const database = readFileSync(path.join(root, ".cclinic/tasks.db"));
+    const database = readFileSync(path.join(root, ".luseen/tasks.db"));
     const scale = await page
       .locator("#board")
       .evaluate((node) => Number(/scale\(([\d.]+)\)/.exec(node.style.transform)?.[1] ?? "1"));
@@ -372,7 +372,7 @@ describe("canvas page", () => {
     const cardAfter = (await page.locator('[data-key="task-1"]').boundingBox()) ?? { x: 0, y: 0 };
     expect(cardAfter.x - card.x).toBeCloseTo(100, 0);
     expect(cardAfter.y - card.y).toBeCloseTo(50, 0);
-    expect(readFileSync(path.join(root, ".cclinic/tasks.db")).equals(database)).toBe(true);
+    expect(readFileSync(path.join(root, ".luseen/tasks.db")).equals(database)).toBe(true);
   });
 
   it("TC-GUI-098: nothing is written while dragging, only once the drag ends", async () => {
@@ -434,7 +434,7 @@ describe("canvas page", () => {
 });
 
 describe("tasks from the page", () => {
-  it("TC-GUI-029: removing a task asks first; cancel runs nothing, confirm runs cclinic tasks remove", async () => {
+  it("TC-GUI-029: removing a task asks first; cancel runs nothing, confirm runs luseen tasks remove", async () => {
     const { page, started } = await open();
     await page.locator('[data-key="task-3"]').click();
     await page.locator("#panel-body button.danger", { hasText: "Remove" }).click();
@@ -450,7 +450,7 @@ describe("tasks from the page", () => {
     });
   });
 
-  it("TC-GUI-028: the page adds a task, depends it, starts it and marks it done through cclinic tasks", async () => {
+  it("TC-GUI-028: the page adds a task, depends it, starts it and marks it done through luseen tasks", async () => {
     const { page, started } = await open();
     await page.locator("#add-task-open").click();
     await page.locator('input[name="title"]').fill("New one");
@@ -529,12 +529,12 @@ function manualClock() {
 }
 
 function storeOf(root: string) {
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   return store;
 }
 
-/** A job that prints the CLI's `--json` failure and exits 1, as `cclinic tasks` does when it refuses. */
+/** A job that prints the CLI's `--json` failure and exits 1, as `luseen tasks` does when it refuses. */
 function failingJob(message: string) {
   const started: string[][] = [];
   const startJob = (args: readonly string[]): JobProcess => {
@@ -568,7 +568,7 @@ describe("QA: tasks from the page", () => {
     const cycle = "Task 1 can't depend on task 3: it would make a cycle (#1 -> #3 -> #2 -> #1).";
     const jobs = failingJob(cycle);
     const { page, root } = await open({ startJob: jobs.startJob });
-    const database = readFileSync(path.join(root, ".cclinic/tasks.db"));
+    const database = readFileSync(path.join(root, ".luseen/tasks.db"));
     await page.locator('[data-key="task-1"]').click();
     await page.locator('#panel-body input[type="number"]').fill("3");
     await page.locator("#panel-body button", { hasText: "Add dependency" }).click();
@@ -576,7 +576,7 @@ describe("QA: tasks from the page", () => {
     expect(await page.locator("#notice").getAttribute("class")).toContain("error");
     expect(jobs.started).toEqual([["tasks", "depend", "1", "--on=3", "--json"]]);
     expect(await page.locator("#panel-title").textContent()).toBe("Task #1");
-    expect(readFileSync(path.join(root, ".cclinic/tasks.db")).equals(database)).toBe(true);
+    expect(readFileSync(path.join(root, ".luseen/tasks.db")).equals(database)).toBe(true);
   });
 
   it("TC-GUI-029: a refused add keeps its dialog open and shows the CLI's message in it", async () => {
@@ -602,7 +602,7 @@ describe("QA: tasks from the page", () => {
     expect(started).toEqual([]);
   });
 
-  it("TC-GUI-028: the panel removes a dependency through cclinic tasks undepend", async () => {
+  it("TC-GUI-028: the panel removes a dependency through luseen tasks undepend", async () => {
     const { page, started } = await open();
     await page.locator('[data-key="task-3"]').click();
     await page.locator('#panel-body button[aria-label="Remove the dependency on #2"]').click();
@@ -658,7 +658,7 @@ describe("QA: tasks from the page", () => {
       onOutput: () => undefined,
       onExit: (listener) => {
         void Promise.resolve().then(() => {
-          // What `cclinic tasks remove` would have done.
+          // What `luseen tasks remove` would have done.
           if (args[1] === "remove") {
             const store = storeOf(root);
             store.removeTask(Number(args[2]));
@@ -748,7 +748,7 @@ describe("QA: live canvas, page side", () => {
   it("TC-GUI-102: a roadmap in a live run and a task worked on by hand show their own modes on the page", async () => {
     const root = project();
     const runId = "20261111-110000";
-    const folder = path.join(root, ".cclinic/auto", runId);
+    const folder = path.join(root, ".luseen/auto", runId);
     mkdirSync(path.join(folder, "sessions"), { recursive: true });
     writeFileSync(
       path.join(folder, "run.json"),
@@ -756,7 +756,7 @@ describe("QA: live canvas, page side", () => {
         runId,
         roadmapId: 1,
         roadmapTitle: "Payments",
-        runBranch: `cclinic/auto/${runId}/run`,
+        runBranch: `luseen/auto/${runId}/run`,
         startedAt: new Date(Date.now() - 600_000).toISOString(),
         finishedAt: null,
         outcome: null,
@@ -779,7 +779,7 @@ describe("QA: live canvas, page side", () => {
         skippedInProgress: [],
       }),
     );
-    writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId }));
+    writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId }));
     const manual = beginChange(
       { changeType: "feature", spec: "signup", taskId: 5 },
       { key: stateKey(5, "main"), approverMode: "user", now: new Date().toISOString() },
@@ -2150,7 +2150,7 @@ describe("QA C2a run 3: small items", () => {
     it(`TC-GUI-067: an unrecognised stored theme "${stored}" falls back to Auto, and the toggle goes on to Light`, async () => {
       const { page } = await open();
       await page.evaluate((value) => {
-        localStorage.setItem("cclinic.theme", value);
+        localStorage.setItem("luseen.theme", value);
       }, stored);
       await page.reload();
       await page.locator('[data-key="task-1"]').waitFor();
@@ -2158,13 +2158,13 @@ describe("QA C2a run 3: small items", () => {
       expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBeUndefined();
       await page.locator("#theme").click();
       expect(await page.locator("#theme").textContent()).toBe("Theme: Light");
-      expect(await page.evaluate(() => localStorage.getItem("cclinic.theme"))).toBe("light");
+      expect(await page.evaluate(() => localStorage.getItem("luseen.theme"))).toBe("light");
     });
 
   it("TC-GUI-054 (exploratory): an unrecognised stored layout shows the Canvas with its button pressed", async () => {
     const { page } = await open();
     await page.evaluate(() => {
-      localStorage.setItem("cclinic.layout", "grid");
+      localStorage.setItem("luseen.layout", "grid");
     });
     await page.reload();
     await page.locator('[data-key="task-1"]').waitFor();
@@ -2189,7 +2189,7 @@ async function openWatched(
 ) {
   const root = options.root ?? project();
   // A set-up project opens on the canvas; one with no documents opens on Setup (FR-GUI-014).
-  if (options.isSetUp !== false) mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+  if (options.isSetUp !== false) mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
   const home = makeTempFolder();
   if (options.withSessions === true) await withSessions(root, home);
   const jobs = fakeJobs();
@@ -2320,7 +2320,7 @@ describe("QA C2a run 4: the restyle", () => {
     ).toEqual([]);
     await page.locator('[data-view="setup"]').click();
     await page.locator("#run-doctor").click();
-    await expect.poll(() => page.locator("#output-title").textContent()).toMatch(/^cclinic doctor --json · /);
+    await expect.poll(() => page.locator("#output-title").textContent()).toMatch(/^luseen doctor --json · /);
     await expect.poll(() => page.locator("#output-title").textContent()).not.toMatch(/Running/);
     expect(await page.locator("#cancel-job").isVisible()).toBe(false);
     await page.locator('[data-layout="list"]').evaluate((node: HTMLElement) => {
@@ -2413,8 +2413,8 @@ describe("QA C2a run 4: the restyle", () => {
     await page.locator('[data-view="setup"]').click();
     await page.locator("#run-doctor").click();
     // Setup also lists the models as a job of its own, so the doctor's job is found by its command.
-    const job = page.locator("#job-list button", { hasText: "cclinic doctor" }).first();
-    await expect.poll(() => job.textContent()).toMatch(/^cclinic doctor --json · /);
+    const job = page.locator("#job-list button", { hasText: "luseen doctor" }).first();
+    await expect.poll(() => job.textContent()).toMatch(/^luseen doctor --json · /);
     const hasIcon = await job.evaluate(
       (node) =>
         node.querySelector("svg, .badge, [class*='status']") !== null ||
@@ -3034,7 +3034,7 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
     await countCanvasMessages(page);
     const count = page.locator("#needs-count");
     expect(await count.textContent()).toBe("2");
-    expect(await page.title()).toMatch(/^\(2\) cclinic · /);
+    expect(await page.title()).toMatch(/^\(2\) luseen · /);
     expect(await page.locator('[data-key="task-6"] .needs-you').count()).toBe(1);
     await page.locator('[data-view="setup"]').click();
     expect(await page.locator("#needs-you").isVisible()).toBe(true);
@@ -3052,14 +3052,14 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
     await clock.tick();
     await expect.poll(() => canvasMessages(page)).toBeGreaterThan(before);
     expect(await count.textContent()).toBe("1");
-    expect(await page.title()).toMatch(/^\(1\) cclinic · /);
+    expect(await page.title()).toMatch(/^\(1\) luseen · /);
     expect(await page.locator('[data-key="task-6"] .needs-you').count()).toBe(0);
   });
 
   it("TC-GUI-072: the Needs you list says why it's empty, and Escape closes it", async () => {
     const { page } = await open();
     expect(await page.locator("#needs-count").textContent()).toBe("0");
-    expect(await page.title()).toMatch(/^cclinic · /);
+    expect(await page.title()).toMatch(/^luseen · /);
     await page.locator("#needs-you").click();
     expect(await page.locator("#needs-list").textContent()).toContain("Nothing needs you right now.");
     await page.keyboard.press("Escape");
@@ -3071,7 +3071,7 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
 
   it("TC-GUI-074: with documents and no tasks.db, the banner suggests planning a roadmap, and the empty canvas says why", async () => {
     const root = makeTempFolder();
-    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
     const { page } = await open({ root, waitFor: "#next-step:not([hidden])" });
     expect(await banner(page).textContent()).toContain("There's no roadmap yet.");
     // D5: the banner's action is the GUI's own Plan, for a new roadmap.
@@ -3103,7 +3103,7 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
     await page.locator('[data-view="canvas"]').click();
     await banner(page).locator("button", { hasText: "Open Setup" }).click();
     expect(await page.locator("#view-setup").isVisible()).toBe(true);
-    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
     await page.reload();
     // FR-GUI-063: the reload returns to Setup, as its URL names; the canvas is one click away.
     await page.locator("#view-setup:not([hidden])").waitFor();
@@ -3250,7 +3250,7 @@ describe("canvas performance (FR-GUI-081)", () => {
       // Times the page's own handling of the first canvas message, from its arrival to the finished layout.
       await page.addInitScript({
         content: `
-        localStorage.setItem("cclinic.sessions", "on");
+        localStorage.setItem("luseen.sessions", "on");
         window.drawTimes = [];
         const native = EventTarget.prototype.addEventListener;
         EventSource.prototype.addEventListener = function (type, listener, options) {
@@ -3280,7 +3280,7 @@ describe("QA C2b run 1: sessions, search, keyboard, Needs you and the banner", (
 
   /** A live AI run on roadmap 1 with task 2 running, and session files for it: QA live, Developer ended. */
   function withRun(root: string, home: string, sessions: { id: string; role: string; ended: boolean }[] = []): void {
-    const folder = path.join(root, ".cclinic/auto", RUN_ID);
+    const folder = path.join(root, ".luseen/auto", RUN_ID);
     mkdirSync(path.join(folder, "sessions"), { recursive: true });
     writeFileSync(
       path.join(folder, "run.json"),
@@ -3288,7 +3288,7 @@ describe("QA C2b run 1: sessions, search, keyboard, Needs you and the banner", (
         runId: RUN_ID,
         roadmapId: 1,
         roadmapTitle: "Payments",
-        runBranch: `cclinic/auto/${RUN_ID}/run`,
+        runBranch: `luseen/auto/${RUN_ID}/run`,
         startedAt: new Date(Date.now() - 600_000).toISOString(),
         finishedAt: null,
         outcome: null,
@@ -3331,7 +3331,7 @@ describe("QA C2b run 1: sessions, search, keyboard, Needs you and the banner", (
         }),
       );
     }
-    writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: RUN_ID }));
+    writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId: RUN_ID }));
   }
 
   /** `count` of your sessions on task `taskId`, each seen an hour ago. */
@@ -3692,7 +3692,7 @@ describe("QA C2b run 1: sessions, search, keyboard, Needs you and the banner", (
   it("TC-GUI-074: with a run going and no roadmap left to run, the banner offers Open its roadmap, which zooms to its frame", async () => {
     const root = project();
     const home = makeTempFolder();
-    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
     withRun(root, home);
     const store = storeOf(root);
     store.setStatus(5, "done");
@@ -3718,7 +3718,7 @@ describe("QA C2b run 1: sessions, search, keyboard, Needs you and the banner", (
 
   it("FR-GUI-053: with every roadmap done and no run, the banner is hidden", async () => {
     const root = project();
-    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
     const store = storeOf(root);
     for (const id of [2, 3, 4, 5]) store.setStatus(id, "done");
     store.close();
@@ -3729,7 +3729,7 @@ describe("QA C2b run 1: sessions, search, keyboard, Needs you and the banner", (
   it("FR-GUI-053: Open its roadmap from the List shows the Canvas and zooms to the frame", async () => {
     const root = project();
     const home = makeTempFolder();
-    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
     withRun(root, home);
     const store = storeOf(root);
     store.setStatus(5, "done");
@@ -4173,13 +4173,13 @@ describe("Setup (FR-GUI-014 to FR-GUI-018)", () => {
       "Not installed. Add this entry to .mcp.json, or install the skills.",
     );
     const entry = (await page.locator("#mcp-entry").textContent()) ?? "";
-    expect(JSON.parse(entry)).toEqual({ mcpServers: { cclinic: { command: "npx", args: ["cclinic", "mcp"] } } });
+    expect(JSON.parse(entry)).toEqual({ mcpServers: { luseen: { command: "npx", args: ["luseen", "mcp"] } } });
     writeFileSync(path.join(root, ".mcp.json"), entry);
     await page.locator('[data-view="canvas"]').click();
     await page.locator('[data-view="setup"]').click();
     await expect
       .poll(() => page.locator("#mcp-status").textContent())
-      .toBe("Installed: your coding agent can start cclinic mcp.");
+      .toBe("Installed: your coding agent can start luseen mcp.");
   });
 
   it("TC-GUI-026: Setup says when .mcp.json can't be read, rather than that it's missing", async () => {
@@ -4189,7 +4189,7 @@ describe("Setup (FR-GUI-014 to FR-GUI-018)", () => {
     await opened.page.locator('[data-view="setup"]').click();
     await expect
       .poll(() => opened.page.locator("#mcp-status").textContent())
-      .toBe(".mcp.json can't be read, or isn't valid JSON, so cclinic can't tell whether it's connected.");
+      .toBe(".mcp.json can't be read, or isn't valid JSON, so luseen can't tell whether it's connected.");
     expect(await opened.page.locator("#mcp-status").getAttribute("class")).toBe("muted");
   });
 

@@ -48,7 +48,7 @@ describe("reporter", () => {
   });
 
   it("TC-CLI-051: --debug-file gets details, without printing them", () => {
-    const folder = mkdtempSync(path.join(tmpdir(), "cclinic-reporter-"));
+    const folder = mkdtempSync(path.join(tmpdir(), "luseen-reporter-"));
     try {
       const debugFile = path.join(folder, "debug.log");
       const { reporter, stderr } = setup({ debugFile, quiet: true });

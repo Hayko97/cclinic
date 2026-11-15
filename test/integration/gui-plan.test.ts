@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 /**
- * Plan with the PM from the GUI: a chat in the side panel, on the same planning sessions as `cclinic plan` and
+ * Plan with the PM from the GUI: a chat in the side panel, on the same planning sessions as `luseen plan` and
  * Claude Code, mirrored from the session's Claude transcript (spec: roadmap-planning FR-PLAN-033 to FR-PLAN-043,
  * gui FR-GUI-023 to FR-GUI-026).
  */
@@ -22,7 +22,7 @@ import { openStream, sendTo, startTestGui, type TestGui } from "../support/gui.j
 
 vi.mock("@inquirer/prompts", () => ({ confirm: vi.fn(), select: vi.fn(), input: vi.fn() }));
 
-/** Starting the fake `claude`, and its `cclinic mcp --plan` server, can take a few seconds on a busy machine. */
+/** Starting the fake `claude`, and its `luseen mcp --plan` server, can take a few seconds on a busy machine. */
 const WAIT = { timeout: 30_000, interval: 100 };
 const SLOW = 90_000;
 
@@ -75,8 +75,8 @@ const proposing = (message: string, proposal: unknown): FakeClaudeRule => ({
 /** A project with documents, and roadmap 1 "Launch" with tasks 1 and 2. */
 function project(): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
@@ -87,7 +87,7 @@ function project(): string {
 }
 
 function roadmapTitles(root: string): string[] {
-  const store = openTaskStore(path.join(root, ".cclinic"), "read");
+  const store = openTaskStore(path.join(root, ".luseen"), "read");
   try {
     return store?.listRoadmaps().map((roadmap) => roadmap.title) ?? [];
   } finally {
@@ -211,7 +211,7 @@ function postLarge(gui: TestGui, requestPath: string, body: unknown): Promise<nu
         path: requestPath,
         headers: {
           host: `127.0.0.1:${gui.port}`,
-          "x-cclinic-token": gui.token,
+          "x-luseen-token": gui.token,
           "content-type": "application/json",
         },
       },
@@ -239,7 +239,7 @@ function getBytes(
         host: "127.0.0.1",
         port: gui.port,
         path: requestPath,
-        headers: { host: `127.0.0.1:${gui.port}`, "x-cclinic-token": gui.token },
+        headers: { host: `127.0.0.1:${gui.port}`, "x-luseen-token": gui.token },
       },
       (response) => {
         const chunks: Buffer[] = [];
@@ -271,7 +271,7 @@ function itemsIn(stream: ReturnType<typeof openStream>): PlanChatItem[] {
 
 describe("Plan through the API", () => {
   it(
-    "TC-GUI-032: Plan starts the same session as cclinic plan: the same arguments and first prompt, in a persistent Claude session",
+    "TC-GUI-032: Plan starts the same session as luseen plan: the same arguments and first prompt, in a persistent Claude session",
     async () => {
       const root = project();
       const { gui, harness } = await startGui(root, [replying("Who pays?")]);
@@ -401,7 +401,7 @@ describe("Plan through the API", () => {
     SLOW,
   );
 
-  it("FR-GUI-023: what cclinic plan refuses is refused with its words, and a message with nothing in it too", async () => {
+  it("FR-GUI-023: what luseen plan refuses is refused with its words, and a message with nothing in it too", async () => {
     const root = project();
     const { gui, harness } = await startGui(root, []);
     const bad = await post(gui, "/api/plan", { ...NEW_ROADMAP, timeoutMinutes: 0 });
@@ -414,12 +414,12 @@ describe("Plan through the API", () => {
     expect(harness.calls()).toHaveLength(0);
   });
 
-  it("FR-GUI-023: a project with no documents is refused as cclinic plan refuses it", async () => {
+  it("FR-GUI-023: a project with no documents is refused as luseen plan refuses it", async () => {
     const root = makeTempFolder();
     const { gui } = await startGui(root, []);
     const refused = await post(gui, "/api/plan", NEW_ROADMAP);
     expect(refused.status).toBe(409);
-    expect(errorOf(refused)).toContain("Run cclinic in the project folder first");
+    expect(errorOf(refused)).toContain("Run luseen in the project folder first");
   });
 
   it("TC-PLAN-051: uploads of the wrong type, too large or without the token are refused, and nothing is added", async () => {
@@ -749,7 +749,7 @@ describe("Plan in the browser", () => {
 
   /** A second roadmap, "Payments", for the target menu. */
   function addRoadmap(root: string): void {
-    const store = openTaskStore(path.join(root, ".cclinic"), "create");
+    const store = openTaskStore(path.join(root, ".luseen"), "create");
     store?.savePlan({
       roadmap: { title: "Payments", goal: "Pay" },
       milestones: [{ title: "One", goal: "", tasks: [planned("p")] }],
@@ -921,7 +921,7 @@ describe("Plan in the browser", () => {
       await page.locator("#plan-more").click();
       expect(await page.locator("#plan-cancel-session").isVisible()).toBe(true);
       const commands = await page.locator("#plan-resume code").allTextContents();
-      expect(commands[0]).toBe("cclinic plan --resume plan-2");
+      expect(commands[0]).toBe("luseen plan --resume plan-2");
       expect(commands[1]).toMatch(/^claude --resume /);
       expect(await page.locator("#plan-resume").getByRole("button", { name: "Copy" }).count()).toBe(2);
     },
@@ -1002,7 +1002,7 @@ describe("Plan in the browser", () => {
         file,
         line(
           "user",
-          `Here it is\n\nAttached (new in this message):\n- mock.png (image): .cclinic/plans/${session.id}/attachments/mock.png`,
+          `Here it is\n\nAttached (new in this message):\n- mock.png (image): .luseen/plans/${session.id}/attachments/mock.png`,
         ),
       );
       const page = await openPage(gui);

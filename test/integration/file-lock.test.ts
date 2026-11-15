@@ -42,7 +42,7 @@ describe("file locks", () => {
 
   it("TC-CLI-027: two runs on the same folder at the same moment: exactly one gets the lock", async () => {
     for (let round = 0; round < ROUNDS; round += 1) {
-      const lockFile = path.join(makeTempFolder(), ".cclinic/.lock");
+      const lockFile = path.join(makeTempFolder(), ".luseen/.lock");
       expect(await race(async () => ({ release: await acquireLock(lockFile) }))).toBe(1);
     }
   });

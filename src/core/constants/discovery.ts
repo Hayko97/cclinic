@@ -1,5 +1,5 @@
 /** What the scan skips and how it classifies files (spec: file-discovery). */
-import { TOOL_FOLDER_NAME } from "./paths.js";
+import { LEGACY_TOOL_FOLDER_NAME, TOOL_FOLDER_NAME } from "./paths.js";
 
 export const REASONS = {
   secret: "secret file",
@@ -82,7 +82,14 @@ export const SECRET_NAMES: ReadonlySet<string> = new Set([
 ]);
 export const SECRET_EXTENSIONS: ReadonlySet<string> = new Set(["pem", "key", "p12", "pfx"]);
 export const SECRET_FOLDERS: ReadonlySet<string> = new Set([".ssh", ".aws"]);
-export const TOOL_FOLDERS: ReadonlySet<string> = new Set([".git", TOOL_FOLDER_NAME, ".agents", ".claude"]);
+/** cclinic's folder too, which is left in place when `.luseen/` already exists (FR-CLI-039). */
+export const TOOL_FOLDERS: ReadonlySet<string> = new Set([
+  ".git",
+  TOOL_FOLDER_NAME,
+  LEGACY_TOOL_FOLDER_NAME,
+  ".agents",
+  ".claude",
+]);
 
 export const DOCUMENT_EXTENSIONS: ReadonlySet<string> = new Set([
   "md",

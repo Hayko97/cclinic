@@ -1,5 +1,5 @@
 /**
- * Vitest global setup: tests whose fake `claude` starts `cclinic mcp --plan` run the built program, so it's built once
+ * Vitest global setup: tests whose fake `claude` starts `luseen mcp --plan` run the built program, so it's built once
  * before any test file runs. Building per file let one file's rebuild delete `dist/` under another's running tests.
  */
 import { execFileSync } from "node:child_process";

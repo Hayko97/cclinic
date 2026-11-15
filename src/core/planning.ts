@@ -246,7 +246,7 @@ export function buildFirstTurnPrompt(
     "",
     INSTRUCTIONS_MARKER,
     "",
-    "You are the PM agent in a cclinic planning session. Follow these instructions:",
+    "You are the PM agent in a luseen planning session. Follow these instructions:",
     "<instructions>",
     input.skill.trim(),
     "</instructions>",
@@ -303,7 +303,7 @@ export function repeatedMessageOf(text: string): string | null {
   return repeated === "" ? null : repeated;
 }
 
-/** Whether a message is one cclinic wrote to the PM, such as Retry's request or a nudge, not the user's own. */
+/** Whether a message is one luseen wrote to the PM, such as Retry's request or a nudge, not the user's own. */
 export function isPlanningNote(text: string): boolean {
   return (
     text.startsWith(NUDGE_MESSAGE) ||
@@ -322,7 +322,7 @@ export function userPartOf(message: string): string {
 
 /**
  * FR-PLAN-031, FR-PLAN-038: what a message in the transcript shows as the user's: their own words, or the message a
- * Retry request repeated; null for cclinic's other notes. The terminal, the GUI and the waiting-message rule all read
+ * Retry request repeated; null for luseen's other notes. The terminal, the GUI and the waiting-message rule all read
  * messages this way.
  */
 export function shownUserMessage(text: string): string | null {
@@ -543,7 +543,7 @@ export function nextPlanId(existing: readonly string[]): string {
 }
 
 const PLACE_NAMES: Readonly<Record<HolderPlace, string>> = {
-  terminal: "a terminal (cclinic plan)",
+  terminal: "a terminal (luseen plan)",
   gui: "the GUI",
   "claude-code": "Claude Code",
 };
@@ -555,7 +555,7 @@ export function placeName(place: HolderPlace): string {
 /** FR-PLAN-043: both ways to continue a session. */
 export function resumeCommands(session: Pick<PlanSession, "id" | "claudeSessionId">): string[] {
   return [
-    `cclinic plan --resume ${session.id}`,
+    `luseen plan --resume ${session.id}`,
     ...(session.claudeSessionId === null ? [] : [`claude --resume ${session.claudeSessionId}`]),
   ];
 }
@@ -727,7 +727,7 @@ const PLAN_TOOL_PATTERN = /^mcp__\w+__plan_\w+$/;
 /** `"planId":"plan-3"` in a reply, however many times the reply was quoted as JSON. */
 const TAKEN_PLAN_ID = new RegExp(`\\\\*"planId\\\\*"\\s*:\\s*\\\\*"(${PLAN_ID_SOURCE})\\\\*"`);
 
-/** Whether a tool call is one of cclinic's planning tools, which never link to a change (FR-MCP-045). */
+/** Whether a tool call is one of luseen's planning tools, which never link to a change (FR-MCP-045). */
 export function isPlanToolCall(toolName: string | undefined): boolean {
   return toolName !== undefined && PLAN_TOOL_PATTERN.test(toolName);
 }

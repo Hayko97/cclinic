@@ -1,4 +1,4 @@
-/** `cclinic mcp` and `cclinic approve` through the built binary (spec: mcp-server). */
+/** `luseen mcp` and `luseen approve` through the built binary (spec: mcp-server). */
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { makeTempFolder, writeProject } from "../support/helpers.js";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
-const BIN = path.join(REPO, "bin/cclinic.js");
+const BIN = path.join(REPO, "bin/luseen.js");
 const RESPONSE_TIMEOUT_MS = 20_000;
 
 function environment(): NodeJS.ProcessEnv {
@@ -19,7 +19,7 @@ function environment(): NodeJS.ProcessEnv {
   return { PATH: bin, HOME: home, XDG_CONFIG_HOME: path.join(home, "c") };
 }
 
-function cclinic(args: readonly string[], cwd = makeTempFolder()) {
+function luseen(args: readonly string[], cwd = makeTempFolder()) {
   const result = spawnSync(process.execPath, [BIN, ...args], { cwd, encoding: "utf8", env: environment(), input: "" });
   return { code: result.status, stdout: result.stdout, stderr: result.stderr };
 }
@@ -27,8 +27,8 @@ function cclinic(args: readonly string[], cwd = makeTempFolder()) {
 function makeProject(): string {
   const root = makeTempFolder();
   writeProject(root, {
-    ".cclinic/sdd/README.md": "# SDD documentation\n",
-    ".cclinic/sdd/specs/user-login/spec.md": "# user-login\n",
+    ".luseen/sdd/README.md": "# SDD documentation\n",
+    ".luseen/sdd/specs/user-login/spec.md": "# user-login\n",
   });
   return root;
 }
@@ -66,7 +66,7 @@ const INITIALIZE = {
 };
 const INITIALIZED = { jsonrpc: "2.0", method: "notifications/initialized" };
 
-describe("cclinic mcp", () => {
+describe("luseen mcp", () => {
   it("TC-MCP-001: speaks MCP over stdio, with only protocol messages on stdout, and stops when stdin closes", async () => {
     const root = makeProject();
     const { lines } = await exchange(
@@ -86,7 +86,7 @@ describe("cclinic mcp", () => {
       [
         INITIALIZE,
         INITIALIZED,
-        { jsonrpc: "2.0", id: 2, method: "resources/read", params: { uri: "cclinic://specs/user-login" } },
+        { jsonrpc: "2.0", id: 2, method: "resources/read", params: { uri: "luseen://specs/user-login" } },
       ],
       2,
     );
@@ -101,31 +101,31 @@ describe("cclinic mcp", () => {
       [["--approver", "pm-agent", "--run", "R"], "--task"],
       [["--approver", "pm-agent", "--run", "R", "--task", "1", "--max-budget-usd", "1"], "--max-budget-usd"],
     ] as const) {
-      const result = cclinic(["mcp", "-C", root, ...args]);
+      const result = luseen(["mcp", "-C", root, ...args]);
       expect(result.code).toBe(2);
       expect(result.stdout).toBe("");
       expect(result.stderr).toContain(named);
     }
   });
 
-  it("TC-MCP-004: a project without cclinic's documents exits 2, saying to run cclinic", () => {
-    const result = cclinic(["mcp", "-C", makeTempFolder()]);
+  it("TC-MCP-004: a project without luseen's documents exits 2, saying to run luseen", () => {
+    const result = luseen(["mcp", "-C", makeTempFolder()]);
     expect(result.code).toBe(2);
-    expect(result.stderr).toContain('Run "cclinic"');
+    expect(result.stderr).toContain('Run "luseen"');
   });
 
   it("TC-CLI-056: help lists the options, and a bad value exits 2", () => {
-    const help = cclinic(["help", "mcp"]);
+    const help = luseen(["help", "mcp"]);
     expect(help.code).toBe(0);
     for (const option of ["--dir", "--approver", "--run", "--task"]) expect(help.stdout).toContain(option);
     expect(help.stdout).not.toContain("--max-budget-usd");
-    expect(cclinic(["mcp", "--approver", "robot"]).code).toBe(2);
+    expect(luseen(["mcp", "--approver", "robot"]).code).toBe(2);
   });
 });
 
-describe("cclinic session-link", () => {
+describe("luseen session-link", () => {
   it("TC-CLI-062: it's left out of the help, and with empty input it exits 0 and prints nothing", () => {
-    expect(cclinic(["--help"]).stdout).not.toContain("session-link");
+    expect(luseen(["--help"]).stdout).not.toContain("session-link");
     const result = spawnSync(process.execPath, [BIN, "session-link"], {
       cwd: makeTempFolder(),
       encoding: "utf8",
@@ -137,9 +137,9 @@ describe("cclinic session-link", () => {
   });
 });
 
-describe("cclinic approve", () => {
+describe("luseen approve", () => {
   it("TC-CLI-059 and TC-MCP-045: without a terminal it exits 2 and answers nothing", () => {
-    const result = cclinic(["approve", makeProject()]);
+    const result = luseen(["approve", makeProject()]);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("your own terminal");
   });
@@ -152,13 +152,13 @@ const isPseudoTerminalAvailable = process.platform === "darwin" && existsSync(SC
 function makeFullProject(): string {
   const root = makeProject();
   writeProject(root, {
-    ".cclinic/sdd/specs/user-login/validation.md": "# validation\n",
-    ".cclinic/sdd/specs/user-login/verification.md": "# verification\n",
+    ".luseen/sdd/specs/user-login/validation.md": "# validation\n",
+    ".luseen/sdd/specs/user-login/verification.md": "# verification\n",
   });
   return root;
 }
 
-/** Connects the SDK's client to `cclinic mcp` over stdio, without elicitation. */
+/** Connects the SDK's client to `luseen mcp` over stdio, without elicitation. */
 async function stdioClient(root: string) {
   const transport = new StdioClientTransport({
     command: process.execPath,
@@ -176,7 +176,7 @@ async function stdioClient(root: string) {
   return { client, call };
 }
 
-/** A change whose G1 question waits for `cclinic approve`, built through the tools. */
+/** A change whose G1 question waits for `luseen approve`, built through the tools. */
 async function waitingProject(): Promise<string> {
   const root = makeFullProject();
   const { client, call } = await stdioClient(root);
@@ -186,7 +186,7 @@ async function waitingProject(): Promise<string> {
   return root;
 }
 
-/** Runs `cclinic approve` in a pseudo-terminal with no keys typed. `script` needs a file, not a socket, as stdin. */
+/** Runs `luseen approve` in a pseudo-terminal with no keys typed. `script` needs a file, not a socket, as stdin. */
 function approveInTerminal(root: string) {
   const keysFile = path.join(makeTempFolder(), "keys");
   writeFileSync(keysFile, "");
@@ -204,7 +204,7 @@ function approveInTerminal(root: string) {
   }
 }
 
-describe("cclinic mcp and approve, QA", () => {
+describe("luseen mcp and approve, QA", () => {
   it("TC-MCP-002: workflow_status reports the state of the folder named with -C", async () => {
     const root = makeFullProject();
     const first = await stdioClient(root);
@@ -220,10 +220,10 @@ describe("cclinic mcp and approve, QA", () => {
 
   it("TC-MCP-045 and TC-CLI-059: with a waiting question and no terminal, it exits 2 and the gate stays closed", async () => {
     const root = await waitingProject();
-    const before = readFileSync(path.join(root, ".cclinic/workflow/branch-no-branch.json"), "utf8");
-    const result = cclinic(["approve", root]);
+    const before = readFileSync(path.join(root, ".luseen/workflow/branch-no-branch.json"), "utf8");
+    const result = luseen(["approve", root]);
     expect(result.code).toBe(2);
-    expect(readFileSync(path.join(root, ".cclinic/workflow/branch-no-branch.json"), "utf8")).toBe(before);
+    expect(readFileSync(path.join(root, ".luseen/workflow/branch-no-branch.json"), "utf8")).toBe(before);
     const { client, call } = await stdioClient(root);
     expect(await call("workflow_advance", { to: "implement" })).toMatchObject({ status: "waiting-for-approval" });
     expect(await call("workflow_status")).toMatchObject({ change: { step: "spec" } });
@@ -243,7 +243,7 @@ describe("cclinic mcp and approve, QA", () => {
     const home = env["HOME"] ?? "";
     const result = spawnSync(process.execPath, [BIN, "skills", root], { encoding: "utf8", env, input: "" });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain("[mcp_servers.cclinic]");
+    expect(result.stdout).toContain("[mcp_servers.luseen]");
     expect(result.stdout).toContain("~/.codex/config.toml");
     expect(readdirSync(home)).toEqual([]);
   });

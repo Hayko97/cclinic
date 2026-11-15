@@ -1,4 +1,4 @@
-/** The `cclinic auto` command: runs a whole roadmap with developer, PM and QA agents (spec: automated-mode). */
+/** The `luseen auto` command: runs a whole roadmap with developer, PM and QA agents (spec: automated-mode). */
 import { randomUUID } from "node:crypto";
 import { openRunRepository, readRepositoryState, branchExists, missingFromHead } from "../adapters/git/run-branches.js";
 import { savePlanLimits } from "../adapters/config/limits-store.js";
@@ -64,7 +64,7 @@ export interface AutoOptions {
 
 /** FR-AUTO-003 */
 async function checkProject(target: string, context: CommandContext): Promise<void> {
-  await requireClaudeCli("cclinic auto", context);
+  await requireClaudeCli("luseen auto", context);
   const options = { environment: context.environment };
   const repository = await readRepositoryState(target, options);
   if (!repository.isRepository) {
@@ -82,7 +82,7 @@ async function checkProject(target: string, context: CommandContext): Promise<vo
   }
   if (missing.length > 0) {
     throw new UsageError(
-      `The cclinic skills ${missing.join(", ")} aren't installed and committed. Agents work from the last commit, so run "cclinic skills" and commit the result.`,
+      `The luseen skills ${missing.join(", ")} aren't installed and committed. Agents work from the last commit, so run "luseen skills" and commit the result.`,
     );
   }
 }
@@ -96,16 +96,16 @@ async function chooseRoadmap(given: number | undefined, overview: RoadmapOvervie
   if (given !== undefined) {
     const found = overview.roadmaps.find((roadmap) => roadmap.id === given);
     if (found === undefined)
-      throw new UsageError(`Roadmap ${given} doesn't exist. See your roadmaps with: cclinic tasks roadmaps`);
+      throw new UsageError(`Roadmap ${given} doesn't exist. See your roadmaps with: luseen tasks roadmaps`);
     return found;
   }
   if (overview.roadmaps.length === 0) {
-    throw new UsageError("There are no roadmaps to run. Create one with the PM agent: cclinic plan");
+    throw new UsageError("There are no roadmaps to run. Create one with the PM agent: luseen plan");
   }
   if (!isInteractive()) {
     const ids = overview.roadmaps.map((roadmap) => roadmap.id).join(", ");
     throw new UsageError(
-      `Choose a roadmap with --roadmap <id>. Roadmaps: ${ids}. See them with: cclinic tasks roadmaps`,
+      `Choose a roadmap with --roadmap <id>. Roadmaps: ${ids}. See them with: luseen tasks roadmaps`,
     );
   }
   const id = await chooseFrom(
@@ -272,7 +272,7 @@ export async function runAutoCommand(options: AutoOptions, context: CommandConte
   const cycle = findRunCycle(selected, allTasks);
   if (cycle !== undefined) {
     throw new UsageError(
-      `The tasks depend on each other in a cycle: ${[...cycle, cycle[0]].map((id) => `#${String(id)}`).join(" -> ")}. Fix it with cclinic tasks undepend.`,
+      `The tasks depend on each other in a cycle: ${[...cycle, cycle[0]].map((id) => `#${String(id)}`).join(" -> ")}. Fix it with luseen tasks undepend.`,
     );
   }
   const { runnable, blockedBefore } = planRun(selected, allTasks);

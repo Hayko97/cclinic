@@ -205,7 +205,7 @@ export function commitMessage(
 ): string {
   const subject = `#${task.id} ${task.title}${isWip ? ` (${WIP_COMMIT_MARKER})` : ""}`;
   const body = isWip
-    ? `${WIP_COMMIT_MARKER}: unfinished work from cclinic automated mode, not approved.`
+    ? `${WIP_COMMIT_MARKER}: unfinished work from luseen automated mode, not approved.`
     : `Requirements: ${requirementIds.length === 0 ? "none reported" : requirementIds.join(", ")}`;
   return `${subject}\n\n${body}`;
 }
@@ -255,11 +255,11 @@ function describeTask(context: TaskContext): string {
   ].join("\n");
 }
 
-const AUTOMATED_RULES = `You're working in cclinic's automated mode. No human is watching, so never wait for a human or ask the user anything.
+const AUTOMATED_RULES = `You're working in luseen's automated mode. No human is watching, so never wait for a human or ask the user anything.
 Follow the project's AGENTS.md lifecycle and skills, except:
 - The PM agent gives every approval instead of the user. Don't ask for approval; finish your stage and stop.
-- Don't commit, push or run git. cclinic commits approved work itself.
-- Don't change .cclinic/tasks.db, and don't run \`cclinic tasks\` commands.
+- Don't commit, push or run git. luseen commits approved work itself.
+- Don't change .luseen/tasks.db, and don't run \`luseen tasks\` commands.
 - Work only inside the current folder.`;
 
 export type DeveloperStage =
@@ -324,7 +324,7 @@ function clipped(diff: string): string {
 /** FR-AUTO-019 */
 export function buildSpecReviewPrompt(context: TaskContext, specDiff: string): string {
   return [
-    "You are the PM agent, reviewing a spec change in cclinic's automated mode. You only read: you can't change files or run commands.",
+    "You are the PM agent, reviewing a spec change in luseen's automated mode. You only read: you can't change files or run commands.",
     "",
     describeTask(context),
     "",
@@ -340,7 +340,7 @@ export function buildSpecReviewPrompt(context: TaskContext, specDiff: string): s
 /** FR-AUTO-022 */
 export function buildImplementationReviewPrompt(context: TaskContext, diff: string, qa: QaResult): string {
   return [
-    "You are the PM agent, reviewing finished work in cclinic's automated mode. You only read: you can't change files or run commands.",
+    "You are the PM agent, reviewing finished work in luseen's automated mode. You only read: you can't change files or run commands.",
     "",
     describeTask(context),
     "",
@@ -407,7 +407,7 @@ export function renderReport(state: RunState): string {
 export function notificationText(state: RunState): { readonly title: string; readonly message: string } {
   const count = (status: TaskRunStatus): number => state.tasks.filter((run) => run.status === status).length;
   return {
-    title: `cclinic: ${state.roadmapTitle}`,
+    title: `luseen: ${state.roadmapTitle}`,
     message: `Run ${state.outcome ?? "ended"}: ${count("done")} done, ${count("blocked") + count("skipped")} blocked.`,
   };
 }

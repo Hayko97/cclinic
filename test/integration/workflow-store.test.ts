@@ -28,7 +28,7 @@ describe("workflow store", () => {
       { key: stateKey(null, "main"), approverMode: "user", now: NOW },
     );
     await store.save(first);
-    const file = path.join(root, ".cclinic/workflow/branch-main.json");
+    const file = path.join(root, ".luseen/workflow/branch-main.json");
     const before = readFileSync(file, "utf8");
     failure.isRenameFailing = true;
     try {

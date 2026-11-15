@@ -35,6 +35,7 @@ import { runPlanCommand, type PlanOptions } from "./plan-command.js";
 import { runGuiCommand, type GuiOptions } from "./gui-command.js";
 import { runApproveCommand, runMcpCommand, runSessionLink, type McpOptions } from "./mcp-command.js";
 import { addTasksCommand } from "./tasks-command.js";
+import { migrateProject, migrateUserSettings } from "./legacy-migration.js";
 
 const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
   version: string;
@@ -76,7 +77,7 @@ function limitOption(
 function buildProgram(context: CommandContext, setExit: (code: number) => void): Command {
   const program = new Command();
   program
-    .name("cclinic")
+    .name("luseen")
     .description("Generate spec-driven development documents for a project, using Claude.")
     .version(version, "-v, --version", "show the version")
     .helpOption("-h, --help", "show help")
@@ -89,7 +90,8 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .configureOutput({
       writeOut: (text) => process.stdout.write(text),
       writeErr: (text) => process.stderr.write(text),
-    });
+    })
+    .hook("preAction", (_program, command) => migrateProject(command, context));
 
   program
     .argument("[path]", "folder to analyse (default: the current folder)")
@@ -100,9 +102,9 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .option("--json", "write the final result as JSON on stdout")
     .addOption(new Option("--color <mode>", "use color in output").choices(["auto", "always", "never"]).default("auto"))
     .optionsGroup("Generation options:")
-    .option("-o, --out <dir>", "output folder (default: <path>/.cclinic/sdd)")
+    .option("-o, --out <dir>", "output folder (default: <path>/.luseen/sdd)")
     .addOption(
-      new Option("--provider <name>", "how to reach Claude (default: auto, or CCLINIC_PROVIDER)").argParser(
+      new Option("--provider <name>", "how to reach Claude (default: auto, or LUSEEN_PROVIDER)").argParser(
         oneOf(PROVIDER_CHOICES),
       ),
     )
@@ -157,7 +159,7 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
 
   program
     .command("guide")
-    .description("Show the full walkthrough: how cclinic works, and what to do at each step")
+    .description("Show the full walkthrough: how luseen works, and what to do at each step")
     .action(() => {
       context.reporter.result(GUIDE_TEXT.trimEnd());
     });
@@ -170,17 +172,17 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .option("-m, --model <value>", "save this model as the default, without the menus")
     .option("--effort <value>", "save this reasoning level as the default, without the menus")
     .option("--json", "with --list or a value to save, print JSON")
-    .addHelpText("after", commandHelp("cclinic model", "cclinic model --model opus --effort high"))
+    .addHelpText("after", commandHelp("luseen model", "luseen model --model opus --effort high"))
     .action(async (options: ModelCommandOptions) => {
       await runModelCommand(options, context);
     });
 
   program
     .command("doctor")
-    .description("Check that cclinic is ready to run, without using any Claude usage")
+    .description("Check that luseen is ready to run, without using any Claude usage")
     .argument("[path]", "folder to check (default: the current folder)")
     .option("--json", "print JSON")
-    .addHelpText("after", commandHelp("cclinic doctor", "cclinic doctor ./my-project --json"))
+    .addHelpText("after", commandHelp("luseen doctor", "luseen doctor ./my-project --json"))
     .action(async (given: string | undefined, options: { json?: boolean }) => {
       setExit(await runDoctor(given, options, context));
     });
@@ -189,10 +191,10 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .command("skills")
     .description("Install the coding agent skills, without using any Claude usage")
     .argument("[path]", "project folder (default: the current folder)")
-    .option("-o, --out <dir>", "where the project documents are (default: <path>/.cclinic/sdd)")
-    .option("-f, --force", "replace cclinic skills that were edited")
+    .option("-o, --out <dir>", "where the project documents are (default: <path>/.luseen/sdd)")
+    .option("-f, --force", "replace luseen skills that were edited")
     .option("--json", "print JSON")
-    .addHelpText("after", commandHelp("cclinic skills", "cclinic skills ./my-project --out docs/sdd --json"))
+    .addHelpText("after", commandHelp("luseen skills", "luseen skills ./my-project --out docs/sdd --json"))
     .action(async (given: string | undefined, options: SkillsCommandOptions) => {
       await runSkillsCommand(given, options, context);
     });
@@ -217,10 +219,10 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .addHelpText(
       "after",
       commandHelp(
-        "cclinic plan",
-        "cclinic plan --task --roadmap 1",
-        "cclinic plan --attach brief.pdf",
-        "cclinic plan --resume plan-3",
+        "luseen plan",
+        "luseen plan --task --roadmap 1",
+        "luseen plan --attach brief.pdf",
+        "luseen plan --resume plan-3",
       ),
     )
     .action(async (options: PlanOptions) => {
@@ -239,7 +241,7 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .option("-y, --yes", "skip the confirmation prompt")
     .option("--dry-run", "check everything and show the plan, without starting the run")
     .option("--json", "print the result as JSON")
-    .addHelpText("after", commandHelp("cclinic auto", "cclinic auto --roadmap 1 --developers 3 --yes"))
+    .addHelpText("after", commandHelp("luseen auto", "luseen auto --roadmap 1 --developers 3 --yes"))
     .action(async (options: AutoOptions) => {
       setExit(await runAutoCommand(options, context));
     });
@@ -253,8 +255,8 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     )
     .option("--run <id>", "with --approver pm-agent: the automated run")
     .option("--task <id>", "with --approver pm-agent: the task", positiveId)
-    .option("--plan <id>", "serve only the planning tools of this planning session, for a PM turn cclinic runs", planId)
-    .addHelpText("after", commandHelp("cclinic mcp", "cclinic mcp -C ./my-project"))
+    .option("--plan <id>", "serve only the planning tools of this planning session, for a PM turn luseen runs", planId)
+    .addHelpText("after", commandHelp("luseen mcp", "luseen mcp -C ./my-project"))
     .action(async (options: McpOptions) => {
       await runMcpCommand(options, context);
     });
@@ -263,7 +265,7 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .command("approve")
     .description("Answer an approval question the MCP server is waiting on, in your own terminal")
     .argument("[path]", "project folder (default: the current folder)")
-    .addHelpText("after", commandHelp("cclinic approve", "cclinic approve ./my-project"))
+    .addHelpText("after", commandHelp("luseen approve", "luseen approve ./my-project"))
     .action(async (given: string | undefined) => {
       await runApproveCommand(given, context);
     });
@@ -280,7 +282,7 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     )
     .option("--no-open", "don't open the browser")
     .option("--json", "write the link and port as JSON on stdout")
-    .addHelpText("after", commandHelp("cclinic gui", "cclinic gui ./my-project --port 4417"))
+    .addHelpText("after", commandHelp("luseen gui", "luseen gui ./my-project --port 4417"))
     .action(async (given: string | undefined, options: GuiOptions) => {
       await runGuiCommand(given, options, context);
     });
@@ -294,7 +296,7 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .command("environment")
     .description("Set up a local environment for previewing changes, using Claude")
     .argument("[path]", "project folder (default: the current folder)")
-    .option("-o, --out <dir>", "where the project documents are (default: <path>/.cclinic/sdd)")
+    .option("-o, --out <dir>", "where the project documents are (default: <path>/.luseen/sdd)")
     .option("-m, --model [value]", "model to use. With no value, opens a menu")
     .option("--effort [value]", "reasoning level. With no value, opens a menu")
     .option("--max-budget-usd <n>", "stop at this estimated spend (default: 2)", positiveNumber)
@@ -302,7 +304,7 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .option("-f, --force", "set up the environment again")
     .option("--allow-broad-target", "allow running on a home folder or filesystem root")
     .option("--json", "print JSON")
-    .addHelpText("after", commandHelp("cclinic environment", "cclinic environment ./my-project --yes --json"))
+    .addHelpText("after", commandHelp("luseen environment", "luseen environment ./my-project --yes --json"))
     .action(async (given: string | undefined, options: EnvironmentCommandOptions) => {
       await runEnvironmentCommand(given, options, context);
     });
@@ -312,7 +314,7 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .description("Delete the cache and failed drafts. Generated documents aren't touched")
     .argument("[path]", "folder to clean (default: the current folder)")
     .option("-y, --yes", "skip the confirmation prompt")
-    .addHelpText("after", commandHelp("cclinic clean", "cclinic clean ./my-project --yes"))
+    .addHelpText("after", commandHelp("luseen clean", "luseen clean ./my-project --yes"))
     .action(async (given: string | undefined, options: { yes?: boolean }) => {
       await runClean(given, options, context);
     });
@@ -381,6 +383,7 @@ async function main(): Promise<void> {
   let exitCode: number = EXIT_CODES.success;
   const context: CommandContext = { reporter, environment: process.env, signal: controller.signal, version };
   try {
+    await migrateUserSettings(process.env, reporter);
     await buildProgram(context, (code) => {
       exitCode = code;
     }).parseAsync(argv, { from: "user" });

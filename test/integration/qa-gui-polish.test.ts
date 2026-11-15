@@ -44,9 +44,9 @@ afterEach(async () => {
 /** Roadmap 1 "Payments" with tasks 1 to 4, task 2's change with one session, a change keyed by branch `fix.x`, and a past run. */
 async function project(home: string, { isGenerated = true, isWaiting = false } = {}): Promise<string> {
   const root = makeTempFolder();
-  mkdirSync(path.join(root, ".cclinic"), { recursive: true });
-  if (isGenerated) mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  mkdirSync(path.join(root, ".luseen"), { recursive: true });
+  if (isGenerated) mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Payments", goal: "Card checkout" },
@@ -83,7 +83,7 @@ async function project(home: string, { isGenerated = true, isWaiting = false } =
   await workflow.save(
     beginChange({ changeType: "bug", spec: "payments" }, { key: BRANCH_KEY, approverMode: "user", now }),
   );
-  const run = path.join(root, ".cclinic/auto", PAST_RUN);
+  const run = path.join(root, ".luseen/auto", PAST_RUN);
   mkdirSync(path.join(run, "logs"), { recursive: true });
   writeFileSync(
     path.join(run, "run.json"),
@@ -91,7 +91,7 @@ async function project(home: string, { isGenerated = true, isWaiting = false } =
       runId: PAST_RUN,
       roadmapId: 1,
       roadmapTitle: "Payments",
-      runBranch: `cclinic/auto/${PAST_RUN}/run`,
+      runBranch: `luseen/auto/${PAST_RUN}/run`,
       startedAt: new Date(Date.now() - 600_000).toISOString(),
       finishedAt: now,
       outcome: "completed",
@@ -322,7 +322,7 @@ describe("QA FR-GUI-062: job notices", () => {
     await page.clock.runFor(2_000);
     jobs.end("auto", 0);
     await page.clock.runFor(2_000);
-    await expect.poll(() => page.locator("#notice").textContent()).toContain("cclinic auto");
+    await expect.poll(() => page.locator("#notice").textContent()).toContain("luseen auto");
     expect(await page.locator("#notice button", { hasText: "Show output" }).count()).toBe(1);
     expect(await page.locator("#notice").textContent()).not.toContain("auto-preview");
   });
@@ -338,7 +338,7 @@ describe("QA FR-GUI-062: job notices", () => {
     await expect.poll(() => page.locator("#notice").textContent()).toBe("Removed task #4.");
     for (let tick = 0; tick < 3; tick += 1) {
       await page.clock.runFor(2_000);
-      expect(await page.locator("#notice").textContent()).not.toContain("cclinic tasks");
+      expect(await page.locator("#notice").textContent()).not.toContain("luseen tasks");
     }
   });
 
@@ -375,7 +375,7 @@ describe("QA FR-GUI-062: job notices", () => {
     await page.clock.runFor(500);
     jobs.end("tasks", 0);
     await page.clock.runFor(10_000);
-    expect(await page.locator("#notice").textContent()).toContain("cclinic doctor");
+    expect(await page.locator("#notice").textContent()).toContain("luseen doctor");
   });
 
   it("QA: at 768 px a notice with a long command and Show output stays on the screen, in both themes", async () => {
@@ -384,7 +384,7 @@ describe("QA FR-GUI-062: job notices", () => {
       await page.evaluate(`(async () => {
         document.documentElement.dataset.theme = ${JSON.stringify(theme)};
         const { notify } = await import("/assets/api.js");
-        notify("cclinic tasks add --title " + "x".repeat(400) + ": Failed (exit 1)", true, { label: "Show output", run: () => undefined });
+        notify("luseen tasks add --title " + "x".repeat(400) + ": Failed (exit 1)", true, { label: "Show output", run: () => undefined });
       })()`);
       const box = await page.locator("#notice").boundingBox();
       // Failure notices stack, so the newest is checked.
@@ -608,7 +608,7 @@ describe("QA run 2: fixes of run 1's defects", () => {
     );
     await page.locator("#job-list button", { hasText: "Run doctor" }).click();
     await expect.poll(() => jobs.started.some((args) => args[0] === "doctor")).toBe(true);
-    await expect.poll(() => page.locator("#job-list").textContent()).toContain("cclinic doctor");
+    await expect.poll(() => page.locator("#job-list").textContent()).toContain("luseen doctor");
     expect(await page.locator("#job-list").textContent()).not.toContain("No jobs yet");
   });
 

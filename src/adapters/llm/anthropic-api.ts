@@ -69,7 +69,7 @@ function translateError(error: unknown, model: ModelChoice): Error {
   }
   if (error instanceof Anthropic.NotFoundError) {
     return new ProviderError(
-      `${labelForModel(model)} isn't available to this account. Run "cclinic model" to choose another model.`,
+      `${labelForModel(model)} isn't available to this account. Run "luseen model" to choose another model.`,
       { cause: error },
     );
   }
@@ -78,7 +78,7 @@ function translateError(error: unknown, model: ModelChoice): Error {
   }
   if (error instanceof Anthropic.BadRequestError) {
     return new ProviderError(
-      `The Anthropic API rejected the request for ${labelForModel(model)}. Run "cclinic model" to try another model.`,
+      `The Anthropic API rejected the request for ${labelForModel(model)}. Run "luseen model" to try another model.`,
       { cause: error },
     );
   }

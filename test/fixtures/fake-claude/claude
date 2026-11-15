@@ -97,7 +97,7 @@ if (scriptFile) {
   }
   const transcript = () => {
     for (const use of rule.toolUses ?? []) line("assistant", [{ type: "tool_use", id: "t", name: use.name, input: use.input ?? {} }]);
-    for (const call of rule.tools ?? []) line("assistant", [{ type: "tool_use", id: "m", name: `mcp__cclinic__${call.name}`, input: call.input ?? {} }]);
+    for (const call of rule.tools ?? []) line("assistant", [{ type: "tool_use", id: "m", name: `mcp__luseen__${call.name}`, input: call.input ?? {} }]);
     if (rule.message !== undefined && rule.message !== "") line("assistant", [{ type: "text", text: rule.message }]);
   };
   /** Calls the scripted MCP tools through the server in --mcp-config, over newline-delimited JSON-RPC. */
@@ -127,7 +127,7 @@ if (scriptFile) {
     await request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "fake-claude", version: "1" } });
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
     for (const call of rule.tools) {
-      emit({ type: "assistant", message: { content: [{ type: "tool_use", name: `mcp__cclinic__${call.name}`, input: call.input ?? {} }] } });
+      emit({ type: "assistant", message: { content: [{ type: "tool_use", name: `mcp__luseen__${call.name}`, input: call.input ?? {} }] } });
       const answer = await request("tools/call", { name: call.name, arguments: { planId, ...(call.input ?? {}) } });
       if (record) fs.appendFileSync(`${record}.tools.jsonl`, `${JSON.stringify({ name: call.name, result: answer.result ?? answer.error })}\n`);
     }
@@ -188,8 +188,8 @@ if (!args.includes("--json-schema")) {
   const part = { name: "web", type: "web", start: "docker compose up", stop: "docker compose down", url: "http://sample.localhost:3000", fallbackUrl: "http://localhost:3000", review: "Open the link" };
   const contents = { valid: JSON.stringify({ version: 1, alias: "sample", parts: [part] }), invalid: JSON.stringify({ version: 1, alias: "Bad Alias", parts: [] }) };
   if (contents[outcome]) {
-    fs.mkdirSync(".cclinic/environment", { recursive: true });
-    fs.writeFileSync(".cclinic/environment/environment.json", contents[outcome]);
+    fs.mkdirSync(".luseen/environment", { recursive: true });
+    fs.writeFileSync(".luseen/environment/environment.json", contents[outcome]);
   }
   for (const file of (process.env.FAKE_CLAUDE_ALSO_WRITE ?? "").split(",").filter(Boolean)) fs.writeFileSync(file, "changed by the agent\n");
   emit({ type: "result", is_error: false, subtype: "success", result: "I couldn't tell what runs here.", total_cost_usd: 0.25 });

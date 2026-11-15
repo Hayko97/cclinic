@@ -1,4 +1,4 @@
-/** Everything that touches .cclinic on disk: cache, safe writes, hand-edit checks and the run lock. */
+/** Everything that touches .luseen on disk: cache, safe writes, hand-edit checks and the run lock. */
 import { createHash } from "node:crypto";
 import { access, constants, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -180,7 +180,7 @@ export async function checkOutputFolder(out: string, isForced: boolean): Promise
   if (manifest === undefined) {
     if (isForced) return { overwritten: files };
     throw new UsageError(
-      `${out} has files but no cclinic manifest, so it may not be cclinic's folder. Choose another --out folder, or use --force to replace it.`,
+      `${out} has files but no luseen manifest, so it may not be luseen's folder. Choose another --out folder, or use --force to replace it.`,
     );
   }
   const edited = await findHandEditedFiles(out, manifest);
@@ -223,7 +223,7 @@ export async function acquireLock(lockFile: string): Promise<() => Promise<void>
     {
       signal: AbortSignal.timeout(LOCK_WAIT_MS),
       refuse: (holder) =>
-        new UsageError(`Another cclinic run (process ${holder.pid}) is already working on this folder.`),
+        new UsageError(`Another luseen run (process ${holder.pid}) is already working on this folder.`),
     },
   );
   return lock.release;

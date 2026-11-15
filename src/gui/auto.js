@@ -73,7 +73,7 @@ export async function openAutoDialog(roadmap, settings = undefined) {
   }
 }
 
-/** FR-GUI-027, FR-GUI-028: the plan from `cclinic auto --dry-run`, or the CLI's reason it won't run. */
+/** FR-GUI-027, FR-GUI-028: the plan from `luseen auto --dry-run`, or the CLI's reason it won't run. */
 async function showPlan() {
   const asked = options();
   state.asking = asked;

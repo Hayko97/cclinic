@@ -1,4 +1,4 @@
-/** QA: the workflow store's `update`, used to answer from the GUI under the `cclinic mcp` lock (spec: gui FR-GUI-038). */
+/** QA: the workflow store's `update`, used to answer from the GUI under the `luseen mcp` lock (spec: gui FR-GUI-038). */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -26,7 +26,7 @@ const change = () =>
     NOW,
   );
 
-const workflow = (root: string) => path.join(root, ".cclinic/workflow");
+const workflow = (root: string) => path.join(root, ".luseen/workflow");
 
 describe("QA: workflow store update", () => {
   it("with no workflow folder, decides on nothing and creates no files", async () => {
@@ -54,7 +54,7 @@ describe("QA: workflow store update", () => {
     }
     expect(readdirSync(workflow(root)).sort()).toEqual(before);
     expect(readFileSync(file, "utf8")).toBe(content);
-    expect(readdirSync(root).sort()).toEqual([".cclinic"]);
+    expect(readdirSync(root).sort()).toEqual([".luseen"]);
   });
 
   it("saves the decided state on the change's own file and returns the value", async () => {

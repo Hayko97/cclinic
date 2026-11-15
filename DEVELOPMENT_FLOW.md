@@ -1,8 +1,8 @@
-# How development works with `cclinic`
+# How development works with `luseen`
 
-What a coding agent does after `cclinic` setup, from your prompt to a commit.
+What a coding agent does after `luseen` setup, from your prompt to a commit.
 
-Source of truth: the workflow in [`AGENTS.md`](AGENTS.md), the skills in [`.agents/skills/`](.agents/skills/), and the [mcp-server](.cclinic/sdd/specs/mcp-server/spec.md) spec. For the setup itself, see [SETUP_FLOW.md](SETUP_FLOW.md). For planning tasks, see [PLANNING_FLOW.md](PLANNING_FLOW.md). For runs with no human, see [AUTO_FLOW.md](AUTO_FLOW.md). For the web page, see [GUI_FLOW.md](GUI_FLOW.md).
+Source of truth: the workflow in [`AGENTS.md`](AGENTS.md), the skills in [`.agents/skills/`](.agents/skills/), and the [mcp-server](.luseen/sdd/specs/mcp-server/spec.md) spec. For the setup itself, see [SETUP_FLOW.md](SETUP_FLOW.md). For planning tasks, see [PLANNING_FLOW.md](PLANNING_FLOW.md). For runs with no human, see [AUTO_FLOW.md](AUTO_FLOW.md). For the web page, see [GUI_FLOW.md](GUI_FLOW.md).
 
 ---
 
@@ -29,12 +29,12 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    P([Your prompt]) --> T0[cclinic tasks list]
+    P([Your prompt]) --> T0[luseen tasks list]
     T0 --> TQ{Open tasks, and the<br/>prompt isn't about one?}
     TQ -- yes --> TA[List them. You choose:<br/>work on one, remove it,<br/>or keep it and go on] --> Q
     TQ -- no --> Q{What kind<br/>of prompt?}
     Q -- question / review --> A([Just answer])
-    Q -- planning --> PL([Talk it through.<br/>cclinic plan saves it])
+    Q -- planning --> PL([Talk it through.<br/>luseen plan saves it])
     Q -- code change --> W{Which spec?}
     W -- unclear --> Ask[Ask you] --> W
     W -- found --> K{Kind of change?}
@@ -73,19 +73,19 @@ flowchart TD
 
 ## 3. Stage 0 and 1: Open tasks, then understand the prompt
 
-On every prompt, the agent first runs `cclinic tasks list --json`. If there are open tasks and your prompt isn't about one of them, it lists them and waits: work on one, remove it, or keep it and go on. It doesn't ask about the same tasks again in that conversation.
+On every prompt, the agent first runs `luseen tasks list --json`. If there are open tasks and your prompt isn't about one of them, it lists them and waits: work on one, remove it, or keep it and go on. It doesn't ask about the same tasks again in that conversation.
 
 ```mermaid
 flowchart LR
     P([Prompt]) --> T{Type}
     T -- question --> A[Answer]
-    T -- planning --> PE[product-engineer<br/>then cclinic plan]
-    T -- change --> S[Find the spec<br/>in .cclinic/sdd/README.md]
+    T -- planning --> PE[product-engineer<br/>then luseen plan]
+    T -- change --> S[Find the spec<br/>in .luseen/sdd/README.md]
     S --> Tell[Tell you<br/>which spec]
-    T -- a task --> St[cclinic tasks start id<br/>use the task's spec]
+    T -- a task --> St[luseen tasks start id<br/>use the task's spec]
 ```
 
-If more than one spec fits, or none does, the agent asks you. The agent never creates roadmaps itself. `cclinic plan` does, with the PM agent.
+If more than one spec fits, or none does, the agent asks you. The agent never creates roadmaps itself. `luseen plan` does, with the PM agent.
 
 ---
 
@@ -110,7 +110,7 @@ Then the agent shows what changed and any open questions, and **stops** until yo
 
 - **`approve`**: go to stage 3.
 - **`refine`**: change the spec as you ask, and offer the options again.
-- **`review-doc`**: write `.cclinic/reviews/<spec>/review.md`, with diagrams and mockups of how the project will work and look after the change. Then offer `approve` or `refine`. A review doc isn't approval.
+- **`review-doc`**: write `.luseen/reviews/<spec>/review.md`, with diagrams and mockups of how the project will work and look after the change. Then offer `approve` or `refine`. A review doc isn't approval.
 
 ---
 
@@ -138,7 +138,7 @@ flowchart TD
 - **QA** runs in a separate agent, so the code isn't checked by the agent that wrote it. At most 3 QA runs per change.
 - **Code review** runs after QA passes, in a separate agent, with `review-code` against your coding rules and `developer-guidelines.md`. Findings are `blocking`, `should-fix` or `nit`. Blocking and should-fix ones are fixed, then QA and the review run again. Nits are only reported. At most 3 reviews.
 - The counts start again only after you reply. If a 3rd QA run or review still fails, the agent stops, reports, and doesn't ask for approval.
-- **Preview** runs each `start` command in `.cclinic/environment/environment.json`. If it's missing, the `local-env` skill sets it up.
+- **Preview** runs each `start` command in `.luseen/environment/environment.json`. If it's missing, the `local-env` skill sets it up.
 - **Report** lists each requirement, the tests and their real results, the review's findings, and steps for any `manual` test case.
 
 ---
@@ -147,20 +147,20 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A[You approve<br/>the change] --> TD[cclinic tasks done id<br/>if it was a task]
+    A[You approve<br/>the change] --> TD[luseen tasks done id<br/>if it was a task]
     TD --> Q{Commit?}
     Q -- yes --> St[Stage only<br/>this change's files]
     St --> C[Commit spec + code + tests<br/>message cites FR- IDs]
     Q -- no --> N[Leave uncommitted]
 ```
 
-Review docs in `.cclinic/reviews/` are left out unless you ask. The agent never pushes unless you ask.
+Review docs in `.luseen/reviews/` are left out unless you ask. The agent never pushes unless you ask.
 
 ---
 
-## 7. The same stages, enforced: `cclinic mcp`
+## 7. The same stages, enforced: `luseen mcp`
 
-`AGENTS.md` is guidance, so an agent can still skip a step. Connect your coding agent to `cclinic mcp` (Claude Code reads it from `.mcp.json`), and each step becomes a tool call the server checks. A step whose gate hasn't passed is refused.
+`AGENTS.md` is guidance, so an agent can still skip a step. Connect your coding agent to `luseen mcp` (Claude Code reads it from `.mcp.json`), and each step becomes a tool call the server checks. A step whose gate hasn't passed is refused.
 
 ```
 begin → spec ─[G1]→ implement → qa ─[G2]→ review ─[G3]→ preview ─[G4]→ approval ─[G5]→ commit ─[G6]→ done
@@ -175,16 +175,16 @@ begin → spec ─[G1]→ implement → qa ─[G2]→ review ─[G3]→ preview 
 | G5 change approved | You approve the finished change                | You: `approve` or `request changes`      |
 | G6 commit agreed   | You agree to commit                            | You: `yes` or `no`                       |
 
-You answer a waiting gate in your agent's own prompt, with `cclinic approve` in a terminal, or with the buttons in the GUI's task panel. The state of each change is kept in `.cclinic/workflow/`.
+You answer a waiting gate in your agent's own prompt, with `luseen approve` in a terminal, or with the buttons in the GUI's task panel. The state of each change is kept in `.luseen/workflow/`.
 
 ---
 
 ## 8. Watching it in the GUI
 
-`cclinic gui` shows the same work on its canvas ([GUI_FLOW.md](GUI_FLOW.md)):
+`luseen gui` shows the same work on its canvas ([GUI_FLOW.md](GUI_FLOW.md)):
 
 - A task you work on in your own Claude Code session shows as **Manual**, with its workflow step and your session.
-- Each time your session calls a cclinic MCP tool, a Claude Code hook (`cclinic session-link`) records the session on the change, so the GUI can show its transcript, live and read-only.
+- Each time your session calls a luseen MCP tool, a Claude Code hook (`luseen session-link`) records the session on the change, so the GUI can show its transcript, live and read-only.
 - A waiting gate shows in **Needs you** and in the task panel, where you can answer it.
 
 ---
@@ -193,7 +193,7 @@ You answer a waiting gate in your agent's own prompt, with `cclinic approve` in 
 
 | Skill              | Used in | Job                                                  |
 | ------------------ | ------- | ---------------------------------------------------- |
-| `product-engineer` | Stage 1 | Talks through what to build. `cclinic plan` saves it |
+| `product-engineer` | Stage 1 | Talks through what to build. `luseen plan` saves it  |
 | `create-spec`      | Stage 2 | Writes a new spec                                    |
 | `refine-spec`      | Stage 2 | Updates an existing spec                             |
 | `review-doc`       | Stage 2 | Writes a visual doc of the change, for you to review |

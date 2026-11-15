@@ -148,7 +148,7 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
     if (access.kind === "denied")
       return json(access.status, {
         error:
-          access.status === HTTP_STATUS.unauthorized ? "Open the GUI with the link cclinic gui printed." : "Forbidden.",
+          access.status === HTTP_STATUS.unauthorized ? "Open the GUI with the link luseen gui printed." : "Forbidden.",
       });
     const route = matchRoute(request.method, request.path);
     if (route === undefined) return json(HTTP_STATUS.notFound, NOT_FOUND);
@@ -265,7 +265,7 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
         try {
           result = await answerChange(ports.answers, route.key, await request.readBody());
         } catch (error) {
-          // A workflow state that can't be read is named, with how to fix it, as `cclinic approve` names it.
+          // A workflow state that can't be read is named, with how to fix it, as `luseen approve` names it.
           if (error instanceof UsageError) return json(HTTP_STATUS.conflict, { error: error.message });
           throw error;
         }
@@ -300,7 +300,7 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
           open: (send) => ports.planner.stream(send),
         };
       case "plan-start": {
-        // FR-GUI-023: a value `cclinic plan` would refuse is named in its own words.
+        // FR-GUI-023: a value `luseen plan` would refuse is named in its own words.
         const parsed = planRequestSchema.safeParse(await request.readBody());
         if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
         const plan = parsed.data;

@@ -91,8 +91,8 @@ describe("Claude CLI output", () => {
     expect(run).toThrow(/claude auth login.*anthropic-api.*-p/s);
   });
 
-  it("TC-LLM-050: an invalid model names it and suggests cclinic model", () => {
-    expect(() => interpretOutcome(recorded("invalid-model"), 1, "opus")).toThrow(/Opus 5\.5.*cclinic model/);
+  it("TC-LLM-050: an invalid model names it and suggests luseen model", () => {
+    expect(() => interpretOutcome(recorded("invalid-model"), 1, "opus")).toThrow(/Opus 5\.5.*luseen model/);
   });
 
   it("TC-LLM-051: a reached budget raises BudgetError", () => {

@@ -140,13 +140,13 @@ describe("reading history", () => {
     expect(raw?.commits[0]?.paths).toEqual(["in.ts"]);
   });
 
-  it("TC-GIT-020: commits touching only cclinic's output are left out", async () => {
+  it("TC-GIT-020: commits touching only luseen's output are left out", async () => {
     const environment = isolatedEnvironment();
     const root = repository(environment);
     commitFile(root, "src/a.ts", "project change", environment);
     const projectCommit = git(root, ["rev-parse", "HEAD"], environment).trim();
     writeProject(root, {
-      ".cclinic/sdd/README.md": "x",
+      ".luseen/sdd/README.md": "x",
       ".agents/skills/a/SKILL.md": "x",
       ".claude/skills/a/SKILL.md": "x",
       "AGENTS.md": "x",
@@ -178,7 +178,7 @@ describe("reading history", () => {
     const raw = await history(root, environment);
     const filter = createPathFilter({
       target: root,
-      outFolder: path.join(root, ".cclinic/sdd"),
+      outFolder: path.join(root, ".luseen/sdd"),
       include: [],
       exclude: [],
     });
@@ -286,7 +286,7 @@ describe("pipeline use", () => {
       effort: "medium",
       concurrency: 2,
       noCache: false,
-      cclinicVersion: "1",
+      luseenVersion: "1",
       ...(runHistory === undefined ? {} : { history: runHistory }),
     } as const;
     const scan = {
@@ -362,7 +362,7 @@ describe("pipeline use", () => {
   it("TC-GIT-036: documents don't change when the window does, and hold no commit dates", async () => {
     const root = makeTempFolder();
     await run(root, new FakeLlm(), recent);
-    const out = path.join(root, ".cclinic/sdd");
+    const out = path.join(root, ".luseen/sdd");
     const read = (name: string): string => readFileSync(path.join(out, name), "utf8");
     const names = ["README.md", "overview.md", "stack.md", "architecture.md", "scan-report.md", "open-questions.md"];
     const before = names.map(read);

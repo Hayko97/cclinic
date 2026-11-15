@@ -60,7 +60,7 @@ export interface RunSettings {
   readonly concurrency: number;
   readonly noCache: boolean;
   readonly maxBudgetUsd?: number;
-  readonly cclinicVersion: string;
+  readonly luseenVersion: string;
   readonly history?: HistoryForRun;
 }
 
@@ -499,7 +499,7 @@ function buildManifest(input: {
     .sort();
   const models = accounting.actualModels.size > 0 ? [...accounting.actualModels] : (previous?.actualModels ?? []);
   return {
-    cclinicVersion: settings.cclinicVersion,
+    luseenVersion: settings.luseenVersion,
     promptVersion: PROMPT_VERSION,
     generatedAt: deps.now().toISOString(),
     provider: deps.llm.name,

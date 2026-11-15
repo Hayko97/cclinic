@@ -107,9 +107,9 @@ export async function checkLatestVersion(
   fetcher: (url: string, init: { signal: AbortSignal }) => Promise<{ ok: boolean; json(): Promise<unknown> }> = fetch,
   timeoutMs: number = VERSION_CHECK_TIMEOUT_MS,
 ): Promise<DoctorCheck> {
-  const name = "cclinic version";
+  const name = "luseen version";
   try {
-    const response = await fetcher("https://registry.npmjs.org/cclinic/latest", {
+    const response = await fetcher("https://registry.npmjs.org/luseen/latest", {
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) return { name, state: "skipped", detail: `${current}. Couldn't check for a newer version` };
@@ -119,7 +119,7 @@ export async function checkLatestVersion(
         name,
         state: "passed",
         detail: `${current}. Version ${version} is on npm`,
-        fix: "Run: npm update -g cclinic",
+        fix: "Run: npm update -g luseen",
       };
     }
     return { name, state: "passed", detail: `${current}, which is the latest` };
@@ -128,7 +128,7 @@ export async function checkLatestVersion(
   }
 }
 
-/** Git is optional, so these never make cclinic "not ready" (FR-GIT-003). */
+/** Git is optional, so these never make luseen "not ready" (FR-GIT-003). */
 function gitChecks(status: GitStatus): readonly DoctorCheck[] {
   switch (status.kind) {
     case "not-installed":
@@ -153,7 +153,7 @@ function gitChecks(status: GitStatus): readonly DoctorCheck[] {
           name: "Git repository",
           state: "skipped",
           detail: "none",
-          fix: "Run cclinic to create one, or run: git init",
+          fix: "Run luseen to create one, or run: git init",
         },
       ];
   }
@@ -231,7 +231,7 @@ export async function runDoctor(
   add(
     saved.warnings.length === 0
       ? { name: "Config", state: "passed", detail: configFile(environment) }
-      : { name: "Config", state: "failed", detail: saved.warnings.join(" "), fix: "Run: cclinic model --reset" },
+      : { name: "Config", state: "failed", detail: saved.warnings.join(" "), fix: "Run: luseen model --reset" },
   );
 
   const target = path.resolve(given ?? process.cwd());
@@ -250,7 +250,7 @@ export async function runDoctor(
   add(
     (await hasInstalledSkills(target))
       ? { name: "Agent skills", state: "passed", detail: "installed" }
-      : { name: "Agent skills", state: "skipped", detail: "not installed", fix: "Run: cclinic skills" },
+      : { name: "Agent skills", state: "skipped", detail: "not installed", fix: "Run: luseen skills" },
   );
   for (const check of gitChecks(await detectGit(target, { environment }))) add(check);
   add(await checkLatestVersion(version));
@@ -264,7 +264,7 @@ export async function runDoctor(
       `${symbols[check.state]} ${check.name}: ${check.detail}`,
       ...(check.fix === undefined ? [] : [`     ${check.fix}`]),
     ]);
-    reporter.result([...lines, "", isReady ? "cclinic is ready to run." : "cclinic isn't ready yet."].join("\n"));
+    reporter.result([...lines, "", isReady ? "luseen is ready to run." : "luseen isn't ready yet."].join("\n"));
   }
   return isReady ? EXIT_CODES.success : EXIT_CODES.noProvider;
 }

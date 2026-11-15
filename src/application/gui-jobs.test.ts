@@ -54,7 +54,7 @@ describe("GUI jobs", () => {
     const { jobs, started } = setup([child]);
     const job = jobs.start({ command: "doctor" });
     expect(started[0]).toEqual(["doctor", "--json"]);
-    expect(job).toMatchObject({ id: "job-1", command: "cclinic doctor --json", isRunning: true, endedAt: null });
+    expect(job).toMatchObject({ id: "job-1", command: "luseen doctor --json", isRunning: true, endedAt: null });
     child.write("stdout", "ready\npart");
     child.write("stderr", "warning\n");
     child.exit(0);
@@ -131,7 +131,7 @@ describe("GUI jobs", () => {
     const { jobs } = setup([generate, fakeProcess()]);
     jobs.start({ command: "generate", confirmed: true, options: { include: [], exclude: [] } as never });
     for (const command of ["clean", "skills"] as const)
-      expect(() => jobs.start({ command } as never)).toThrow(/while cclinic --json --yes \(job-1\) is running/);
+      expect(() => jobs.start({ command } as never)).toThrow(/while luseen --json --yes \(job-1\) is running/);
     expect(jobs.start({ command: "doctor" }).id).toBe("job-2");
     generate.exit(0);
     expect(() => jobs.start({ command: "clean" })).toThrow("no process left");

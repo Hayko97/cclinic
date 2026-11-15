@@ -1,4 +1,4 @@
-/** Starts `cclinic gui` in-process for a test, and sends it raw requests. */
+/** Starts `luseen gui` in-process for a test, and sends it raw requests. */
 import { request as httpRequest } from "node:http";
 import { vi } from "vitest";
 import { runGuiCommand, type GuiDependencies, type GuiOptions } from "../../src/cli/gui-command.js";
@@ -64,7 +64,7 @@ export function sendTo(gui: TestGui, method: string, requestPath: string, body?:
         path: requestPath,
         headers: {
           host: `127.0.0.1:${gui.port}`,
-          "x-cclinic-token": gui.token,
+          "x-luseen-token": gui.token,
           ...(text === undefined ? {} : { "content-type": "application/json" }),
         },
       },
@@ -90,7 +90,7 @@ export function openStream(gui: TestGui, requestPath: string) {
     host: "127.0.0.1",
     port: gui.port,
     path: requestPath,
-    headers: { host: `127.0.0.1:${gui.port}`, "x-cclinic-token": gui.token },
+    headers: { host: `127.0.0.1:${gui.port}`, "x-luseen-token": gui.token },
   });
   outgoing.on("response", (response) => {
     response.setEncoding("utf8");

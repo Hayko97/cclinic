@@ -38,7 +38,7 @@ import { redact } from "../core/redaction.js";
 export interface CanvasPorts {
   readonly readSources: () => Promise<CanvasSources>;
   readonly readLayout: () => Promise<Layout | undefined>;
-  /** Whether `cclinic` has generated the project's documents yet (FR-GUI-053). */
+  /** Whether `luseen` has generated the project's documents yet (FR-GUI-053). */
   readonly hasDocuments: () => boolean;
   /** Saves what `change` makes of the saved layout, one change at a time, so none is lost to another. */
   readonly updateLayout: (change: (saved: Layout | undefined) => Layout) => Promise<void>;
@@ -48,7 +48,7 @@ export interface CanvasPorts {
   readonly readTranscript: (file: string, from: TranscriptPosition | undefined) => Promise<TranscriptLines>;
   /** FR-GUI-057: the whole lines at a transcript's end, and when it was last written to. */
   readonly readTranscriptTail: (file: string) => Promise<{ readonly lines: string[]; readonly modifiedAt: Date }>;
-  /** FR-GUI-083: the newest Claude plan limits cclinic saved, or null when none are known. */
+  /** FR-GUI-083: the newest Claude plan limits luseen saved, or null when none are known. */
   readonly readLimits: () => Promise<PlanLimits | null>;
   readonly now: () => Date;
   /** Runs `run` every `ms`, and returns what stops it. `run` resolves once its check is done. */

@@ -65,8 +65,8 @@ const says = (message: string, extra: Omit<FakeClaudeRule, "message"> = {}): Fak
 
 function project(): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   store?.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
     milestones: [{ title: "One", goal: "", tasks: [planned("x")] }],
@@ -76,7 +76,7 @@ function project(): string {
 }
 
 function roadmapTitles(root: string): string[] {
-  const store = openTaskStore(path.join(root, ".cclinic"), "read");
+  const store = openTaskStore(path.join(root, ".luseen"), "read");
   try {
     return store?.listRoadmaps().map((item) => item.title) ?? [];
   } finally {
@@ -153,7 +153,7 @@ describe("QA: terminal attachments and messages", () => {
       const [session] = await sessions(root);
       expect(session?.status).toBe("open");
       expect(session?.attachments).toHaveLength(28);
-      const copies = readdirSync(path.join(root, ".cclinic/plans", session?.id ?? "", "attachments"));
+      const copies = readdirSync(path.join(root, ".luseen/plans", session?.id ?? "", "attachments"));
       expect(copies).toHaveLength(28);
     },
     SLOW,
@@ -211,21 +211,21 @@ describe("QA: files outside the scan", () => {
       cwd: root,
       encoding: "utf8",
     });
-    expect(status).not.toContain(".cclinic/plans");
+    expect(status).not.toContain(".luseen/plans");
     const dry = execFileSync(
       process.execPath,
-      [path.join(REPO, "bin/cclinic.js"), "--dry-run", "--json", "--model", "sonnet", "--effort", "low", root],
-      { encoding: "utf8", env: { ...process.env, CCLINIC_PROVIDER: "claude-cli" } },
+      [path.join(REPO, "bin/luseen.js"), "--dry-run", "--json", "--model", "sonnet", "--effort", "low", root],
+      { encoding: "utf8", env: { ...process.env, LUSEEN_PROVIDER: "claude-cli" } },
     );
     const result = JSON.parse(dry.slice(dry.indexOf("{"))) as { included: { path: string }[] };
     expect(result.included.map((item) => item.path)).toContain("src/app.ts");
-    expect(result.included.some((item) => item.path.startsWith(".cclinic/plans"))).toBe(false);
+    expect(result.included.some((item) => item.path.startsWith(".luseen/plans"))).toBe(false);
   });
 });
 
 describe("QA: sessions moving between places", () => {
   it(
-    "TC-PLAN-067: a session begun in Claude Code is listed and continued by cclinic plan with its Claude session, once Claude Code lets go",
+    "TC-PLAN-067: a session begun in Claude Code is listed and continued by luseen plan with its Claude session, once Claude Code lets go",
     async () => {
       const root = project();
       const { client, call } = await host(root);
@@ -240,7 +240,7 @@ describe("QA: sessions moving between places", () => {
       await hook(root, {
         session_id: "s-cc",
         transcript_path: transcript,
-        tool_name: "mcp__cclinic__plan_begin",
+        tool_name: "mcp__luseen__plan_begin",
         tool_input: {},
         tool_response: [{ type: "text", text: JSON.stringify({ planId }) }],
       });
@@ -281,11 +281,11 @@ describe("QA: sessions moving between places", () => {
     await hook(root, {
       session_id: "s1",
       transcript_path: "/t/s1.jsonl",
-      tool_name: "mcp__cclinic__plan_begin",
+      tool_name: "mcp__luseen__plan_begin",
       tool_input: {},
       tool_response: [{ type: "text", text: JSON.stringify({ planId }) }],
     });
-    await hook(root, { session_id: "s2", transcript_path: "/t/s2.jsonl", tool_name: "mcp__cclinic__workflow_status" });
+    await hook(root, { session_id: "s2", transcript_path: "/t/s2.jsonl", tool_name: "mcp__luseen__workflow_status" });
     expect(await openPlanStore(root).read(planId)).toMatchObject({
       claudeSessionId: "s1",
       transcriptPath: "/t/s1.jsonl",
@@ -296,7 +296,7 @@ describe("QA: sessions moving between places", () => {
 });
 
 describe("QA: approving while another place holds the session", () => {
-  it("FR-PLAN-013 (QA): two approvals at once, as from Needs you and cclinic approve, save the roadmap once", async () => {
+  it("FR-PLAN-013 (QA): two approvals at once, as from Needs you and luseen approve, save the roadmap once", async () => {
     const root = project();
     const { call } = await host(root);
     const planId = String((await call("plan_begin", { target: { kind: "new-roadmap" }, request: "x" }))["planId"]);
@@ -489,7 +489,7 @@ describe("QA run 2: fixes from run 1, and what's around them", () => {
       await plan(root, harness, { resume: session.id });
       expect(harness.output.out).toContain("Cancelled. Nothing was saved.");
       expect((await openPlanStore(root).read(session.id))?.status).toBe("cancelled");
-      expect(existsSync(path.join(root, ".cclinic/plans", session.id, "attachments"))).toBe(false);
+      expect(existsSync(path.join(root, ".luseen/plans", session.id, "attachments"))).toBe(false);
       expect(harness.calls()).toHaveLength(0);
       expect(roadmapTitles(root)).toEqual(["Launch"]);
     },
@@ -606,7 +606,7 @@ describe("QA run 2: fixes from run 1, and what's around them", () => {
     await hook(root, {
       session_id: "s-other",
       transcript_path: "/t/s-other.jsonl",
-      tool_name: "mcp__cclinic__plan_resume",
+      tool_name: "mcp__luseen__plan_resume",
       tool_input: { planId: session.id },
       tool_response: [{ type: "text", text: JSON.stringify(refused) }],
     });
@@ -671,7 +671,7 @@ describe("QA run 2: Cancel session in the browser", () => {
 });
 
 describe("QA run 3: TC-PLAN-069 to TC-PLAN-071, and fixes from run 2", () => {
-  /** A process that runs until killed, standing in for a live `cclinic plan` in another terminal. */
+  /** A process that runs until killed, standing in for a live `luseen plan` in another terminal. */
   function liveTerminal(): { pid: number; stop: () => void } {
     const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
     return { pid: child.pid ?? 0, stop: () => child.kill("SIGKILL") };
@@ -1019,7 +1019,7 @@ describe("QA run 3: TC-PLAN-069 to TC-PLAN-071, and fixes from run 2", () => {
     await hook(root, {
       session_id: "s-begin",
       transcript_path: "/t/s-begin.jsonl",
-      tool_name: "mcp__cclinic__plan_begin",
+      tool_name: "mcp__luseen__plan_begin",
       tool_response: [{ type: "text", text: JSON.stringify(begin) }],
     });
     // A refused plan_resume naming the session in its text, and a plan_status reply carrying planId, link nothing.
@@ -1027,21 +1027,21 @@ describe("QA run 3: TC-PLAN-069 to TC-PLAN-071, and fixes from run 2", () => {
     await hook(root, {
       session_id: "s-refused",
       transcript_path: "/t/s-refused.jsonl",
-      tool_name: "mcp__cclinic__plan_resume",
+      tool_name: "mcp__luseen__plan_resume",
       tool_input: { planId },
       tool_response: [{ type: "text", text: JSON.stringify(refusal) }],
     });
     await hook(root, {
       session_id: "s-status",
       transcript_path: "/t/s-status.jsonl",
-      tool_name: "mcp__cclinic__plan_status",
+      tool_name: "mcp__luseen__plan_status",
       tool_input: { planId },
       tool_response: [{ type: "text", text: JSON.stringify({ status: "ok", planId }) }],
     });
     await hook(root, {
       session_id: "s-input-only",
       transcript_path: "/t/s-input-only.jsonl",
-      tool_name: "mcp__cclinic__plan_resume",
+      tool_name: "mcp__luseen__plan_resume",
       tool_input: { planId },
     });
     expect(await openPlanStore(root).read(planId)).toMatchObject({

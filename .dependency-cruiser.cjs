@@ -1,4 +1,4 @@
-/** Enforces the import rules in .cclinic/sdd/architecture.md. */
+/** Enforces the import rules in .luseen/sdd/architecture.md. */
 module.exports = {
   forbidden: [
     {

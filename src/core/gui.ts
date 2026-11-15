@@ -350,7 +350,7 @@ export const generateOptionsSchema = z.strictObject({
   maxRetries: limit("--max-retries <n>", LIMITS.maxRetries),
 });
 
-/** FR-GUI-017: `cclinic environment`'s options. */
+/** FR-GUI-017: `luseen environment`'s options. */
 export const environmentOptionsSchema = z.strictObject({
   model: modelValueSchema.optional(),
   effort: effortValueSchema.optional(),
@@ -359,7 +359,7 @@ export const environmentOptionsSchema = z.strictObject({
   allowBroadTarget: z.boolean().default(false),
 });
 
-/** FR-GUI-023, FR-PLAN-035: the model, reasoning and time limit a session's PM turns use, as `cclinic plan` takes them. */
+/** FR-GUI-023, FR-PLAN-035: the model, reasoning and time limit a session's PM turns use, as `luseen plan` takes them. */
 const planOptionsShape = {
   model: modelValueSchema.optional(),
   effort: effortValueSchema.optional(),
@@ -424,7 +424,7 @@ export const planUploadCheckSchema = z.strictObject({
   sizeBytes: z.number().int().nonnegative(),
 });
 
-/** FR-GUI-027: `cclinic auto`'s options, checked with the CLI's own limits. */
+/** FR-GUI-027: `luseen auto`'s options, checked with the CLI's own limits. */
 export const autoOptionsSchema = z.strictObject({
   roadmap: idSchema,
   developers: limit("--developers <n>", AUTO_LIMITS.developers),
@@ -434,7 +434,7 @@ export const autoOptionsSchema = z.strictObject({
 });
 export type AutoOptions = z.output<typeof autoOptionsSchema>;
 
-/** FR-AUTO-040: what `cclinic auto --dry-run --json` prints. */
+/** FR-AUTO-040: what `luseen auto --dry-run --json` prints. */
 export const autoPlanSchema = z.object({
   status: z.literal("plan"),
   roadmapId: z.number(),
@@ -487,7 +487,7 @@ export const jobRequestSchema = z.discriminatedUnion("command", [
   // FR-GUI-027: unconfirmed, the GUI answers with the plan from a dry run; confirmed, the run starts with --yes.
   z.strictObject({ command: z.literal("auto"), confirmed: z.boolean().default(false), options: autoOptionsSchema }),
   z.strictObject({ command: z.literal("auto-preview"), options: autoOptionsSchema }),
-  // FR-GUI-020: every `cclinic tasks` change. Creating a roadmap or milestone isn't one (FR-GUI-021).
+  // FR-GUI-020: every `luseen tasks` change. Creating a roadmap or milestone isn't one (FR-GUI-021).
   z.strictObject({
     command: z.literal("tasks-add"),
     title: titleSchema,
@@ -540,7 +540,7 @@ function generateArgs(options: GenerateOptions): string[] {
 
 const TASKS_PREFIX = "tasks-";
 
-/** FR-GUI-013, FR-GUI-033: the arguments of the `cclinic` child process, run in the project's folder. */
+/** FR-GUI-013, FR-GUI-033: the arguments of the `luseen` child process, run in the project's folder. */
 export function jobArgs(request: JobRequest): string[] {
   switch (request.command) {
     case "doctor":
@@ -591,7 +591,7 @@ export function jobArgs(request: JobRequest): string[] {
 
 /** How a job is shown: the command a user would type, with values quoted where needed. */
 export function describeJob(args: readonly string[]): string {
-  return ["cclinic", ...args.map((arg) => (/^[\w./=:@-]+$/.test(arg) ? arg : JSON.stringify(arg)))].join(" ");
+  return ["luseen", ...args.map((arg) => (/^[\w./=:@-]+$/.test(arg) ? arg : JSON.stringify(arg)))].join(" ");
 }
 
 /** FR-GUI-035: commands that change the same files, of which only one may run. Others, such as doctor, may run side by side. */
@@ -662,12 +662,12 @@ export interface PlanChatItem {
   readonly toolUseId: string | null;
   /** For a tool result, or a call with input the tool refuses: the call was refused (FR-PLAN-007). */
   readonly isError: boolean;
-  /** For cclinic's request to answer a message again: that message, as the conversation shows it (FR-PLAN-014). */
+  /** For luseen's request to answer a message again: that message, as the conversation shows it (FR-PLAN-014). */
   readonly repeats?: PlanChatItem | null;
   readonly at: string | null;
 }
 
-/** What the panel shows for cclinic's request to answer the last message again. */
+/** What the panel shows for luseen's request to answer the last message again. */
 export const ANSWER_LAST_NOTE = "Asked the PM to answer your last message.";
 
 /** How `buildUserMessage` lists a message's files (FR-PLAN-006). */

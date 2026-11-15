@@ -1,5 +1,5 @@
 /**
- * The MCP server's planning tools, for a PM in Claude Code or in a turn cclinic drives (roadmap-planning
+ * The MCP server's planning tools, for a PM in Claude Code or in a turn luseen drives (roadmap-planning
  * FR-PLAN-007, FR-PLAN-009, FR-PLAN-044 to FR-PLAN-046; mcp-server FR-MCP-007, FR-MCP-046).
  */
 import { PLAN_DRIVEN_TOOL_NAMES } from "../core/constants/agents.js";
@@ -30,7 +30,7 @@ import type { UserReply, WorkflowTool } from "./workflow-tools.js";
 export interface PlanToolPorts extends DecisionPorts {
   /**
    * `host`: a Claude Code session's own server, which begins and resumes sessions and asks the user about
-   * proposals. `driven`: the server of one session a cclinic process drives, which shows proposals itself.
+   * proposals. `driven`: the server of one session a luseen process drives, which shows proposals itself.
    */
   readonly mode: { readonly kind: "host" } | { readonly kind: "driven"; readonly planId: string };
   /** This server's process, as the holder of the sessions it begins or resumes. */
@@ -76,7 +76,7 @@ export function createPlanTools(ports: PlanToolPorts): readonly WorkflowTool[] {
       specsListPath: ports.specsListPath,
     });
 
-  /** FR-PLAN-045: asks the user about an accepted proposal, or leaves it waiting for the GUI or `cclinic approve`. */
+  /** FR-PLAN-045: asks the user about an accepted proposal, or leaves it waiting for the GUI or `luseen approve`. */
   const decide = async (session: PlanSession): Promise<Reply> => {
     if (session.proposal === null) return refused("No proposal is waiting.");
     const asked = await ports.askUser({
@@ -86,7 +86,7 @@ export function createPlanTools(ports: PlanToolPorts): readonly WorkflowTool[] {
     if (asked.kind === "unsupported") {
       return reply(
         "waiting-for-approval",
-        'The proposal is saved as waiting. Ask the user to approve or cancel it in the GUI\'s Needs you, or by running "cclinic approve" in their own terminal. Never run it yourself.',
+        'The proposal is saved as waiting. Ask the user to approve or cancel it in the GUI\'s Needs you, or by running "luseen approve" in their own terminal. Never run it yourself.',
       );
     }
     if (asked.kind === "declined" || asked.answer === "keep chatting") {
@@ -194,7 +194,7 @@ export function createPlanTools(ports: PlanToolPorts): readonly WorkflowTool[] {
     {
       name: "plan_propose",
       description:
-        "Proposes the roadmap or the task. cclinic checks it: if it returns problems, fix them and call it again. Only an accepted proposal is shown to the user, who approves, cancels or keeps chatting.",
+        "Proposes the roadmap or the task. luseen checks it: if it returns problems, fix them and call it again. Only an accepted proposal is shown to the user, who approves, cancels or keeps chatting.",
       inputSchema: planProposeInputSchema,
       run: async (input) => {
         const { planId, proposal } = planProposeInputSchema.parse(input);

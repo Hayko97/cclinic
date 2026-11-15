@@ -32,8 +32,8 @@ afterEach(async () => {
 /** Roadmap 1 "Payments" with tasks 1 to 4 (task 4 "Card form"), and task 2's change with one session. */
 async function project(home: string): Promise<string> {
   const root = makeTempFolder();
-  mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Payments", goal: "Card checkout" },
@@ -145,7 +145,7 @@ describe("GUI polish", () => {
     await page.locator("#view-jobs:not([hidden])").waitFor();
     jobs.end("doctor", 0);
     await page.clock.runFor(2_000);
-    await expect.poll(() => notice.textContent()).toContain("cclinic doctor --json");
+    await expect.poll(() => notice.textContent()).toContain("luseen doctor --json");
     expect(await notice.locator("button", { hasText: "Show output" }).count()).toBe(1);
     await page.clock.runFor(6_500);
     await expect.poll(() => notice.textContent()).toBe("");
@@ -158,7 +158,7 @@ describe("GUI polish", () => {
     await page.clock.runFor(2_000);
     await expect.poll(() => notice.getAttribute("class")).toContain("error");
     await page.clock.runFor(20_000);
-    expect(await notice.textContent()).toContain("cclinic doctor --json");
+    expect(await notice.textContent()).toContain("luseen doctor --json");
     await notice.locator("button", { hasText: "Show output" }).click();
     expect(await page.locator("#view-jobs").isVisible()).toBe(true);
     await notice.locator(".notice-close").click();

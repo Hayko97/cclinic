@@ -35,8 +35,8 @@ afterEach(async () => {
 
 function project(): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
@@ -303,7 +303,7 @@ describe("QA: sources stay with their turn (DEF-9)", () => {
       const { gui, harness } = await startGui(root);
       const sources = [{ title: "One", url: "https://first.example.org/a" }];
       // Claude Code drives the PM through the MCP tools: plan_suggest saved the sources on the record, and no
-      // cclinic turn cleared them before the next message.
+      // luseen turn cleared them before the next message.
       const session = await unheldSession(
         root,
         harness.environment.HOME ?? "",
@@ -313,7 +313,7 @@ describe("QA: sources stay with their turn (DEF-9)", () => {
             {
               type: "tool_use",
               id: "s1",
-              name: "mcp__cclinic__plan_suggest",
+              name: "mcp__luseen__plan_suggest",
               input: { suggestions: ["Yes"], sources },
             },
           ]),
@@ -338,7 +338,7 @@ describe("QA: sources stay with their turn (DEF-9)", () => {
   );
 
   it(
-    "FR-PLAN-037 QA: a cclinic note (Propose now) starts a new turn, so sources given after it show only under its reply",
+    "FR-PLAN-037 QA: a luseen note (Propose now) starts a new turn, so sources given after it show only under its reply",
     async () => {
       const root = project();
       const { gui, harness } = await startGui(root);
@@ -351,7 +351,7 @@ describe("QA: sources stay with their turn (DEF-9)", () => {
           {
             type: "tool_use",
             id: "s2",
-            name: "mcp__cclinic__plan_suggest",
+            name: "mcp__luseen__plan_suggest",
             input: { suggestions: ["Ok"], sources: [{ title: "Two", url: "https://second.example.org/b" }] },
           },
         ]),

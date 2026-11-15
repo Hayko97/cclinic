@@ -1,4 +1,4 @@
-/** Answering a change's waiting question from the GUI, as `cclinic approve` does (spec: gui FR-GUI-038). */
+/** Answering a change's waiting question from the GUI, as `luseen approve` does (spec: gui FR-GUI-038). */
 import { waitingQuestion } from "../core/canvas.js";
 import { answerRequestSchema } from "../core/gui.js";
 import { answerPending, isNotesAnswer, type WorkflowState } from "../core/workflow.js";
@@ -29,7 +29,7 @@ export async function answerChange(ports: AnswerPorts, key: string, body: unknow
     return { status: "invalid", message: notes?.message ?? "That isn't an answer to a question." };
   }
   const { question, answer, notes } = parsed.data;
-  // As `cclinic approve`: only an answer that carries notes keeps them, and empty notes are none.
+  // As `luseen approve`: only an answer that carries notes keeps them, and empty notes are none.
   const kept = isNotesAnswer(answer) ? (notes ?? "").trim() : "";
   return ports.update<AnswerResult>(key, (latest) => {
     if (latest === undefined) return { value: { status: "unknown" } };

@@ -52,8 +52,8 @@ afterEach(async () => {
 
 function project(): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
@@ -78,8 +78,8 @@ const proposal: RoadmapProposal = {
 };
 
 function roadmapTitles(root: string): string[] {
-  if (!existsSync(tasksDatabaseFile(path.join(root, ".cclinic")))) return [];
-  const store = openTaskStore(path.join(root, ".cclinic"), "read");
+  if (!existsSync(tasksDatabaseFile(path.join(root, ".luseen")))) return [];
+  const store = openTaskStore(path.join(root, ".luseen"), "read");
   const titles = store?.listRoadmaps().map((item) => item.title) ?? [];
   store?.close();
   return titles;
@@ -211,7 +211,7 @@ describe("QA run 7: TC-PLAN-072 in the terminal", () => {
         await planInTerminal(root, last, "plan-1");
         expect(last.calls()[0]?.prompt).toBe(expected);
         expect(last.output.err).toContain("PM › Patients, noted.");
-        // The history shown on resume has the user's message once, as theirs, and never cclinic's own request.
+        // The history shown on resume has the user's message once, as theirs, and never luseen's own request.
         const history = last.output.err;
         expect(history.split("You › Patients").length - 1, history).toBe(1);
         expect(history).not.toContain("You › Your last turn was stopped");

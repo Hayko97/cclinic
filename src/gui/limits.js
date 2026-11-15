@@ -1,4 +1,4 @@
-// FR-GUI-083: the top bar mirrors the Claude plan's usage limits, as cclinic last read them. No dollars.
+// FR-GUI-083: the top bar mirrors the Claude plan's usage limits, as luseen last read them. No dollars.
 import { element, when } from "./api.js";
 
 const PERCENT = 100;

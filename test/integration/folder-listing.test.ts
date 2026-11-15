@@ -38,7 +38,7 @@ describe("listing folders that may not exist (C1 review follow-up)", () => {
 
   it("TC-GUI-014: the workflow store reports an unreadable folder as a problem, which the canvas shows", async () => {
     const root = makeTempFolder();
-    lockedFolder(path.join(root, ".cclinic/workflow"));
+    lockedFolder(path.join(root, ".luseen/workflow"));
     const { states, problems } = await openWorkflowStore(root).listReadable();
     expect(states).toEqual([]);
     expect(problems).toHaveLength(1);
@@ -54,7 +54,7 @@ describe("a run whose sessions folder can't be read", () => {
       runId,
       roadmapId: 1,
       roadmapTitle: "Roadmap 1",
-      runBranch: `cclinic/auto/${runId}/run`,
+      runBranch: `luseen/auto/${runId}/run`,
       startedAt: "2026-11-11T11:00:00.000Z",
       finishedAt: "2026-11-11T11:30:00.000Z",
       outcome: "completed",

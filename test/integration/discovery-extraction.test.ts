@@ -11,7 +11,7 @@ import { makeDocx, makePdf, makeTempFolder, writeProject } from "../support/help
 function options(target: string, overrides: Partial<ScanOptions> = {}): ScanOptions {
   return {
     target,
-    outFolder: path.join(target, ".cclinic", "sdd"),
+    outFolder: path.join(target, ".luseen", "sdd"),
     include: [],
     exclude: [],
     maxFileSizeMib: 1,
@@ -77,7 +77,7 @@ const SECRET_FILES = [
 describe("file discovery", () => {
   it("TC-DISC-003: --include can't expose secrets or tool folders", async () => {
     const root = makeTempFolder();
-    writeProject(root, { ".env": "x", ".git/config": "x", ".cclinic/x": "x", "a.ts": "a" });
+    writeProject(root, { ".env": "x", ".git/config": "x", ".luseen/x": "x", "a.ts": "a" });
     expect(await includedPaths(root, { include: ["**"] })).toEqual(["a.ts"]);
   });
 
@@ -103,10 +103,10 @@ describe("file discovery", () => {
     expect(await includedPaths(root)).toEqual([".gitignore", "b.ts", "sub/.gitignore", "sub/e.ts", "sub/keep.log"]);
   });
 
-  it("TC-DISC-006: .cclinicignore is honoured", async () => {
+  it("TC-DISC-006: .luseenignore is honoured", async () => {
     const root = makeTempFolder();
-    writeProject(root, { ".cclinicignore": "drafts/\n", "drafts/a.ts": "a", "b.ts": "b" });
-    expect(await includedPaths(root)).toEqual([".cclinicignore", "b.ts"]);
+    writeProject(root, { ".luseenignore": "drafts/\n", "drafts/a.ts": "a", "b.ts": "b" });
+    expect(await includedPaths(root)).toEqual([".luseenignore", "b.ts"]);
   });
 
   it("TC-DISC-007: every dependency folder is skipped at any depth", async () => {

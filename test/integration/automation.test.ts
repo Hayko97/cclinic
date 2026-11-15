@@ -1,4 +1,4 @@
-/** `cclinic auto` in-process, on real Git repositories, with a scripted fake `claude`. */
+/** `luseen auto` in-process, on real Git repositories, with a scripted fake `claude`. */
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -39,7 +39,7 @@ function repository(files: Record<string, string> = {}): string {
   writeProject(root, {
     "README.md": "# App\n",
     "src/shared.txt": "base\n",
-    ".cclinic/sdd/README.md": "# Specs\n",
+    ".luseen/sdd/README.md": "# Specs\n",
     ...Object.fromEntries(AUTO_REQUIRED_SKILLS.map((skill) => [`.claude/skills/${skill}/SKILL.md`, `# ${skill}\n`])),
     ...files,
   });
@@ -52,7 +52,7 @@ function repository(files: Record<string, string> = {}): string {
 }
 
 function openStore(root: string): TaskStore {
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   return store;
 }
@@ -88,7 +88,7 @@ function happyRules(taskIds: readonly number[], overrides: FakeClaudeRule[] = []
       {
         match: `developer agent.*Task #${id}:.*## Stage: spec`,
         times: 0,
-        write: { [`.cclinic/sdd/specs/t${id}.md`]: `# t${id}\n` },
+        write: { [`.luseen/sdd/specs/t${id}.md`]: `# t${id}\n` },
       },
       {
         match: `developer agent.*Task #${id}:.*## Stage: (implement|fix)`,
@@ -123,12 +123,12 @@ async function auto(root: string, harness: ReturnType<typeof agentHarness>, opti
 }
 
 function runFolderOf(root: string): string {
-  const folder = path.join(root, ".cclinic/auto");
+  const folder = path.join(root, ".luseen/auto");
   const [runId] = readdirSync(folder).filter((name) => name !== ".lock");
   return path.join(folder, runId ?? "");
 }
 
-describe("cclinic auto on a real repository", () => {
+describe("luseen auto on a real repository", () => {
   it("TC-AUTO-001: the whole roadmap runs; done, other-roadmap and unplanned tasks don't; in-progress ones are left alone", async () => {
     const root = repository();
     savePlan(root, {
@@ -168,10 +168,10 @@ describe("cclinic auto on a real repository", () => {
     const harness = agentHarness({ rules: happyRules([1, 2]) });
     expect(await auto(root, harness)).toBe(0);
     const runId = path.basename(runFolderOf(root));
-    const runBranch = `cclinic/auto/${runId}/run`;
+    const runBranch = `luseen/auto/${runId}/run`;
     expect(git(root, "merge-base", runBranch, "main")).toBe(start);
     for (const id of [1, 2]) {
-      const branch = `cclinic/auto/${runId}/task-${id}`;
+      const branch = `luseen/auto/${runId}/task-${id}`;
       expect(git(root, "log", "-1", "--format=%B", branch)).toBe(
         `#${id} Task ${String.fromCharCode(96 + id)}\n\nRequirements: FR-CORE-001`,
       );
@@ -183,7 +183,7 @@ describe("cclinic auto on a real repository", () => {
     for (const call of harness.calls()) {
       const id = /Task #(\d+):/.exec(call.prompt)?.[1];
       expect(path.basename(call.cwd)).toBe(`task-${id}`);
-      expect(call.cwd).toContain(path.join(".cclinic/auto", runId, "worktrees"));
+      expect(call.cwd).toContain(path.join(".luseen/auto", runId, "worktrees"));
     }
     expect(readFileSync(path.join(root, "notes.txt"), "utf8")).toBe("mine\n");
     expect(git(root, "log", "--all", "--name-only", "--format=")).not.toContain("notes.txt");
@@ -208,7 +208,7 @@ describe("cclinic auto on a real repository", () => {
     expect(git(root, "status", "--porcelain")).toBe(before.status);
     expect(git(remote, "for-each-ref")).toBe("");
     const branches = git(root, "branch", "--format=%(refname:short)").split("\n");
-    expect(branches.filter((branch) => branch !== "main").every((branch) => branch.startsWith("cclinic/auto/"))).toBe(
+    expect(branches.filter((branch) => branch !== "main").every((branch) => branch.startsWith("luseen/auto/"))).toBe(
       true,
     );
   });
@@ -216,14 +216,14 @@ describe("cclinic auto on a real repository", () => {
   it("TC-AUTO-050: a committed tasks.db doesn't stop the next run, and is the only tracked change", async () => {
     const root = repository();
     roadmap(root, planned("a"), planned("b"));
-    git(root, "add", "-f", ".cclinic/tasks.db");
+    git(root, "add", "-f", ".luseen/tasks.db");
     git(root, "commit", "-q", "-m", "share the roadmap");
     expect(await auto(root, agentHarness({ rules: happyRules([1]) }), { developers: 1 })).not.toBe(2);
     const store = openStore(root);
     store.setStatus(2, "open");
     store.close();
     expect(await auto(root, agentHarness({ rules: happyRules([2]) }))).toBe(0);
-    expect(git(root, "status", "--porcelain", "--untracked-files=no")).toBe("M .cclinic/tasks.db");
+    expect(git(root, "status", "--porcelain", "--untracked-files=no")).toBe("M .luseen/tasks.db");
   });
 
   it("TC-AUTO-009: a dependent task's branch starts from the run branch with its dependency merged", async () => {
@@ -231,7 +231,7 @@ describe("cclinic auto on a real repository", () => {
     roadmap(root, planned("a"), planned("b", ["a"]));
     expect(await auto(root, agentHarness({ rules: happyRules([1, 2]) }))).toBe(0);
     const runId = path.basename(runFolderOf(root));
-    expect(git(root, "show", `cclinic/auto/${runId}/task-2:src/t1.txt`)).toBe("task 1");
+    expect(git(root, "show", `luseen/auto/${runId}/task-2:src/t1.txt`)).toBe("task 1");
   });
 
   it("TC-AUTO-010: a task whose dependency is already done starts at once", async () => {
@@ -262,7 +262,7 @@ describe("cclinic auto on a real repository", () => {
     };
     expect(state.tasks.map((item) => item.status).sort()).toEqual(["blocked", "done"]);
     expect(state.tasks.find((item) => item.status === "blocked")?.reason).toContain("src/shared.txt");
-    const runBranch = `cclinic/auto/${path.basename(runFolderOf(root))}/run`;
+    const runBranch = `luseen/auto/${path.basename(runFolderOf(root))}/run`;
     expect(git(root, "show", `${runBranch}:src/shared.txt`)).not.toContain("<<<<<<<");
   });
 
@@ -277,7 +277,7 @@ describe("cclinic auto on a real repository", () => {
     expect(await auto(root, agentHarness({ rules: happyRules([1, 2], [failingQa]) }))).toBe(1);
     expect(git(root, "worktree", "list").split("\n")).toHaveLength(1);
     const firstRun = path.basename(runFolderOf(root));
-    const blocked = `cclinic/auto/${firstRun}/task-2`;
+    const blocked = `luseen/auto/${firstRun}/task-2`;
     expect(git(root, "log", "-1", "--format=%s", blocked)).toContain("WIP");
     const oldTip = git(root, "rev-parse", blocked);
     const store = openStore(root);
@@ -285,8 +285,8 @@ describe("cclinic auto on a real repository", () => {
     store.close();
     const harness = agentHarness({ rules: happyRules([2]) });
     expect(await auto(root, harness)).toBe(0);
-    const runs = readdirSync(path.join(root, ".cclinic/auto")).filter((name) => name !== ".lock" && name !== firstRun);
-    expect(git(root, "rev-parse", "--verify", `cclinic/auto/${runs[0]}/task-2`)).not.toBe("");
+    const runs = readdirSync(path.join(root, ".luseen/auto")).filter((name) => name !== ".lock" && name !== firstRun);
+    expect(git(root, "rev-parse", "--verify", `luseen/auto/${runs[0]}/task-2`)).not.toBe("");
     expect(git(root, "rev-parse", blocked)).toBe(oldTip);
   });
 
@@ -425,7 +425,7 @@ describe("cclinic auto on a real repository", () => {
       expect(readFileSync(path.join(folder, file), "utf8"), file).not.toContain("sk-ant-api03-abcdefghijklmnop");
     }
     const report = readFileSync(path.join(folder, "report.md"), "utf8");
-    for (const part of ["Roadmap: #1 Launch", "Outcome: completed", "git merge cclinic/auto/"])
+    for (const part of ["Roadmap: #1 Launch", "Outcome: completed", "git merge luseen/auto/"])
       expect(report).toContain(part);
   });
 
@@ -439,7 +439,7 @@ describe("cclinic auto on a real repository", () => {
     expect(result).toMatchObject({ status: "plan", roadmapId: 1, runnable: [1, 2], blocked: [] });
     expect(result["plan"]).toContain("Roadmap #1: Launch");
     expect(harness.calls()).toEqual([]);
-    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/auto"))).toBe(false);
     expect(git(root, "branch", "--list")).toBe(branchesBefore);
   });
 
@@ -454,11 +454,11 @@ describe("cclinic auto on a real repository", () => {
 
     const locked = repository();
     roadmap(locked, planned("a"));
-    writeProject(locked, { ".cclinic/auto/.lock": JSON.stringify({ pid: process.pid, runId: "20261112-100000" }) });
+    writeProject(locked, { ".luseen/auto/.lock": JSON.stringify({ pid: process.pid, runId: "20261112-100000" }) });
     const refused = await auto(locked, agentHarness(), { dryRun: true }).catch((caught: unknown) => caught);
     expect(refused).toBeInstanceOf(UsageError);
     expect((refused as Error).message).toContain("Automated run 20261112-100000");
-    expect(readdirSync(path.join(locked, ".cclinic/auto"))).toEqual([".lock"]);
+    expect(readdirSync(path.join(locked, ".luseen/auto"))).toEqual([".lock"]);
   });
 
   it("TC-AUTO-062: a dry run refuses a model the run would refuse, without opening a menu", async () => {
@@ -468,13 +468,13 @@ describe("cclinic auto on a real repository", () => {
     const run = (dryRun: boolean) =>
       runAutoCommand(
         { dir: root, roadmap: 1, developers: 1, timeoutMinutes: 30, yes: true, dryRun },
-        agentHarness({ env: { CCLINIC_MODEL: "not-a-model" } }).context,
+        agentHarness({ env: { LUSEEN_MODEL: "not-a-model" } }).context,
       ).catch((caught: unknown) => caught);
     const dry = await run(true);
     const real = await run(false);
     expect(dry).toBeInstanceOf(UsageError);
     expect((dry as Error).message).toBe((real as Error).message);
-    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/auto"))).toBe(false);
   });
 
   it("TC-AUTO-063: Claude's plan limits are saved in the user config folder, and a malformed report changes nothing", async () => {
@@ -493,7 +493,7 @@ describe("cclinic auto on a real repository", () => {
     roadmap(root, planned("a"));
     const harness = agentHarness({ rules: happyRules([1]).map((rule) => ({ ...rule, events: [limitEvent] })) });
     expect(await auto(root, harness)).toBe(0);
-    const file = path.join(harness.environment["XDG_CONFIG_HOME"] ?? "", "cclinic", "limits.json");
+    const file = path.join(harness.environment["XDG_CONFIG_HOME"] ?? "", "luseen", "limits.json");
     const saved = readFileSync(file, "utf8");
     expect(JSON.parse(saved)).toMatchObject({
       status: "allowed",
@@ -564,11 +564,11 @@ describe("cclinic auto on a real repository", () => {
   it("TC-AUTO-039: a lock left by a process that has ended is replaced", async () => {
     const root = repository();
     roadmap(root, planned("a"));
-    writeProject(root, { ".cclinic/auto/.lock": JSON.stringify({ pid: 999_999_999, runId: "old" }) });
+    writeProject(root, { ".luseen/auto/.lock": JSON.stringify({ pid: 999_999_999, runId: "old" }) });
     expect(await auto(root, agentHarness({ rules: happyRules([1]) }))).toBe(0);
   });
 
-  it("TC-AUTO-040: cclinic clean keeps run folders", async () => {
+  it("TC-AUTO-040: luseen clean keeps run folders", async () => {
     const root = repository();
     roadmap(root, planned("a"));
     await auto(root, agentHarness({ rules: happyRules([1]) }));
@@ -583,7 +583,7 @@ describe("cclinic auto on a real repository", () => {
     const root = repository();
     roadmap(root, planned("a"), planned("b", ["a"]), planned("c", ["b"]));
     const { DatabaseSync } = await import("node:sqlite");
-    const database = new DatabaseSync(tasksDatabaseFile(path.join(root, ".cclinic")));
+    const database = new DatabaseSync(tasksDatabaseFile(path.join(root, ".luseen")));
     database.exec("INSERT INTO task_dependencies (task_id, depends_on_id) VALUES (1, 3)");
     database.close();
     const harness = agentHarness();
@@ -591,7 +591,7 @@ describe("cclinic auto on a real repository", () => {
     expect(error).toBeInstanceOf(UsageError);
     expect(String(error)).toContain("#1 -> #3 -> #2 -> #1");
     expect(harness.calls()).toEqual([]);
-    expect(existsSync(path.join(root, ".cclinic/auto"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/auto"))).toBe(false);
   });
 
   it("TC-AUTO-006: a task depending on an unfinished task in another roadmap is blocked before the run", async () => {
@@ -618,10 +618,10 @@ describe("cclinic auto on a real repository", () => {
     const harness = agentHarness();
     const error = await auto(root, harness, { yes: false }).catch((caught: unknown) => caught);
     expect(exitCodeFor(error)).toBe(2);
-    for (const part of ["Roadmap #1: Launch", "#2 Task b (after #1)", "Run branch: cclinic/auto/", "Developers: 2"]) {
+    for (const part of ["Roadmap #1: Launch", "#2 Task b (after #1)", "Run branch: luseen/auto/", "Developers: 2"]) {
       expect(harness.output.err, part).toContain(part);
     }
-    expect(git(root, "branch", "--list", "cclinic/*")).toBe("");
+    expect(git(root, "branch", "--list", "luseen/*")).toBe("");
   });
 
   it("TC-AUTO-042: without --roadmap, the menu lists roadmaps and the chosen one runs", async () => {
@@ -658,7 +658,7 @@ describe("notifications", () => {
     return { environment: { PATH: `${bin}:/usr/bin:/bin` }, record };
   }
 
-  const message = { title: "cclinic: Launch", message: "Run completed: 2 done, 0 blocked." };
+  const message = { title: "luseen: Launch", message: "Run completed: 2 done, 0 blocked." };
 
   it("TC-AUTO-034: macOS uses osascript, Linux notify-send, and otherwise the terminal bell", async () => {
     const mac = notifier("osascript");
@@ -680,7 +680,7 @@ describe("notifications", () => {
         writeTerminal: () => undefined,
       }),
     ).toBe("notify-send");
-    expect(readFileSync(linux.record, "utf8")).toContain("cclinic: Launch");
+    expect(readFileSync(linux.record, "utf8")).toContain("luseen: Launch");
     let written = "";
     expect(
       await notifyUser({
@@ -690,7 +690,7 @@ describe("notifications", () => {
         writeTerminal: (text) => (written += text),
       }),
     ).toBe("terminal");
-    expect(written).toBe("\u0007cclinic: Launch: Run completed: 2 done, 0 blocked.\n");
+    expect(written).toBe("\u0007luseen: Launch: Run completed: 2 done, 0 blocked.\n");
   });
 
   it("TC-AUTO-035: a failing notifier falls back to the terminal, without failing", async () => {

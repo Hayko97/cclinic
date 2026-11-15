@@ -15,7 +15,7 @@ const THUMBNAIL_PX = 48;
 const PAGE_ID = [...crypto.getRandomValues(new Uint8Array(12))]
   .map((byte) => byte.toString(16).padStart(2, "0"))
   .join("");
-const PLACE_NAMES = { terminal: "a terminal (cclinic plan)", gui: "this GUI", "claude-code": "Claude Code" };
+const PLACE_NAMES = { terminal: "a terminal (luseen plan)", gui: "this GUI", "claude-code": "Claude Code" };
 
 /**
  * `view` is the panel as the server last sent it; `items` the open session's conversation from its transcript;
@@ -536,7 +536,7 @@ function acceptedSuggestCalls(items) {
 /**
  * FR-PLAN-038: the user's message the PM hasn't answered, from the record, when the conversation doesn't show it yet,
  * so it's shown once, as theirs. Its time is when the turn started: any message of theirs shown since then, written
- * by Claude or repeated by cclinic, is it. With no time, the newest message shown must be it, with no finished reply
+ * by Claude or repeated by luseen, is it. With no time, the newest message shown must be it, with no finished reply
  * after it. The terminal does the same with isWaitingMessageWritten in the core.
  */
 function unansweredShown(open, items) {
@@ -560,7 +560,7 @@ function conversation(open) {
   const accepted = acceptedSuggestCalls(items);
   let turnIndex = 0;
   const turnOf = items.map((item) => {
-    // Every message sent to the PM, the user's or cclinic's own, starts a turn.
+    // Every message sent to the PM, the user's or luseen's own, starts a turn.
     if (item.kind === "user" || item.kind === "note") turnIndex += 1;
     // Each accepted call replaces the turn's sources, as it replaces them on the server.
     if (accepted.has(item)) sourcesByTurn[turnIndex] = item.sources;

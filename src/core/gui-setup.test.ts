@@ -21,7 +21,7 @@ describe("generate's questions (FR-GUI-016)", () => {
     const questions = generateQuestions(options(), dryRun({ git: { status: "no-repository" } }));
     expect(questions.map((question) => question.id)).toEqual(["cost", "git", "environment"]);
     expect(questions[0]?.text).toBe(
-      "cclinic will analyse 3 files, about 12,345 input tokens, with Sonnet 5.5 at Medium reasoning. Estimated cost: $0.42. Continue?",
+      "luseen will analyse 3 files, about 12,345 input tokens, with Sonnet 5.5 at Medium reasoning. Estimated cost: $0.42. Continue?",
     );
     expect(questions[1]?.answers.map((answer) => answer.value)).toEqual(["create", "no-git"]);
     expect(questions[2]?.text).toBe(ENVIRONMENT_CONSENT_MESSAGE);
@@ -35,7 +35,7 @@ describe("generate's questions (FR-GUI-016)", () => {
     expect(questions.map((question) => question.id)).toEqual(["cost", "git", "force"]);
     expect(questions[0]?.text).toContain("It uses your Claude Code subscription.");
     expect(questions[2]?.text).toBe(
-      "--force replaces .cclinic/sdd completely, including any changes made to it by hand.",
+      "--force replaces .luseen/sdd completely, including any changes made to it by hand.",
     );
     expect(
       generateQuestions(options({ noGit: true, noSkills: true }), dryRun()).map((question) => question.id),
@@ -50,16 +50,16 @@ describe("generate's questions (FR-GUI-016)", () => {
 });
 
 describe("connecting a host agent (FR-GUI-018)", () => {
-  it("TC-GUI-026: says whether cclinic's entry is in .mcp.json, and gives the entry to add", () => {
+  it("TC-GUI-026: says whether luseen's entry is in .mcp.json, and gives the entry to add", () => {
     const read = (content: string) => mcpInfo({ kind: "read", content });
     const missing = mcpInfo({ kind: "missing" });
     expect(missing.status).toBe("missing");
     expect(JSON.parse(missing.entry)).toEqual({
-      mcpServers: { cclinic: { command: "npx", args: ["cclinic", "mcp"] } },
+      mcpServers: { luseen: { command: "npx", args: ["luseen", "mcp"] } },
     });
     expect(read(missing.entry).status).toBe("installed");
     expect(read('{"mcpServers":{"other":{"command":"x"}}}').status).toBe("missing");
-    expect(read('{"mcpServers":{"cclinic":{"command":"node","args":["mine.js"]}}}').status).toBe("changed");
+    expect(read('{"mcpServers":{"luseen":{"command":"node","args":["mine.js"]}}}').status).toBe("changed");
     expect(read("{ not json").status).toBe("unreadable");
     // A file that can't be read at all still gives the entry to add.
     expect(mcpInfo({ kind: "unreadable" })).toEqual({ ...missing, status: "unreadable" });

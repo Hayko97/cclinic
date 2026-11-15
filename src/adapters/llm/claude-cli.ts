@@ -126,11 +126,11 @@ function classifyFailure(result: ResultEvent, exitCode: number | null, model: Mo
   }
   if (status === HTTP_STATUS.NOT_FOUND || /issue with the selected model/i.test(message)) {
     return new ProviderError(
-      `${labelForModel(model)} isn't available to this account. Run "cclinic model" to choose another model.`,
+      `${labelForModel(model)} isn't available to this account. Run "luseen model" to choose another model.`,
     );
   }
   if (status === HTTP_STATUS.TOO_MANY_REQUESTS || USAGE_LIMIT.test(message)) {
-    const advice = MODEL_LIMIT.test(message) ? ` Run "cclinic model" to choose another model, or wait.` : "";
+    const advice = MODEL_LIMIT.test(message) ? ` Run "luseen model" to choose another model, or wait.` : "";
     const detail = message === "" ? "Claude's rate or usage limit was reached." : message;
     return new RateLimitError(`${detail}${advice} ${RESUME_HINT}`);
   }
@@ -236,8 +236,8 @@ export function createClaudeCliProvider(options: ClaudeCliOptions): LlmProvider 
   const run = async <T>(request: LlmRequest<T>): Promise<LlmResult<T>> => {
     await gate.wait(request.signal);
     if (request.signal?.aborted === true) throw new CancelledError("Cancelled.");
-    const workFolder = await mkdtemp(path.join(tmpdir(), "cclinic-claude-"));
-    const promptFolder = await mkdtemp(path.join(tmpdir(), "cclinic-prompt-"));
+    const workFolder = await mkdtemp(path.join(tmpdir(), "luseen-claude-"));
+    const promptFolder = await mkdtemp(path.join(tmpdir(), "luseen-prompt-"));
     try {
       const systemPromptFile = path.join(promptFolder, "system.txt");
       await writeFile(systemPromptFile, request.system);
@@ -358,7 +358,7 @@ export function runProcess(
     child.on("error", (error) => {
       finish(() => {
         reject(
-          new ProviderError('Couldn\'t start the Claude CLI. Run "cclinic doctor" to check your setup.', {
+          new ProviderError('Couldn\'t start the Claude CLI. Run "luseen doctor" to check your setup.', {
             cause: error,
           }),
         );

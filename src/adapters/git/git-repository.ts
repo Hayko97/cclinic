@@ -98,7 +98,7 @@ export async function detectGit(target: string, options: GitOptions): Promise<Gi
   if (inside.hasTimedOut) return { kind: "unavailable", reason: "Git didn't respond in time" };
   if (!inside.isOk) {
     if (/dubious ownership/i.test(inside.stderr)) {
-      // The owner must approve this with safe.directory. cclinic never bypasses it (FR-GIT-022).
+      // The owner must approve this with safe.directory. luseen never bypasses it (FR-GIT-022).
       return { kind: "unavailable", reason: "Git refuses this folder as unsafe, because of its ownership" };
     }
     if (await pathExists(path.join(target, GIT_FOLDER))) {

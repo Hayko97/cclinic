@@ -1,4 +1,4 @@
-/** The newest Claude plan limits cclinic saw, kept next to the saved model (automated-mode FR-AUTO-041). */
+/** The newest Claude plan limits luseen saw, kept next to the saved model (automated-mode FR-AUTO-041). */
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";

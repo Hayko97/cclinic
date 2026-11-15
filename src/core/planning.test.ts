@@ -213,7 +213,7 @@ describe("sessions", () => {
     const held = session();
     const gui = { place: "gui", pid: 20 } as const;
     expect(takeHold(held, gui, () => true, TIME)).toBe(
-      "Planning session plan-1 is open in a terminal (cclinic plan). Close it there to continue here.",
+      "Planning session plan-1 is open in a terminal (luseen plan). Close it there to continue here.",
     );
     expect(takeHold(held, gui, () => false, TIME)).toMatchObject({ holder: gui, lastPlace: "gui" });
     expect(takeHold(held, holder, () => true, TIME)).toMatchObject({ holder });
@@ -226,14 +226,14 @@ describe("sessions", () => {
 
   it("TC-PLAN-064: a planning tool call names its session, and links the Claude session to it", () => {
     const reply = (body: Record<string, unknown>) => [{ type: "text", text: JSON.stringify(body) }];
-    expect(planIdOfToolCall("mcp__cclinic__plan_resume", reply({ status: "ok", planId: "plan-4" }))).toBe("plan-4");
-    expect(planIdOfToolCall("mcp__cclinic__plan_begin", reply({ status: "ok", planId: "plan-7" }))).toBe("plan-7");
+    expect(planIdOfToolCall("mcp__luseen__plan_resume", reply({ status: "ok", planId: "plan-4" }))).toBe("plan-4");
+    expect(planIdOfToolCall("mcp__luseen__plan_begin", reply({ status: "ok", planId: "plan-7" }))).toBe("plan-7");
     // A refused take, a look or a suggestion from another Claude session never moves the link.
     expect(
-      planIdOfToolCall("mcp__cclinic__plan_resume", reply({ status: "refused", message: "plan-4 is open in the GUI" })),
+      planIdOfToolCall("mcp__luseen__plan_resume", reply({ status: "refused", message: "plan-4 is open in the GUI" })),
     ).toBeUndefined();
-    expect(planIdOfToolCall("mcp__cclinic__plan_status", reply({ status: "ok", planId: "plan-4" }))).toBeUndefined();
-    expect(planIdOfToolCall("mcp__cclinic__workflow_status", reply({ planId: "plan-4" }))).toBeUndefined();
+    expect(planIdOfToolCall("mcp__luseen__plan_status", reply({ status: "ok", planId: "plan-4" }))).toBeUndefined();
+    expect(planIdOfToolCall("mcp__luseen__workflow_status", reply({ planId: "plan-4" }))).toBeUndefined();
     expect(planIdOfToolCall(undefined, undefined)).toBeUndefined();
     const linked = linkClaudeSession(
       { ...session(), claudeSessionId: null, transcriptPath: null },
@@ -245,10 +245,10 @@ describe("sessions", () => {
   });
 
   it("TC-PLAN-061: tool calls read as short activity lines", () => {
-    expect(activityOf("Read", { file_path: "/p/.cclinic/plans/plan-1/attachments/brief.pdf" })).toBe("Read brief.pdf");
+    expect(activityOf("Read", { file_path: "/p/.luseen/plans/plan-1/attachments/brief.pdf" })).toBe("Read brief.pdf");
     expect(activityOf("WebSearch", { query: "patient portal GDPR" })).toBe("Searched the web: patient portal GDPR");
     expect(activityOf("Grep", { pattern: "auth" })).toBe("Searched the project: auth");
-    expect(activityOf("mcp__cclinic__plan_propose", {})).toBe("plan_propose");
+    expect(activityOf("mcp__luseen__plan_propose", {})).toBe("plan_propose");
     expect(
       activitiesOfEvent({
         type: "assistant",
@@ -351,28 +351,28 @@ describe("prompt and display", () => {
       planId: "plan-3",
       target: { kind: "extend-roadmap", roadmapId: 1 },
       overview,
-      overviewPath: ".cclinic/sdd/overview.md",
-      specsListPath: ".cclinic/sdd/README.md",
+      overviewPath: ".luseen/sdd/overview.md",
+      specsListPath: ".luseen/sdd/README.md",
       message: buildUserMessage("Add exports", [
-        { name: "mock.png", kind: "image", readPath: ".cclinic/plans/plan-3/attachments/mock.png" },
+        { name: "mock.png", kind: "image", readPath: ".luseen/plans/plan-3/attachments/mock.png" },
       ]),
     });
     for (const part of [
       "Follow the PM steps.",
-      ".cclinic/sdd/overview.md",
-      ".cclinic/sdd/README.md",
+      ".luseen/sdd/overview.md",
+      ".luseen/sdd/README.md",
       '"dependsOn":[1]',
       '"status":"open"',
       "EXTEND roadmap 1",
       "plan-3",
       "Add exports",
-      "- mock.png (image): .cclinic/plans/plan-3/attachments/mock.png",
+      "- mock.png (image): .luseen/plans/plan-3/attachments/mock.png",
     ]) {
       expect(prompt, part).toContain(part);
     }
     expect(prompt.startsWith("## The user's first message\n\nAdd exports")).toBe(true);
     expect(userPartOf(prompt)).toBe(
-      "Add exports\n\nAttached (new in this message):\n- mock.png (image): .cclinic/plans/plan-3/attachments/mock.png",
+      "Add exports\n\nAttached (new in this message):\n- mock.png (image): .luseen/plans/plan-3/attachments/mock.png",
     );
     const later = buildUserMessage("Also", [{ name: "brief.docx", kind: "document", readPath: "p/brief.docx.md" }]);
     expect(later).toBe("Also\n\nAttached (new in this message):\n- brief.docx (document): p/brief.docx.md");
@@ -456,7 +456,7 @@ describe("answered turns", () => {
         at(2),
       ),
     ).toBe(true);
-    // cclinic's own Retry request isn't the user moving on.
+    // luseen's own Retry request isn't the user moving on.
     expect(
       isTurnAnswered(
         [
@@ -486,7 +486,7 @@ describe("answered turns", () => {
         "Yes",
       ),
     ).toBe(true);
-    // cclinic's own Retry request isn't the user's message.
+    // luseen's own Retry request isn't the user's message.
     expect(
       isWaitingMessageWritten(
         [...before, entry("user", 3, "Your last turn was stopped. Answer my last message.")],
@@ -502,7 +502,7 @@ describe("answered turns", () => {
     expect(isWaitingMessageWritten([...before, entry("user", 3, answerLastMessage("Yes"))], at(2), "Yes")).toBe(true);
     expect(repeatedMessageOf(answerLastMessage("Yes"))).toBe("Yes");
     expect(repeatedMessageOf(answerLastMessage(null))).toBeNull();
-    // The user's words, a Retry request's repeat, and nothing for cclinic's other notes.
+    // The user's words, a Retry request's repeat, and nothing for luseen's other notes.
     expect(shownUserMessage("Patients")).toBe("Patients");
     expect(shownUserMessage(answerLastMessage("Patients"))).toBe("Patients");
     expect(shownUserMessage(answerLastMessage(null))).toBeNull();

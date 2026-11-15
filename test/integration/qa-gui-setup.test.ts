@@ -1,5 +1,5 @@
 /**
- * QA for GUI stage D1 (Setup): the API against the real `cclinic` binary, so the dry run's JSON, the model
+ * QA for GUI stage D1 (Setup): the API against the real `luseen` binary, so the dry run's JSON, the model
  * command and the other Setup jobs are checked end to end. Nothing here reaches Claude: generate is only ever
  * asked about (its dry run), and `claude` isn't on PATH.
  */
@@ -70,7 +70,7 @@ function resultOf(job: JobView): unknown {
 
 type Questions = { questions: { id: string; text: string; answers: { value: string }[] }[]; job?: unknown };
 
-describe("QA D1: Setup against the real cclinic binary", () => {
+describe("QA D1: Setup against the real luseen binary", () => {
   it("TC-GUI-116: with a Git repository, --force and the environment option set, the questions are the cost and the --force warning, and no generate job starts", async () => {
     const root = withGit(project({ "src/a.ts": "export const a = 1;\n", "src/b.ts": "export const b = 2;\n" }));
     const gui = await open(root);
@@ -99,10 +99,10 @@ describe("QA D1: Setup against the real cclinic binary", () => {
           ? "under $0.01"
           : `$${dryRun.estimatedCostUsd.toFixed(2)}`;
     expect(body.questions[0]?.text).toContain(cost);
-    expect(body.questions[1]?.text).toContain("replaces .cclinic/sdd completely");
-    expect(list[0]?.command).toBe("cclinic --dry-run --json --force --no-environment");
+    expect(body.questions[1]?.text).toContain("replaces .luseen/sdd completely");
+    expect(list[0]?.command).toBe("luseen --dry-run --json --force --no-environment");
     // The dry run wrote nothing.
-    expect(existsSync(path.join(root, ".cclinic/sdd"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/sdd"))).toBe(false);
   });
 
   it("TC-GUI-023: with no Git repository, the real dry run leads to the cost, Git and environment questions, and creates no repository", async () => {
@@ -133,7 +133,7 @@ describe("QA D1: Setup against the real cclinic binary", () => {
     expect(reply.status).toBe(200);
     const [preview] = await jobs(gui);
     expect(preview?.command).toBe(
-      'cclinic --dry-run --json "--include=my docs/**" --exclude=--force "--exclude=src/**"',
+      'luseen --dry-run --json "--include=my docs/**" --exclude=--force "--exclude=src/**"',
     );
     const dryRun = resultOf(await finished(gui, preview?.id ?? "")) as { included: { path: string }[] };
     expect(dryRun.included.map((file) => file.path)).toEqual(["my docs/a.md"]);
@@ -150,7 +150,7 @@ describe("QA D1: Setup against the real cclinic binary", () => {
     const { error } = JSON.parse(reply.body) as { error: string };
     let cliMessage = "";
     try {
-      execFileSync(process.execPath, ["bin/cclinic.js", root, "--provider", "openai", "--dry-run"], {
+      execFileSync(process.execPath, ["bin/luseen.js", root, "--provider", "openai", "--dry-run"], {
         stdio: "pipe",
         env: { ...process.env, XDG_CONFIG_HOME: makeTempFolder() },
       });
@@ -184,9 +184,9 @@ describe("QA D1: Setup against the real cclinic binary", () => {
 
   it("TC-GUI-025, TC-GUI-118: model choice, list, reset, skills and clean have the same effect as in the terminal", async () => {
     const root = project();
-    mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
+    mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
     const gui = await open(root);
-    const config = path.join(gui.harness.environment.XDG_CONFIG_HOME ?? "", "cclinic/config.json");
+    const config = path.join(gui.harness.environment.XDG_CONFIG_HOME ?? "", "luseen/config.json");
     const run = async (request: unknown) => {
       const reply = await post(gui, request);
       expect(reply.status, JSON.stringify(request)).toBe(201);
@@ -242,14 +242,14 @@ describe("QA D1: Setup against the real cclinic binary", () => {
     expect(await status()).toBe("unreadable");
     writeFileSync(
       path.join(root, ".mcp.json"),
-      JSON.stringify({ mcpServers: { cclinic: { command: "node", args: ["my/cclinic.js", "mcp"] } } }),
+      JSON.stringify({ mcpServers: { luseen: { command: "node", args: ["my/luseen.js", "mcp"] } } }),
     );
     expect(await status()).toBe("changed");
   });
 
-  it("FR-GUI-016: without --force, a document folder cclinic can't vouch for stops the run with the CLI's own message, before any Claude call", async () => {
+  it("FR-GUI-016: without --force, a document folder luseen can't vouch for stops the run with the CLI's own message, before any Claude call", async () => {
     const root = project();
-    writeProject(root, { ".cclinic/sdd/notes.md": "# Mine\n" });
+    writeProject(root, { ".luseen/sdd/notes.md": "# Mine\n" });
     const bin = makeTempFolder();
     copyFileSync(path.resolve("test/fixtures/fake-claude/claude"), path.join(bin, "claude"));
     chmodSync(path.join(bin, "claude"), 0o755);
@@ -270,8 +270,8 @@ describe("QA D1: Setup against the real cclinic binary", () => {
     expect(reply.status).toBe(201);
     const job = await finished(gui, (JSON.parse(reply.body) as { job: JobView }).job.id);
     expect(job.exitCode).toBe(2);
-    expect(job.output.lines.map((line) => line.text).join("\n")).toContain("has files but no cclinic manifest");
+    expect(job.output.lines.map((line) => line.text).join("\n")).toContain("has files but no luseen manifest");
     expect(existsSync(record)).toBe(false);
-    expect(readFileSync(path.join(root, ".cclinic/sdd/notes.md"), "utf8")).toBe("# Mine\n");
+    expect(readFileSync(path.join(root, ".luseen/sdd/notes.md"), "utf8")).toBe("# Mine\n");
   });
 });

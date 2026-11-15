@@ -1,5 +1,5 @@
 // Setup (FR-GUI-014 to FR-GUI-018): check, generate, skills, environment, the default model, MCP and clean.
-// Each runs the same `cclinic` command as the terminal, as a job, after the same questions.
+// Each runs the same `luseen` command as the terminal, as a job, after the same questions.
 import { api, confirmAction, element, notify, runJob } from "./api.js";
 
 const byId = (id) => document.getElementById(id);
@@ -29,7 +29,7 @@ async function startAndShow(request) {
 
 const DOCTOR_STATES = { passed: "Passed", failed: "Failed", skipped: "Skipped" };
 
-/** FR-GUI-015: the newest finished `cclinic doctor`, check by check. */
+/** FR-GUI-015: the newest finished `luseen doctor`, check by check. */
 async function drawDoctor() {
   const list = byId("doctor-result");
   const { jobs } = await api("/api/jobs");
@@ -62,7 +62,7 @@ async function drawDoctor() {
   );
 }
 
-/** FR-GUI-017: the options and the saved choice come from `cclinic model --list --json`. */
+/** FR-GUI-017: the options and the saved choice come from `luseen model --list --json`. */
 async function loadModels() {
   const job = await runJob({ command: "model-list" });
   const result = await resultOf(job.id);
@@ -268,10 +268,10 @@ async function clean() {
 }
 
 const MCP_STATUS = {
-  installed: "Installed: your coding agent can start cclinic mcp.",
+  installed: "Installed: your coding agent can start luseen mcp.",
   missing: "Not installed. Add this entry to .mcp.json, or install the skills.",
-  changed: "cclinic's entry in .mcp.json was changed by hand, so it's left as it is.",
-  unreadable: ".mcp.json can't be read, or isn't valid JSON, so cclinic can't tell whether it's connected.",
+  changed: "luseen's entry in .mcp.json was changed by hand, so it's left as it is.",
+  unreadable: ".mcp.json can't be read, or isn't valid JSON, so luseen can't tell whether it's connected.",
 };
 
 /** FR-GUI-014, FR-GUI-018: whether the project is set up, and how a host agent connects. */

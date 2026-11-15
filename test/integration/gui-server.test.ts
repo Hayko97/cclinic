@@ -1,4 +1,4 @@
-/** `cclinic gui` in-process: the server, its security checks and its jobs (spec: gui). */
+/** `luseen gui` in-process: the server, its security checks and its jobs (spec: gui). */
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, readdirSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
@@ -107,10 +107,10 @@ function send(
 }
 
 const authed = (gui: { token: string }, extra: Record<string, string> = {}) => ({
-  headers: { "x-cclinic-token": gui.token, ...extra },
+  headers: { "x-luseen-token": gui.token, ...extra },
 });
 
-/** A child process the test controls; it ends when it's interrupted, as cclinic does. */
+/** A child process the test controls; it ends when it's interrupted, as luseen does. */
 function fakeJob() {
   const outputs: ((stream: OutputStream, chunk: string) => void)[] = [];
   const exits: ((code: number) => void)[] = [];
@@ -221,7 +221,7 @@ describe("starting the GUI", () => {
     await send(gui.port, "GET", `/?token=${gui.token}`);
     await send(gui.port, "GET", "/api/jobs", authed(gui));
     await gui.stop();
-    for (const file of listFiles(path.join(root, ".cclinic")))
+    for (const file of listFiles(path.join(root, ".luseen")))
       expect(readFileSync(file, "utf8")).not.toContain(gui.token);
   });
 
@@ -293,12 +293,12 @@ describe("starting the GUI", () => {
     "TC-GUI-011: a lock that can't be read (%j) is replaced",
     async (content) => {
       const root = makeTempFolder();
-      writeProject(root, { ".cclinic/gui/gui.lock": content });
+      writeProject(root, { ".luseen/gui/gui.lock": content });
       // Older than the moment a lock may take to be written.
       const old = new Date(Date.now() - 60_000);
-      utimesSync(path.join(root, ".cclinic/gui/gui.lock"), old, old);
+      utimesSync(path.join(root, ".luseen/gui/gui.lock"), old, old);
       const gui = await startGui(root);
-      expect(JSON.parse(readFileSync(path.join(root, ".cclinic/gui/gui.lock"), "utf8"))).toMatchObject({
+      expect(JSON.parse(readFileSync(path.join(root, ".luseen/gui/gui.lock"), "utf8"))).toMatchObject({
         pid: process.pid,
         port: gui.port,
       });
@@ -307,14 +307,14 @@ describe("starting the GUI", () => {
 
   it("TC-GUI-011: a lock left by a GUI that ended is replaced", async () => {
     const root = makeTempFolder();
-    writeProject(root, { ".cclinic/gui/gui.lock": JSON.stringify({ pid: ENDED_PID, port: 1234 }) });
+    writeProject(root, { ".luseen/gui/gui.lock": JSON.stringify({ pid: ENDED_PID, port: 1234 }) });
     const gui = await startGui(root);
-    expect(JSON.parse(readFileSync(path.join(root, ".cclinic/gui/gui.lock"), "utf8"))).toMatchObject({
+    expect(JSON.parse(readFileSync(path.join(root, ".luseen/gui/gui.lock"), "utf8"))).toMatchObject({
       pid: process.pid,
       port: gui.port,
     });
     await gui.stop();
-    expect(readdirSync(path.join(root, ".cclinic/gui"))).toEqual([".gitignore"]);
+    expect(readdirSync(path.join(root, ".luseen/gui"))).toEqual([".gitignore"]);
   });
 });
 
@@ -323,7 +323,7 @@ describe("security", () => {
     const root = makeTempFolder();
     const gui = await startGui(root);
     const name = path.basename(root);
-    for (const headers of [{}, { "x-cclinic-token": "wrong" }]) {
+    for (const headers of [{}, { "x-luseen-token": "wrong" }]) {
       const reply = await send(gui.port, "GET", "/api/project", { headers });
       expect(reply.status).toBe(401);
       expect(reply.body).not.toContain(name);
@@ -459,7 +459,7 @@ describe("jobs", () => {
     });
     expect(job).toMatchObject({
       id: "job-1",
-      command: "cclinic doctor --json",
+      command: "luseen doctor --json",
       exitCode: 0,
       exitMeaning: "Finished",
     });
@@ -510,7 +510,7 @@ describe("jobs", () => {
       host: "127.0.0.1",
       port: gui.port,
       path: "/api/jobs/job-1/events",
-      headers: { host: `127.0.0.1:${gui.port}`, "x-cclinic-token": gui.token },
+      headers: { host: `127.0.0.1:${gui.port}`, "x-luseen-token": gui.token },
     });
     stream.on("response", (response) => {
       response.setEncoding("utf8");
@@ -607,7 +607,7 @@ describe("jobs", () => {
         host: "127.0.0.1",
         port: gui.port,
         path: "/api/jobs/job-1/events",
-        headers: { host: `127.0.0.1:${gui.port}`, "x-cclinic-token": gui.token },
+        headers: { host: `127.0.0.1:${gui.port}`, "x-luseen-token": gui.token },
       });
       stream.on("response", (response) => {
         response.setEncoding("utf8");
@@ -656,13 +656,13 @@ describe("jobs", () => {
     await gui.stop();
     const again = await startGui(root);
     expect(JSON.parse((await send(again.port, "GET", "/api/jobs", authed(again))).body)).toEqual({ jobs: [] });
-    for (const file of listFiles(path.join(root, ".cclinic")))
+    for (const file of listFiles(path.join(root, ".luseen")))
       expect(readFileSync(file, "utf8")).not.toContain("unique-output-marker");
   });
 });
 
 describe("files", () => {
-  it("TC-GUI-063: the GUI adds only an ignored .cclinic/gui, which clean keeps and analysis skips", async () => {
+  it("TC-GUI-063: the GUI adds only an ignored .luseen/gui, which clean keeps and analysis skips", async () => {
     const root = makeTempFolder();
     writeProject(root, { "index.ts": "export const a = 1;\n" });
     execFileSync("git", ["init", "-q"], { cwd: root });
@@ -673,10 +673,10 @@ describe("files", () => {
     expect(execFileSync("git", ["status", "--porcelain", "-uall"], { cwd: root, encoding: "utf8" })).toBe(before);
     await gui.stop();
     await runClean(root, { yes: true }, agentHarness({ withClaude: false }).context);
-    expect(readdirSync(path.join(root, ".cclinic/gui"))).toEqual([".gitignore"]);
+    expect(readdirSync(path.join(root, ".luseen/gui"))).toEqual([".gitignore"]);
     const scan = await scanFolder({
       target: root,
-      outFolder: path.join(root, ".cclinic/sdd"),
+      outFolder: path.join(root, ".luseen/sdd"),
       include: [],
       exclude: [],
       maxFileSizeMib: 1,

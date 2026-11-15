@@ -8,7 +8,7 @@ const state = {
   canvas: undefined,
   plan: null,
   openPlan: () => undefined,
-  titleBase: "cclinic",
+  titleBase: "luseen",
   count: 0,
   open: () => undefined,
   showCanvas: () => undefined,

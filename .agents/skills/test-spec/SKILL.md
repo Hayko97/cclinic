@@ -2,8 +2,8 @@
 name: test-spec
 description: "Acts as QA for a spec or feature: automates its test cases, runs them, explores edge cases, and reports results and defects. Use when the user asks to test, QA, verify or write automation tests for a spec or feature, or to check whether it's ready to release."
 metadata:
-  generated-by: cclinic
-  content-hash: "ff69d35ba69c2b04fccd3efa68de30140bf645e9beec9924079fc8e9308372ef"
+  generated-by: luseen
+  content-hash: "05e5500107088f82792bc631aabbcd45060792764d2b6d631263af85a3e96436"
 ---
 
 # Test a spec
@@ -12,8 +12,8 @@ Work as an independent QA engineer. Your job is to find out whether the feature 
 
 ## Steps
 
-1. **Read the spec.** Read `verification.md`, then `spec.md` and `validation.md`, in `.cclinic/sdd/specs/<name>/`. Testing a feature with no spec? If you're running QA for the agent that implemented a change, run the project's full checks and report that no spec covers it. Otherwise, ask whether to use the `create-spec` skill first. If `.cclinic/sdd` doesn't exist, stop and ask the user to run `cclinic` in the project root to generate it.
-2. **Learn the test setup.** Read the setup in `verification.md`, `.cclinic/sdd/stack.md`, the testing section of `developer-guidelines.md`, and the existing tests. Use the project's test tools and patterns. If it has none, propose one to the user, and don't install anything without agreement.
+1. **Read the spec.** Read `verification.md`, then `spec.md` and `validation.md`, in `.luseen/sdd/specs/<name>/`. Testing a feature with no spec? If you're running QA for the agent that implemented a change, run the project's full checks and report that no spec covers it. Otherwise, ask whether to use the `create-spec` skill first. If `.luseen/sdd` doesn't exist, stop and ask the user to run `luseen` in the project root to generate it.
+2. **Learn the test setup.** Read the setup in `verification.md`, `.luseen/sdd/stack.md`, the testing section of `developer-guidelines.md`, and the existing tests. Use the project's test tools and patterns. If it has none, propose one to the user, and don't install anything without agreement.
 3. **Map every test case.** Find existing tests for each `TC`, by ID and by behaviour, and list what's missing.
 4. **Automate what's missing:**
    - Name each test with its ID: `TC-AUTH-001: locks the account after 5 failed logins`.
@@ -31,7 +31,7 @@ Work as an independent QA engineer. Your job is to find out whether the feature 
 
 - **Never weaken a test to make it pass:** don't loosen an assertion, skip it, retry until it passes, or change the expected result to match what the code does.
 - **Don't change production code.** Report defects. If the user asks you to fix one, use the `write-code` skill, as a separate step.
-- **If the spec and code disagree,** report it, and don't choose. Add it to `.cclinic/sdd/open-questions.md`.
+- **If the spec and code disagree,** report it, and don't choose. Add it to `.luseen/sdd/open-questions.md`.
 - **Never claim a result you didn't see.**
 
 ## Report format

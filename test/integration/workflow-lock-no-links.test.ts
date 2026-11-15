@@ -28,7 +28,7 @@ describe("workflow state lock without hard links", () => {
     );
     const [saved] = await store.list();
     expect(saved?.sessions.map((session) => session.sessionId).sort()).toEqual(["s1", "s2", "s3"]);
-    expect(existsSync(path.join(root, ".cclinic/workflow/.state.lock"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/workflow/.state.lock"))).toBe(false);
   });
 
   it("TC-MCP-071: an empty lock is given time to be written, and replaced once that time has passed", async () => {
@@ -40,13 +40,13 @@ describe("workflow state lock without hard links", () => {
         { key: stateKey(3, "main"), approverMode: "user", now: "2026-11-11T10:00:00.000Z" },
       ),
     );
-    const lock = path.join(root, ".cclinic/workflow/.state.lock");
+    const lock = path.join(root, ".luseen/workflow/.state.lock");
     const add = (id: string) => (open: WorkflowState) =>
       linkSession(open, { sessionId: id, transcriptPath: "t" }, "now");
     writeFileSync(lock, "");
     const stopped = new AbortController();
     stopped.abort();
-    await expect(store.updateOpen(add("s1"), stopped.signal)).rejects.toThrow("Another cclinic process holds");
+    await expect(store.updateOpen(add("s1"), stopped.signal)).rejects.toThrow("Another luseen process holds");
     expect(readFileSync(lock, "utf8")).toBe("");
     const old = new Date(Date.now() - LOCK_WRITE_GRACE_MS - 1_000);
     utimesSync(lock, old, old);

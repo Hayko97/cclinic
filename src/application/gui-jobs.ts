@@ -1,4 +1,4 @@
-/** The commands the GUI runs, each a `cclinic` child process whose output is kept while the GUI runs (spec: gui). */
+/** The commands the GUI runs, each a `luseen` child process whose output is kept while the GUI runs (spec: gui). */
 import { JOB_CANCEL_GRACE_MS, JOB_OUTPUT_MAX_LINES } from "../core/constants/gui.js";
 import { UsageError } from "../core/errors.js";
 import {
@@ -25,7 +25,7 @@ export interface JobProcess {
 }
 
 export interface JobPorts {
-  /** Starts `cclinic` with these arguments in the project's folder, never through a shell (FR-GUI-013). */
+  /** Starts `luseen` with these arguments in the project's folder, never through a shell (FR-GUI-013). */
   readonly start: (args: readonly string[]) => JobProcess;
   readonly now: () => Date;
   /** Runs `run` after `ms`, and returns what cancels it. */
@@ -73,7 +73,7 @@ export interface Jobs {
 
 interface JobRecord {
   summary: JobSummary;
-  /** A second SIGINT makes cclinic exit at once, so a job is only ever interrupted once. */
+  /** A second SIGINT makes luseen exit at once, so a job is only ever interrupted once. */
   isCancelling: boolean;
   output: JobOutput;
   readonly process: JobProcess;

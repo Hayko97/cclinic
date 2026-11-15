@@ -46,8 +46,8 @@ afterEach(async () => {
 
 function project(): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
@@ -88,7 +88,7 @@ const viewOf = async (gui: TestGui) =>
 const line = (type: "user" | "assistant", content: unknown) =>
   `${JSON.stringify({ type, timestamp: new Date().toISOString(), message: { content } })}\n`;
 const suggest = (id: string, input: unknown) =>
-  line("assistant", [{ type: "tool_use", id, name: "mcp__cclinic__plan_suggest", input }]);
+  line("assistant", [{ type: "tool_use", id, name: "mcp__luseen__plan_suggest", input }]);
 const toolResult = (id: string, content: string, isError = false) =>
   line("user", [{ type: "tool_result", tool_use_id: id, content, ...(isError ? { is_error: true } : {}) }]);
 const says = (text: string) => line("assistant", [{ type: "text", text }]);

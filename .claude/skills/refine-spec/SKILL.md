@@ -2,8 +2,8 @@
 name: refine-spec
 description: "Improves an existing spec: fixes vague or untestable requirements, fills coverage gaps, updates it to match the code, and resolves open questions. Use when the user asks to review, refine, update or tighten a spec, or when code and spec have drifted apart."
 metadata:
-  generated-by: cclinic
-  content-hash: "03c0b3a8d792e8ab2cd201155853186bc6b476d1332bbb38515c3d25732879bf"
+  generated-by: luseen
+  content-hash: "7103237278ce8a24e470efb5fbb95432f7a59d5eab17a98705c554da2f0e1e92"
 ---
 
 # Refine a spec
@@ -12,7 +12,7 @@ Make an existing spec more accurate and testable, without changing what the proj
 
 ## Steps
 
-1. **Read the spec's three files,** plus `.cclinic/sdd/open-questions.md`. If `.cclinic/sdd` doesn't exist, stop and ask the user to run `cclinic` in the project root to generate it.
+1. **Read the spec's three files,** plus `.luseen/sdd/open-questions.md`. If `.luseen/sdd` doesn't exist, stop and ask the user to run `luseen` in the project root to generate it.
 2. **Check it against the code and cited evidence.** Open what each requirement cites, and confirm it still says that.
 3. **Find the problems:**
    - Requirements that are vague, untestable, or combine several behaviours
@@ -33,7 +33,7 @@ Make an existing spec more accurate and testable, without changing what the proj
 
 ## Spec format
 
-Each spec is a folder, `.cclinic/sdd/specs/<kebab-case-name>/`, with exactly three files. Copy the structure of an existing spec if there is one.
+Each spec is a folder, `.luseen/sdd/specs/<kebab-case-name>/`, with exactly three files. Copy the structure of an existing spec if there is one.
 
 **`spec.md`:** a goal, then requirements, then edge cases and non-goals.
 
@@ -66,8 +66,8 @@ Each spec is a folder, `.cclinic/sdd/specs/<kebab-case-name>/`, with exactly thr
 - **Requirements:** one testable behaviour each, using "must". Avoid words that can't be tested, such as "fast", "secure" or "user-friendly".
 - **Status:** `confirmed` (code and documents agree), `code-only` (only in code), or `docs-only` (not built yet, or only in documents).
 - **Evidence:** cite `path:line`, `path:start-end`, `document.pdf:page` or `document.docx#Heading`. For a new request with no document, cite where it came from, such as `user request`.
-- **Unknowns:** never invent an answer. Add it to `.cclinic/sdd/open-questions.md`.
+- **Unknowns:** never invent an answer. Add it to `.luseen/sdd/open-questions.md`.
 
 ## Don't lose this work
 
-cclinic treats edits in `.cclinic/sdd` as hand edits. Re-running `cclinic` then refuses to continue, and `cclinic --force` replaces the whole folder, including these edits. Never run `cclinic --force` without asking the user first.
+luseen treats edits in `.luseen/sdd` as hand edits. Re-running `luseen` then refuses to continue, and `luseen --force` replaces the whole folder, including these edits. Never run `luseen --force` without asking the user first.

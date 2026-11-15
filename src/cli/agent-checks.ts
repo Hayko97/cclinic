@@ -1,4 +1,4 @@
-/** Checks shared by `cclinic plan` and `cclinic auto`, which run Claude CLI agents. */
+/** Checks shared by `luseen plan` and `luseen auto`, which run Claude CLI agents. */
 import { existsSync } from "node:fs";
 import { probeClaude } from "../adapters/llm/select-provider.js";
 import { UsageError } from "../core/errors.js";
@@ -9,7 +9,7 @@ import { resolveProviderChoice } from "./generate-command.js";
 export async function requireClaudeCli(command: string, context: CommandContext): Promise<void> {
   if (resolveProviderChoice(undefined, context.environment) === "anthropic-api") {
     throw new UsageError(
-      `${command} runs Claude CLI agents, but the provider is set to anthropic-api. Unset CCLINIC_PROVIDER, or set it to claude-cli.`,
+      `${command} runs Claude CLI agents, but the provider is set to anthropic-api. Unset LUSEEN_PROVIDER, or set it to claude-cli.`,
     );
   }
   const claude = await probeClaude(context.environment);
@@ -22,6 +22,6 @@ export async function requireClaudeCli(command: string, context: CommandContext)
 
 export function requireDocuments(out: string): void {
   if (!existsSync(out)) {
-    throw new UsageError(`${out} doesn't exist. Run cclinic in the project folder first to generate the documents.`);
+    throw new UsageError(`${out} doesn't exist. Run luseen in the project folder first to generate the documents.`);
   }
 }

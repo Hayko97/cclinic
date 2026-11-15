@@ -118,7 +118,7 @@ describe("GUI event streams", () => {
     });
     server = await startGuiServer({ host: "127.0.0.1", port: 0, isPortFixed: false, handle });
     const port = server.port;
-    const headers = { host: `127.0.0.1:${port}`, "x-cclinic-token": TOKEN };
+    const headers = { host: `127.0.0.1:${port}`, "x-luseen-token": TOKEN };
     jobs.start({ command: "doctor" });
     const write = (text: string) => {
       for (const listener of outputs) listener("stdout", text);

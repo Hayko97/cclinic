@@ -155,7 +155,7 @@ describe("session activity", () => {
     runId: "20261112-110000",
     roadmapId: 1,
     roadmapTitle: "Roadmap",
-    runBranch: "cclinic/auto/x",
+    runBranch: "luseen/auto/x",
     startedAt: minutesAgo(30),
     finishedAt: null,
     outcome: null,

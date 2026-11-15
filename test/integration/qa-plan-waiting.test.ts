@@ -53,8 +53,8 @@ afterEach(async () => {
 
 function project(): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
@@ -524,7 +524,7 @@ describe("QA run 11: around the newest-message rule", () => {
 
 const says = (text: string) => line("assistant", [{ type: "text", text }]);
 
-/** A session record with the given transcript, as an older cclinic left it: waiting for "Patients", with no turn time. */
+/** A session record with the given transcript, as an older luseen left it: waiting for "Patients", with no turn time. */
 async function olderSession(root: string, home: string, lines: readonly string[]): Promise<PlanSession> {
   const claudeSessionId = randomUUID();
   const folder = path.join(home, ".claude", "projects", realpathSync(root).replace(/[^a-zA-Z0-9]/g, "-"));
@@ -1818,7 +1818,7 @@ describe("QA run 18: a proposal that no longer fits (TC-PLAN-079)", () => {
       await expect.poll(() => harness.calls().length, WAIT).toBe(1);
       await expect.poll(() => promptsWritten(root, "Make it smaller"), WAIT).toBe(1);
       await stopAndWait(page);
-      const store = openTaskStore(path.join(root, ".cclinic"), "update");
+      const store = openTaskStore(path.join(root, ".luseen"), "update");
       if (store === undefined) throw new Error("No store");
       store.removeTask(1);
       store.close();

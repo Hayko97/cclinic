@@ -927,7 +927,7 @@ export function startPanel() {
   });
 }
 
-/** FR-GUI-020: adds a task with the same checks as `cclinic tasks add`. */
+/** FR-GUI-020: adds a task with the same checks as `luseen tasks add`. */
 export function startAddTask() {
   const dialog = document.getElementById("add-task");
   const form = document.getElementById("add-task-form");
@@ -944,7 +944,7 @@ export function startAddTask() {
     const given = text("dependsOn")
       .split(/[\s,]+/)
       .filter(Boolean);
-    // The same check and message as `cclinic tasks add --depends-on` (`parseId`, FR-GUI-020).
+    // The same check and message as `luseen tasks add --depends-on` (`parseId`, FR-GUI-020).
     const isTaskId = (value) => /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) && Number(value) >= 1;
     const wrong = given.find((value) => !isTaskId(value));
     if (wrong !== undefined) {

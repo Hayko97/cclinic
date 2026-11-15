@@ -1,5 +1,5 @@
 /**
- * The file locks of cclinic's runs, the workflow state and the GUI (FR-CLI-022, FR-AUTO-032, FR-MCP-045,
+ * The file locks of luseen's runs, the workflow state and the GUI (FR-CLI-022, FR-AUTO-032, FR-MCP-045,
  * FR-GUI-007). A lock is created with its content in one step, taken over only when abandoned, and removed
  * only by its holder, so two processes can never both hold it.
  */
@@ -141,7 +141,7 @@ export async function takeLock(
   for (;;) {
     if (options.signal.aborted)
       throw new UsageError(
-        `Another cclinic process holds ${lockFile}. Try again, or delete it if no cclinic process is running.`,
+        `Another luseen process holds ${lockFile}. Try again, or delete it if no luseen process is running.`,
       );
     if (await createExclusive(lockFile, contentWith(fields))) break;
     const text = await readText(lockFile);

@@ -72,14 +72,14 @@ function withCommonOptions(command: Command, example: string): Command {
   return command
     .option("-C, --dir <path>", "project folder (default: the current folder)")
     .option("--json", "print JSON")
-    .addHelpText("after", commandHelp(`cclinic tasks ${command.name()}`, example));
+    .addHelpText("after", commandHelp(`luseen tasks ${command.name()}`, example));
 }
 
 /** Creating roadmaps and milestones is left to the PM agent (FR-TASK-003, FR-TASK-023). */
 function addPlanOnlyCommand(parent: Command, name: string, what: string, context: CommandContext): void {
   withCommonOptions(
-    parent.command(name).description(`${what} (use cclinic plan instead)`).allowUnknownOption().allowExcessArguments(),
-    "cclinic plan",
+    parent.command(name).description(`${what} (use luseen plan instead)`).allowUnknownOption().allowExcessArguments(),
+    "luseen plan",
   ).action(() => {
     context.reporter.debug(`Refused tasks ${parent.name()} ${name}.`);
     throw new UsageError(`${what} isn't available here. ${PLAN_HINT}`);
@@ -95,7 +95,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
 
   withCommonOptions(
     tasks.command("list").description("List open, in-progress and blocked tasks in roadmap order"),
-    "cclinic tasks list --all --json",
+    "luseen tasks list --all --json",
   )
     .option("--all", "include done tasks")
     .action(async (options: TasksOptions & { all?: boolean }) => {
@@ -107,7 +107,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
 
   withCommonOptions(
     tasks.command("roadmaps").description("List every roadmap with its status and task counts"),
-    "cclinic tasks roadmaps --json",
+    "luseen tasks roadmaps --json",
   ).action(async (options: TasksOptions) => {
     await withStore(options, "read", context, (store) => {
       const summaries = readOverview(store).roadmaps.map(summarizeRoadmap);
@@ -117,7 +117,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
 
   const roadmap = withCommonOptions(
     tasks.command("roadmap").description("Show every roadmap in full, then tasks with no milestone"),
-    "cclinic tasks roadmap --json",
+    "luseen tasks roadmap --json",
   ).action(async (options: TasksOptions) => {
     await withStore(options, "read", context, (store) => {
       const overview = readOverview(store);
@@ -127,7 +127,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
 
   withCommonOptions(
     roadmap.command("show").description("Show one roadmap's milestones and tasks").argument("<id>", "roadmap ID"),
-    "cclinic tasks roadmap show 1 --json",
+    "luseen tasks roadmap show 1 --json",
   ).action(async (given: string, options: TasksOptions) => {
     const id = parseId(given, "roadmap");
     await withStore(options, "read", context, (store) => {
@@ -143,7 +143,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
       .command("remove")
       .description("Delete a roadmap and its milestones. Their tasks are kept, with no milestone")
       .argument("<id>", "roadmap ID"),
-    "cclinic tasks roadmap remove 2",
+    "luseen tasks roadmap remove 2",
   ).action(async (given: string, options: TasksOptions) => {
     const id = parseId(given, "roadmap");
     await withStore(options, "update", context, (store) => {
@@ -156,7 +156,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
 
   withCommonOptions(
     tasks.command("show").description("Show every detail of a task").argument("<id>", "task ID"),
-    "cclinic tasks show 3 --json",
+    "luseen tasks show 3 --json",
   ).action(async (given: string, options: TasksOptions) => {
     const id = parseId(given, "task");
     await withStore(options, "read", context, (store) => {
@@ -170,13 +170,13 @@ export function addTasksCommand(program: Command, context: CommandContext): void
   withCommonOptions(
     tasks
       .command("add")
-      .description("Add a task with no milestone. Use cclinic plan --task to add one to a roadmap")
+      .description("Add a task with no milestone. Use luseen plan --task to add one to a roadmap")
       .requiredOption("--title <text>", "what the task delivers")
       .option("--description <text>", "details and acceptance notes")
       .option("--spec <name>", "spec it belongs to, such as user-login")
       .option("--depends-on <id>", "a task that must be done first. Repeatable", collect, [])
-      .option("--milestone <id>", "not available: use cclinic plan --task"),
-    'cclinic tasks add --title "Lock accounts" --spec auth --depends-on 2 --json',
+      .option("--milestone <id>", "not available: use luseen plan --task"),
+    'luseen tasks add --title "Lock accounts" --spec auth --depends-on 2 --json',
   ).action(
     async (
       options: TasksOptions & {
@@ -188,7 +188,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
       },
     ) => {
       if (options.milestone !== undefined) {
-        throw new UsageError(`A task joins a roadmap's milestone only through cclinic plan --task. ${PLAN_HINT}`);
+        throw new UsageError(`A task joins a roadmap's milestone only through luseen plan --task. ${PLAN_HINT}`);
       }
       const input = parseInput(taskInputSchema, {
         title: options.title,
@@ -214,7 +214,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
         .description(description)
         .argument("<id>", "task ID")
         .requiredOption("--on <id>", "the task it depends on"),
-      `cclinic tasks ${name} 3 --on 2`,
+      `luseen tasks ${name} 3 --on 2`,
     ).action(async (given: string, options: TasksOptions & { on: string }) => {
       const id = parseId(given, "task");
       const dependsOnId = parseId(options.on, "task");
@@ -232,7 +232,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
   for (const [name, status, description] of statusCommands) {
     withCommonOptions(
       tasks.command(name).description(description).argument("<id>", "task ID"),
-      `cclinic tasks ${name} 3`,
+      `luseen tasks ${name} 3`,
     ).action(async (given: string, options: TasksOptions) => {
       const id = parseId(given, "task");
       await withStore(options, "update", context, (store) => {
@@ -244,7 +244,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
 
   withCommonOptions(
     tasks.command("remove").description("Delete a task permanently").argument("<id>", "task ID"),
-    "cclinic tasks remove 3",
+    "luseen tasks remove 3",
   ).action(async (given: string, options: TasksOptions) => {
     const id = parseId(given, "task");
     await withStore(options, "update", context, (store) => {
@@ -262,7 +262,7 @@ export function addTasksCommand(program: Command, context: CommandContext): void
       .command("remove")
       .description("Delete a milestone. Its tasks are kept, with no milestone")
       .argument("<id>", "milestone ID"),
-    "cclinic tasks milestone remove 2",
+    "luseen tasks milestone remove 2",
   ).action(async (given: string, options: TasksOptions) => {
     const id = parseId(given, "milestone");
     await withStore(options, "update", context, (store) => {

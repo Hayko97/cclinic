@@ -19,7 +19,7 @@ const skill = (name: string): AgentSkill => {
   if (found === undefined) throw new Error(`No skill named ${name}`);
   return found;
 };
-const render = (name: string): string => renderSkill(skill(name), ".cclinic/sdd", hash);
+const render = (name: string): string => renderSkill(skill(name), ".luseen/sdd", hash);
 const CLAUDE_CODE_STEP = /4\. \*\*Run Claude Code's review[^\n]*\n/;
 
 describe("skill format", () => {
@@ -55,7 +55,7 @@ describe("skill format", () => {
 describe("protecting existing work", () => {
   it("TC-SKILL-013: rendered skills are marked, and classify as managed", () => {
     const file = render("write-code");
-    expect(file).toContain("generated-by: cclinic");
+    expect(file).toContain("generated-by: luseen");
     expect(file).toMatch(/content-hash: "[0-9a-f]{64}"/);
     expect(classifySkill(file, hash)).toBe("managed");
   });
@@ -84,9 +84,9 @@ describe("protecting existing work", () => {
     const block = renderAgentsBlock("docs");
     expect(mergeManagedSection(undefined, block)).toBe(`${block}\n`);
     expect(mergeManagedSection("  \n", block)).toBe(`${block}\n`);
-    expect(mergeManagedSection("<!-- cclinic:start -->\nno end", block)).toBeUndefined();
-    expect(mergeManagedSection("no start\n<!-- cclinic:end -->", block)).toBeUndefined();
-    expect(mergeManagedSection("<!-- cclinic:end --> <!-- cclinic:start -->", block)).toBeUndefined();
+    expect(mergeManagedSection("<!-- luseen:start -->\nno end", block)).toBeUndefined();
+    expect(mergeManagedSection("no start\n<!-- luseen:end -->", block)).toBeUndefined();
+    expect(mergeManagedSection("<!-- luseen:end --> <!-- luseen:start -->", block)).toBeUndefined();
   });
 
   it("TC-SKILL-022: stripping leaves only the user's text", () => {
@@ -124,13 +124,13 @@ describe("skill content", () => {
     ]) {
       expect(body).not.toContain(word);
     }
-    expect(render(name)).toContain(".cclinic/sdd");
+    expect(render(name)).toContain(".luseen/sdd");
   });
 
   it("TC-SKILL-009: the documents folder follows --out", () => {
     const file = renderSkill(skill("implement-spec"), "docs/sdd", hash);
     expect(file).toContain("docs/sdd/specs/");
-    expect(file).not.toContain(".cclinic/sdd");
+    expect(file).not.toContain(".luseen/sdd");
   });
 
   it.each(["create-spec", "refine-spec"])("TC-SKILL-025: %s requires the spec format", (name) => {
@@ -144,7 +144,7 @@ describe("skill content", () => {
       "**Evidence:**",
       "**Status:**",
       "open-questions.md",
-      "cclinic --force",
+      "luseen --force",
     ]) {
       expect(body).toContain(text);
     }
@@ -223,7 +223,7 @@ describe("agent workflow", () => {
       "real results",
       "No behaviour change",
       "say which stage was skipped",
-      "run `cclinic` first",
+      "run `luseen` first",
       "stop at stage 2",
       "ask whether to commit",
       "Only if they agree",
@@ -366,7 +366,7 @@ describe("product engineer and tasks", () => {
   };
 
   it("TC-SKILL-036, TC-PLAN-045: does its homework, asks like a PM, recommends, plays back, then proposes", () => {
-    for (const text of [".cclinic/sdd/overview.md", ".cclinic/sdd/README.md", "every file the user attached"]) {
+    for (const text of [".luseen/sdd/overview.md", ".luseen/sdd/README.md", "every file the user attached"]) {
       expect(position(text)).toBeLessThan(position("**Ask like a PM.**"));
     }
     expect(planner).toContain("Say briefly what you learned from each attached file");
@@ -395,14 +395,14 @@ describe("product engineer and tasks", () => {
   it("TC-SKILL-037, TC-PLAN-045: each task names its spec, and the skill saves only through the planning tools", () => {
     expect(planner).toContain("name the existing spec it belongs to, or say that a new spec is needed");
     expect(planner).toContain(
-      "Never run `cclinic tasks roadmap add`, `cclinic tasks milestone add` or `cclinic tasks add`",
+      "Never run `luseen tasks roadmap add`, `luseen tasks milestone add` or `luseen tasks add`",
     );
     expect(planner).toContain(
-      "Propose with `plan_propose`; cclinic checks it, asks the user, and saves it only after they approve.",
+      "Propose with `plan_propose`; luseen checks it, asks the user, and saves it only after they approve.",
     );
-    expect(planner).toContain("first call the cclinic MCP tool `plan_begin`");
+    expect(planner).toContain("first call the luseen MCP tool `plan_begin`");
     expect(planner).toContain("call `plan_resume` with that ID before anything else");
-    expect(planner).toContain("tell them to run `cclinic plan` in a terminal, or `cclinic plan --task`");
+    expect(planner).toContain("tell them to run `luseen plan` in a terminal, or `luseen plan --task`");
   });
 
   it("TC-SKILL-038: plans without changing code, tests or specs", () => {
@@ -432,11 +432,11 @@ describe("product engineer and tasks", () => {
     const step = AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf("**0."), AGENT_WORKFLOW.indexOf("**1."));
     expect(AGENT_WORKFLOW.indexOf("**0. Check open tasks.**")).toBeGreaterThan(-1);
     for (const text of [
-      "On every prompt, first run `cclinic tasks list --json`",
+      "On every prompt, first run `luseen tasks list --json`",
       "the prompt isn't about one of them",
       "wait for the user to choose",
       "work on one of them",
-      "remove it with `cclinic tasks remove <id>` and continue with the prompt",
+      "remove it with `luseen tasks remove <id>` and continue with the prompt",
       "keep it and continue with the prompt",
     ]) {
       expect(step).toContain(text);
@@ -456,22 +456,22 @@ describe("product engineer and tasks", () => {
       "If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, plan it with the `product-engineer` skill",
     );
     expect(stage).toContain(
-      "only through the cclinic MCP tools `plan_begin` and `plan_propose`, after the user approves",
+      "only through the luseen MCP tools `plan_begin` and `plan_propose`, after the user approves",
     );
     expect(stage).toContain("Never create roadmaps, milestones or roadmap tasks any other way");
-    expect(stage).toContain("Without the cclinic MCP server, tell the user to run `cclinic plan`");
-    expect(stage).toContain("or `cclinic plan --task` for one concrete task");
+    expect(stage).toContain("Without the luseen MCP server, tell the user to run `luseen plan`");
+    expect(stage).toContain("or `luseen plan --task` for one concrete task");
   });
 
   it("TC-INSTR-046: tasks are started with the work, and done after approval", () => {
-    expect(AGENT_WORKFLOW).toContain("When work starts on a task, run `cclinic tasks start <id>`");
+    expect(AGENT_WORKFLOW).toContain("When work starts on a task, run `luseen tasks start <id>`");
     const stage = AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf("**4."));
-    expect(stage).toContain("Once the user approves the implementation, run `cclinic tasks done <id>`");
+    expect(stage).toContain("Once the user approves the implementation, run `luseen tasks done <id>`");
   });
 
   it("TC-INSTR-047: the section with the task steps stays under 200 lines", () => {
-    expect(renderAgentsBlock(".cclinic/sdd").split("\n").length).toBeLessThan(200);
-    expect(renderAgentsBlock(".cclinic/sdd")).toContain("| `product-engineer` |");
+    expect(renderAgentsBlock(".luseen/sdd").split("\n").length).toBeLessThan(200);
+    expect(renderAgentsBlock(".luseen/sdd")).toContain("| `product-engineer` |");
   });
 });
 
@@ -505,7 +505,7 @@ describe("review doc", () => {
     const review = stage("**2.", "**3.");
     for (const text of [
       "use the `review-doc` skill",
-      "`.cclinic/reviews/<spec-name>/review.md`",
+      "`.luseen/reviews/<spec-name>/review.md`",
       "Give the user its path, ask them to review it, and offer `approve` or `refine`",
       "A review doc isn't approval, and it changes no production code",
     ]) {
@@ -514,22 +514,22 @@ describe("review doc", () => {
   });
 
   it("TC-INSTR-052: commits leave out review docs unless asked", () => {
-    expect(stage("**4.")).toContain("leave out review docs in `.cclinic/reviews/` unless the user asks for them");
+    expect(stage("**4.")).toContain("leave out review docs in `.luseen/reviews/` unless the user asks for them");
   });
 
   it("TC-INSTR-053: the section with the stage 2 options stays under 200 lines", () => {
-    const block = renderAgentsBlock(".cclinic/sdd");
+    const block = renderAgentsBlock(".luseen/sdd");
     expect(block.split("\n").length).toBeLessThan(200);
     expect(block).toContain("| `review-doc` |");
   });
 
   it("TC-SKILL-041: reads the change and writes one doc per spec, replacing the old one", () => {
     for (const text of [
-      "`spec.md`, `validation.md` and `verification.md` in `.cclinic/sdd/specs/<spec-name>/`",
+      "`spec.md`, `validation.md` and `verification.md` in `.luseen/sdd/specs/<spec-name>/`",
       "the spec's uncommitted changes",
       "read the code that the changed requirements touch",
-      "If `.cclinic/reviews/<spec-name>/` already exists, delete it",
-      "`.cclinic/reviews/<spec-name>/review.md`",
+      "If `.luseen/reviews/<spec-name>/` already exists, delete it",
+      "`.luseen/reviews/<spec-name>/review.md`",
       "`images/after-<n>.svg`",
     ]) {
       expect(reviewer).toContain(text);
@@ -550,7 +550,7 @@ describe("review doc", () => {
 
   it("TC-SKILL-043: real screenshots of today, or why not, and labelled mockups of after", () => {
     expect(reviewer).toContain("run its `start` commands, and take screenshots");
-    expect(reviewer).toContain("`.cclinic/environment/environment.json`");
+    expect(reviewer).toContain("`.luseen/environment/environment.json`");
     expect(reviewer).toContain("If the environment can't start, or you can't take screenshots, say why in the doc");
     expect(reviewer).toContain('Caption every image of the behaviour after the change with "Mockup, not built yet"');
     expect(reviewer).toContain("every after image says it's a mockup");
@@ -600,7 +600,7 @@ describe("code review", () => {
   it("TC-CREV-005: rule sources are the project's, then the guidelines, then the checklist", () => {
     const order = [
       "**The project's own rules:**",
-      "`.cclinic/sdd/developer-guidelines.md`",
+      "`.luseen/sdd/developer-guidelines.md`",
       "**The checklist below.**",
     ].map((text) => at(text));
     expect(order).toEqual([...order].sort((left, right) => left - right));
@@ -779,7 +779,7 @@ describe("code review", () => {
   });
 
   it("TC-CREV-021: the section with the review step stays under 200 lines", () => {
-    const block = renderAgentsBlock(".cclinic/sdd");
+    const block = renderAgentsBlock(".luseen/sdd");
     expect(block.split("\n").length).toBeLessThan(200);
     expect(block).toContain("| `review-code` |");
   });
@@ -802,8 +802,8 @@ describe("code review", () => {
   });
 });
 
-describe("the cclinic MCP tools in the workflow", () => {
-  const block = renderAgentsBlock(".cclinic/sdd");
+describe("the luseen MCP tools in the workflow", () => {
+  const block = renderAgentsBlock(".luseen/sdd");
 
   it("TC-INSTR-056: tells agents to call workflow_status first and use the tools, or the written steps without them", () => {
     expect(block).toContain("call `workflow_status` at the start of each prompt");
@@ -821,7 +821,7 @@ describe("the cclinic MCP tools in the workflow", () => {
   });
 
   it("TC-INSTR-057: tells agents never to approve for the user, and to report a refused step", () => {
-    expect(block).toContain("Never answer an approval question yourself, and never run `cclinic approve`");
+    expect(block).toContain("Never answer an approval question yourself, and never run `luseen approve`");
     expect(block).toContain("When a tool refuses a step, tell the user why");
   });
 

@@ -50,8 +50,8 @@ afterEach(async () => {
 
 function project(): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
@@ -145,7 +145,7 @@ async function stoppedInTerminal(
   };
 }
 
-/** Claude Code takes the session with plan_resume, as `claude` with cclinic's MCP server does. */
+/** Claude Code takes the session with plan_resume, as `claude` with luseen's MCP server does. */
 async function resumeInClaudeCode(root: string): Promise<void> {
   const quiet = { write: () => true };
   const server = await createProjectServer(
@@ -397,7 +397,7 @@ describe("QA run 8: probes around answered turns", () => {
       const again = agentHarness({ rules: [{ message: "Noted." }], env: { HOME: harness.environment.HOME } });
       inputMock.mockRejectedValueOnce(new Error("stop here"));
       const outcome = await planInTerminal(root, again, "plan-1");
-      // Recorded for the report: no timestamps means cclinic can't tell the turn was answered.
+      // Recorded for the report: no timestamps means luseen can't tell the turn was answered.
       console.log(
         "QA probe, no timestamps:",
         JSON.stringify({ prompts: again.calls().map((call) => call.prompt), outcome: String(outcome) }),

@@ -41,7 +41,7 @@ async function start(root: string, environment: NodeJS.ProcessEnv = {}, clock = 
 }
 
 function openStore(root: string): TaskStore {
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   return store;
 }
@@ -71,12 +71,12 @@ function project(): string {
 }
 
 function writeRun(root: string, roadmapId: number, runningTasks: number[], sessions: AgentSession[], isLive = true) {
-  const folder = path.join(root, ".cclinic/auto", RUN_ID);
+  const folder = path.join(root, ".luseen/auto", RUN_ID);
   const state: RunState = {
     runId: RUN_ID,
     roadmapId,
     roadmapTitle: "Payments",
-    runBranch: `cclinic/auto/${RUN_ID}/run`,
+    runBranch: `luseen/auto/${RUN_ID}/run`,
     startedAt: new Date(Date.now() - 600_000).toISOString(),
     finishedAt: null,
     outcome: null,
@@ -103,8 +103,7 @@ function writeRun(root: string, roadmapId: number, runningTasks: number[], sessi
   writeFileSync(path.join(folder, "run.json"), JSON.stringify(state));
   for (const session of sessions)
     writeFileSync(path.join(folder, "sessions", `${session.sessionId}.json`), JSON.stringify(session));
-  if (isLive)
-    writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: RUN_ID }));
+  if (isLive) writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId: RUN_ID }));
 }
 
 function agentSession(id: string, taskId: number, transcriptPath: string, ended: boolean): AgentSession {
@@ -220,9 +219,9 @@ describe("canvas data", () => {
       answer: null,
       notes: null,
     };
-    mkdirSync(path.join(root, ".cclinic/workflow"), { recursive: true });
+    mkdirSync(path.join(root, ".luseen/workflow"), { recursive: true });
     writeFileSync(
-      path.join(root, ".cclinic/workflow/task-1.json"),
+      path.join(root, ".luseen/workflow/task-1.json"),
       JSON.stringify({ ...state, reason: `Why ${key}`, pending }),
     );
     const reply = await sendTo(await start(root), "GET", "/api/canvas");
@@ -233,8 +232,8 @@ describe("canvas data", () => {
 
   it("TC-GUI-027: a damaged run is reported as a problem, and the rest of the canvas still works", async () => {
     const root = project();
-    mkdirSync(path.join(root, ".cclinic/auto", RUN_ID), { recursive: true });
-    writeFileSync(path.join(root, ".cclinic/auto", RUN_ID, "run.json"), "{broken");
+    mkdirSync(path.join(root, ".luseen/auto", RUN_ID), { recursive: true });
+    writeFileSync(path.join(root, ".luseen/auto", RUN_ID, "run.json"), "{broken");
     const { canvas } = await canvasOf(await start(root));
     expect(canvas.problems).toHaveLength(1);
     expect(canvas.tasks).toHaveLength(3);
@@ -286,7 +285,7 @@ describe("canvas data", () => {
   it("TC-GUI-031: a removed task's saved position leaves layout.json with the next save, by PUT or by Tidy up", async () => {
     const root = project();
     const gui = await start(root);
-    const layoutFile = path.join(root, ".cclinic/gui/layout.json");
+    const layoutFile = path.join(root, ".luseen/gui/layout.json");
     const stale = {
       version: 1,
       frames: { "roadmap-2": { x: 9, y: 9 } },
@@ -309,14 +308,14 @@ describe("canvas data", () => {
   it("TC-GUI-031: saved positions survive a save made while the task database can't be read", async () => {
     const root = project();
     const gui = await start(root);
-    const layoutFile = path.join(root, ".cclinic/gui/layout.json");
+    const layoutFile = path.join(root, ".luseen/gui/layout.json");
     const saved = {
       version: 1,
       frames: { "roadmap-1": { x: 5, y: 5 } },
       cards: { "task-1": { x: 1, y: 1 }, "task-3": { x: 3, y: 3 } },
     };
     await sendTo(gui, "PUT", "/api/layout", saved);
-    writeFileSync(path.join(root, ".cclinic/tasks.db"), "not a database");
+    writeFileSync(path.join(root, ".luseen/tasks.db"), "not a database");
     const reply = await sendTo(gui, "PUT", "/api/layout", {
       ...saved,
       cards: { ...saved.cards, "task-1": { x: 2, y: 2 } },
@@ -333,15 +332,15 @@ describe("canvas data", () => {
     const gui = await start(root);
     const saved = { version: 1, frames: {}, cards: { "task-1": { x: 40, y: 200 }, "task-3": { x: 40, y: 300 } } };
     await sendTo(gui, "PUT", "/api/layout", saved);
-    writeFileSync(path.join(root, ".cclinic/tasks.db"), "not a database");
+    writeFileSync(path.join(root, ".luseen/tasks.db"), "not a database");
     const { canvas } = JSON.parse((await sendTo(gui, "GET", "/api/canvas")).body) as { canvas: CanvasView };
     expect(canvas.problems).not.toEqual([]);
-    expect((JSON.parse(readFileSync(path.join(root, ".cclinic/gui/layout.json"), "utf8")) as Layout).cards).toEqual(
+    expect((JSON.parse(readFileSync(path.join(root, ".luseen/gui/layout.json"), "utf8")) as Layout).cards).toEqual(
       saved.cards,
     );
     // A page sends only what it moved; what it couldn't see stays saved.
     await sendTo(gui, "PUT", "/api/layout", { version: 1, frames: { changes: { x: 9, y: 9 } }, cards: {} });
-    expect((JSON.parse(readFileSync(path.join(root, ".cclinic/gui/layout.json"), "utf8")) as Layout).cards).toEqual(
+    expect((JSON.parse(readFileSync(path.join(root, ".luseen/gui/layout.json"), "utf8")) as Layout).cards).toEqual(
       saved.cards,
     );
   });
@@ -351,7 +350,7 @@ describe("canvas data", () => {
     const gui = await start(root);
     await sendTo(gui, "PUT", "/api/layout", { version: 1, frames: {}, cards: { "task-1": { x: 40, y: 200 } } });
     await sendTo(gui, "PUT", "/api/layout", { version: 1, frames: {}, cards: { "task-3": { x: 40, y: 300 } } });
-    expect((JSON.parse(readFileSync(path.join(root, ".cclinic/gui/layout.json"), "utf8")) as Layout).cards).toEqual({
+    expect((JSON.parse(readFileSync(path.join(root, ".luseen/gui/layout.json"), "utf8")) as Layout).cards).toEqual({
       "task-1": { x: 40, y: 200 },
       "task-3": { x: 40, y: 300 },
     });
@@ -361,7 +360,7 @@ describe("canvas data", () => {
     const root = project();
     const gui = await start(root);
     expect((await sendTo(gui, "POST", "/api/layout/tidy", { frame: "roadmap-1" })).status).toBe(200);
-    expect(JSON.parse(readFileSync(path.join(root, ".cclinic/gui/layout.json"), "utf8"))).toEqual({
+    expect(JSON.parse(readFileSync(path.join(root, ".luseen/gui/layout.json"), "utf8"))).toEqual({
       version: 1,
       frames: {},
       cards: {},
@@ -424,7 +423,7 @@ describe("canvas data", () => {
     const root = project();
     await saveChange(root, null, [], "fix-x");
     await saveChange(root, 3, [{ id: "mine", path: "/nowhere/mine.jsonl" }]);
-    writeFileSync(path.join(root, ".cclinic/workflow/task-9.json"), "{broken");
+    writeFileSync(path.join(root, ".luseen/workflow/task-9.json"), "{broken");
     const gui = await start(root);
     const { canvas } = await canvasOf(gui);
     expect(canvas.problems).toHaveLength(1);
@@ -597,7 +596,7 @@ describe("sessions and transcripts", () => {
 describe("layout", () => {
   it("TC-GUI-099: a saved layout is served again after a restart, and the task database isn't touched", async () => {
     const root = project();
-    const before = readFileSync(path.join(root, ".cclinic/tasks.db"));
+    const before = readFileSync(path.join(root, ".luseen/tasks.db"));
     const gui = await start(root);
     const layout = { version: 1, frames: { "roadmap-1": { x: 400, y: 60 } }, cards: { "task-2": { x: 30, y: 300 } } };
     expect((await sendTo(gui, "PUT", "/api/layout", layout)).status).toBe(200);
@@ -608,7 +607,7 @@ describe("layout", () => {
     expect(served.frames["roadmap-1"]).toEqual({ x: 400, y: 60 });
     expect(served.cards["task-2"]).toEqual({ x: 30, y: 300 });
     expect(served.cards["task-1"]).toBeDefined();
-    expect(readFileSync(path.join(root, ".cclinic/tasks.db")).equals(before)).toBe(true);
+    expect(readFileSync(path.join(root, ".luseen/tasks.db")).equals(before)).toBe(true);
   });
 
   it("TC-GUI-099: a layout that isn't the saved shape is refused and nothing is written", async () => {
@@ -620,7 +619,7 @@ describe("layout", () => {
       { version: 1, frames: {}, cards: { "task-1": { x: 1e9, y: 0 } } },
     ])
       expect((await sendTo(gui, "PUT", "/api/layout", body)).status).toBe(400);
-    expect(() => readFileSync(path.join(root, ".cclinic/gui/layout.json"))).toThrow();
+    expect(() => readFileSync(path.join(root, ".luseen/gui/layout.json"))).toThrow();
   });
 
   it("TC-GUI-099: layouts saved at the same moment all succeed, and the file holds one whole layout", async () => {
@@ -633,7 +632,7 @@ describe("layout", () => {
     }));
     const replies = await Promise.all(layouts.map((layout) => sendTo(gui, "PUT", "/api/layout", layout)));
     expect(replies.map((reply) => reply.status)).toEqual(layouts.map(() => 200));
-    const saved = JSON.parse(readFileSync(path.join(root, ".cclinic/gui/layout.json"), "utf8")) as Layout;
+    const saved = JSON.parse(readFileSync(path.join(root, ".luseen/gui/layout.json"), "utf8")) as Layout;
     expect(layouts.some((layout) => layout.frames["roadmap-1"].x === saved.frames["roadmap-1"]?.x)).toBe(true);
   });
 

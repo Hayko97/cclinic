@@ -3,6 +3,7 @@
  * because providers accept only a subset of JSON Schema. validation.ts checks the rest.
  */
 import { z } from "zod";
+import { LEGACY_NAME } from "./constants/paths.js";
 
 const evidence = z.array(z.string());
 
@@ -99,24 +100,37 @@ export interface GeneratedSpec extends SpecContent {
   readonly area: string;
 }
 
-export const manifestSchema = z.object({
-  cclinicVersion: z.string(),
-  promptVersion: z.string(),
-  generatedAt: z.string(),
-  provider: z.string(),
-  requestedModel: z.string(),
-  actualModels: z.array(z.string()),
-  effort: z.string(),
-  analysedFiles: z.record(z.string(), z.string()),
-  generatedFiles: z.record(z.string(), z.string()),
-  specs: z.array(
-    z.object({
-      name: z.string(),
-      area: z.string(),
-      ids: z.array(z.object({ id: z.string(), title: z.string() })),
-    }),
-  ),
-  retiredIds: z.array(z.string()),
-  newestCommit: z.string().optional(),
-});
+const LEGACY_VERSION_FIELD = `${LEGACY_NAME}Version`;
+
+/** FR-CLI-035: a manifest cclinic wrote names its version `cclinicVersion`. */
+function renameLegacyVersion(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || "luseenVersion" in value || !(LEGACY_VERSION_FIELD in value))
+    return value;
+  const { [LEGACY_VERSION_FIELD]: version, ...rest } = value as Record<string, unknown>;
+  return { ...rest, luseenVersion: version };
+}
+
+export const manifestSchema = z.preprocess(
+  renameLegacyVersion,
+  z.object({
+    luseenVersion: z.string(),
+    promptVersion: z.string(),
+    generatedAt: z.string(),
+    provider: z.string(),
+    requestedModel: z.string(),
+    actualModels: z.array(z.string()),
+    effort: z.string(),
+    analysedFiles: z.record(z.string(), z.string()),
+    generatedFiles: z.record(z.string(), z.string()),
+    specs: z.array(
+      z.object({
+        name: z.string(),
+        area: z.string(),
+        ids: z.array(z.object({ id: z.string(), title: z.string() })),
+      }),
+    ),
+    retiredIds: z.array(z.string()),
+    newestCommit: z.string().optional(),
+  }),
+);
 export type Manifest = z.infer<typeof manifestSchema>;

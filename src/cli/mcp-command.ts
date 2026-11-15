@@ -1,4 +1,4 @@
-/** `cclinic mcp` and `cclinic approve`: the MCP server, and answering its questions in a terminal (spec: mcp-server). */
+/** `luseen mcp` and `luseen approve`: the MCP server, and answering its questions in a terminal (spec: mcp-server). */
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -48,7 +48,7 @@ export interface McpOptions {
   readonly approver: string;
   readonly run?: string;
   readonly task?: number;
-  /** FR-MCP-046: serve only this planning session's tools, for a PM turn cclinic drives. */
+  /** FR-MCP-046: serve only this planning session's tools, for a PM turn luseen drives. */
   readonly plan?: string;
 }
 
@@ -102,7 +102,7 @@ function summarizeRun(target: string) {
 /** This server, as the holder of the planning sessions Claude Code begins or resumes (FR-PLAN-032). */
 const HOST_HOLDER = { place: "claude-code", pid: process.pid } as const;
 
-/** FR-PLAN-044, FR-MCP-046: the planning tools, for Claude Code itself or for one session cclinic drives. */
+/** FR-PLAN-044, FR-MCP-046: the planning tools, for Claude Code itself or for one session luseen drives. */
 function planTools(target: string, connection: McpConnection, planId: string | undefined) {
   const ports = decisionPorts(target);
   return createPlanTools({
@@ -135,7 +135,7 @@ export async function createProjectServer(options: McpOptions, context: CommandC
   const approverMode = parseApprover(options);
   const paths = projectPaths(target, undefined);
   if (!existsSync(paths.out))
-    throw new UsageError(`There are no project documents in ${paths.out}. Run "cclinic" in the project first.`);
+    throw new UsageError(`There are no project documents in ${paths.out}. Run "luseen" in the project first.`);
   const connection = createMcpServer({ name: MCP_SERVER_NAME, version: context.version });
   if (options.plan !== undefined) {
     await requireOpenPlan(target, options.plan);
@@ -176,7 +176,7 @@ export async function createProjectServer(options: McpOptions, context: CommandC
 export async function runMcpCommand(options: McpOptions, context: CommandContext): Promise<void> {
   const connection = await createProjectServer(options, context);
   await connection.connect();
-  context.reporter.debug("The cclinic MCP server is running.");
+  context.reporter.debug("The luseen MCP server is running.");
   await connection.waitUntilClosed();
   if (options.plan === undefined) await releaseHeldPlans(await projectFolder(options.dir));
 }
@@ -203,7 +203,7 @@ async function answerProposal(target: string, session: PlanSession, context: Com
 /** FR-MCP-029, FR-CLI-029: only a person at a terminal can answer, so an agent's shell can't. */
 export async function runApproveCommand(given: string | undefined, context: CommandContext): Promise<void> {
   if (!isInteractive())
-    throw new UsageError("cclinic approve must be run in your own terminal, so only you can answer.");
+    throw new UsageError("luseen approve must be run in your own terminal, so only you can answer.");
   const target = await projectFolder(given);
   const store = openWorkflowStore(target);
   const waiting = (await store.list()).filter((state) => state.pending !== null && state.pending.answer === null);
@@ -240,7 +240,7 @@ export async function runApproveCommand(given: string | undefined, context: Comm
   // The server may have saved this change while the user was choosing, so the answer goes on its latest state.
   const latest = (await store.list()).find((item) => item.key === state.key);
   if (latest === undefined || !isStillWaiting(latest, pending.question))
-    throw new UsageError("That question changed while you were answering. Run cclinic approve again.");
+    throw new UsageError("That question changed while you were answering. Run luseen approve again.");
   const outcome = answerPending(latest, answer, notes === "" ? null : notes, new Date().toISOString());
   if ("refusal" in outcome) throw new UsageError(outcome.refusal);
   await store.save(outcome.state);
@@ -249,7 +249,7 @@ export async function runApproveCommand(given: string | undefined, context: Comm
 
 /**
  * The project the hook's session works on: Claude Code's project folder, else the nearest folder with
- * `.cclinic`. Undefined when there's none, so nothing is written outside a cclinic project.
+ * `.luseen`. Undefined when there's none, so nothing is written outside a luseen project.
  */
 function hookProject(cwd: string, environment: NodeJS.ProcessEnv): string | undefined {
   const given = environment["CLAUDE_PROJECT_DIR"];
@@ -283,7 +283,7 @@ async function linkFromHook(stdin: Readable, environment: NodeJS.ProcessEnv, sig
 }
 
 /**
- * FR-MCP-045, FR-CLI-031: links the Claude Code session that just used a cclinic tool to the open change.
+ * FR-MCP-045, FR-CLI-031: links the Claude Code session that just used a luseen tool to the open change.
  * It runs inside the user's session, so it never fails, never prints and never waits long.
  */
 export async function runSessionLink(stdin: Readable, environment: NodeJS.ProcessEnv): Promise<void> {

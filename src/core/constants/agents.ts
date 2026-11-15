@@ -58,7 +58,7 @@ export const PLAN_ID_PREFIX = "plan-";
 /** A planning session ID, such as `plan-3` (FR-PLAN-030). */
 export const PLAN_ID_SOURCE = "plan-[1-9]\\d{0,8}";
 export const PLAN_ID_PATTERN = new RegExp(`^${PLAN_ID_SOURCE}$`);
-/** FR-PLAN-005, FR-MCP-046: the planning tools a PM turn cclinic drives may call. */
+/** FR-PLAN-005, FR-MCP-046: the planning tools a PM turn luseen drives may call. */
 export const PLAN_DRIVEN_TOOL_NAMES = ["plan_status", "plan_suggest", "plan_propose"] as const;
 
 export const AUTO_LIMITS = {
@@ -68,7 +68,7 @@ export const AUTO_LIMITS = {
 } as const;
 
 export const AUTO_FOLDER = `${TOOL_FOLDER_NAME}/auto`;
-export const AUTO_BRANCH_PREFIX = "cclinic/auto";
+export const AUTO_BRANCH_PREFIX = "luseen/auto";
 export const AUTO_LOCK_FILE = ".lock";
 export const RUN_STATE_FILE = "run.json";
 export const RUN_REPORT_FILE = "report.md";
@@ -82,7 +82,7 @@ export const WIP_COMMIT_MARKER = "WIP";
 
 /** Creating a worktree copies the project, which takes longer than other Git commands. */
 export const AUTO_GIT_TIMEOUT_MS = 300_000;
-export const AUTO_COMMIT_IDENTITY = { name: "cclinic", email: "cclinic@localhost" } as const;
+export const AUTO_COMMIT_IDENTITY = { name: "luseen", email: "luseen@localhost" } as const;
 export const MAX_REVIEW_DIFF_CHARS = 200_000;
 /** The skills developer and QA agents follow. They must be committed, since agents work from HEAD. */
 export const AUTO_REQUIRED_SKILLS: readonly string[] = [

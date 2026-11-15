@@ -38,7 +38,7 @@ async function start(root: string, environment: NodeJS.ProcessEnv = {}, clock = 
 /** Roadmap 1 with tasks 1 and 2, and roadmap 2 with task 3. */
 function project(): string {
   const root = makeTempFolder();
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   const task = (key: string) => ({ key, title: `Task ${key}`, description: "", spec: null, dependsOn: [] });
   store.savePlan({
@@ -57,7 +57,7 @@ function runState(runId: string): RunState {
     runId,
     roadmapId: 1,
     roadmapTitle: "One",
-    runBranch: `cclinic/auto/${runId}/run`,
+    runBranch: `luseen/auto/${runId}/run`,
     startedAt: "2026-11-11T10:00:00.000Z",
     finishedAt: null,
     outcome: null,
@@ -100,7 +100,7 @@ function agent(index: number, transcriptPath: string, ended: boolean): AgentSess
 }
 
 function writeRun(root: string, runId: string, sessions: AgentSession[], text?: string) {
-  const folder = path.join(root, ".cclinic/auto", runId);
+  const folder = path.join(root, ".luseen/auto", runId);
   mkdirSync(path.join(folder, "sessions"), { recursive: true });
   writeFileSync(path.join(folder, "run.json"), text ?? JSON.stringify(runState(runId)));
   for (const session of sessions)
@@ -108,11 +108,11 @@ function writeRun(root: string, runId: string, sessions: AgentSession[], text?: 
 }
 
 function liveLock(root: string, runId: string) {
-  writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId }));
+  writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId }));
 }
 
 const userLine = (text: string) => `${JSON.stringify({ type: "user", message: { content: text } })}\n`;
-const layoutFile = (root: string) => path.join(root, ".cclinic/gui/layout.json");
+const layoutFile = (root: string) => path.join(root, ".luseen/gui/layout.json");
 
 async function canvasOf(gui: TestGui): Promise<{ canvas: CanvasView; layout: Layout }> {
   return JSON.parse((await sendTo(gui, "GET", "/api/canvas")).body) as { canvas: CanvasView; layout: Layout };
@@ -218,7 +218,7 @@ describe("QA run 3: canvas server", () => {
     expect(first.problems).toEqual(["The state of automated run 20261111-100023 isn't readable."]);
     expect(first.roadmaps[0]).toMatchObject({ mode: "ai", runId: live });
     // A finished run read before is still dropped once its folder is removed.
-    rmSync(path.join(root, ".cclinic/auto", "20261111-100005"), { recursive: true });
+    rmSync(path.join(root, ".luseen/auto", "20261111-100005"), { recursive: true });
     const after = (await canvasOf(gui)).canvas.tasks.find((item) => item.id === 1);
     expect(after?.sessions.map((session) => session.runId)).not.toContain("20261111-100005");
   });

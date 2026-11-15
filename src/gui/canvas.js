@@ -48,7 +48,7 @@ const state = {
   savesInFlight: 0,
   /** A save ended during a press, so the update held meanwhile is older than it and the canvas is read again. */
   isPendingStale: false,
-  /** `cclinic tasks` changes running now, so a second click doesn't run the same one twice (FR-GUI-020). */
+  /** `luseen tasks` changes running now, so a second click doesn't run the same one twice (FR-GUI-020). */
   running: new Set(),
   hasFitted: false,
 };
@@ -941,7 +941,7 @@ async function frameAction(button) {
   }
 }
 
-/** Runs a `cclinic tasks` change and says how it went; the canvas stream shows the result (FR-GUI-020). */
+/** Runs a `luseen tasks` change and says how it went; the canvas stream shows the result (FR-GUI-020). */
 export async function runAndReport(request, success) {
   const key = JSON.stringify(request);
   if (state.running.has(key)) {

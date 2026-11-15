@@ -90,7 +90,7 @@ function project(): string {
 }
 
 function savedConfig(harnessValue: Harness): unknown {
-  const file = path.join(harnessValue.environment["XDG_CONFIG_HOME"] ?? "", "cclinic/config.json");
+  const file = path.join(harnessValue.environment["XDG_CONFIG_HOME"] ?? "", "luseen/config.json");
   return JSON.parse(readFileSync(file, "utf8"));
 }
 
@@ -166,7 +166,7 @@ describe("model selection", () => {
     selectMock.mockRejectedValueOnce(Object.assign(new Error("closed"), { name: "ExitPromptError" }));
     const test = harness();
     await expect(runModelCommand({}, test.context)).rejects.toBeInstanceOf(CancelledError);
-    expect(existsSync(path.join(test.environment["XDG_CONFIG_HOME"] ?? "", "cclinic"))).toBe(false);
+    expect(existsSync(path.join(test.environment["XDG_CONFIG_HOME"] ?? "", "luseen"))).toBe(false);
   });
 
   it("TC-MODEL-013: --model with a folder treats it as the target", async () => {
@@ -201,7 +201,7 @@ describe("model selection", () => {
       const environment: NodeJS.ProcessEnv = { ...harness().environment, HOME: home };
       delete environment["XDG_CONFIG_HOME"];
       await runModelCommand({}, { ...harness().context, environment });
-      expect(existsSync(path.join(home, ".config/cclinic/config.json"))).toBe(true);
+      expect(existsSync(path.join(home, ".config/luseen/config.json"))).toBe(true);
     } finally {
       process.env["HOME"] = original;
     }
@@ -282,7 +282,7 @@ describe("the environment step", () => {
     expect(declined.started).toEqual([]);
     expect(declined.test.stdout()).toContain("Use the local-env skill");
     const prompt = confirmMock.mock.calls[1]?.[0] as { message: string; default: boolean };
-    expect(prompt.message).toContain("create files in .cclinic/environment");
+    expect(prompt.message).toContain("create files in .luseen/environment");
     expect(prompt.message).toContain("run this project's code");
     expect(prompt.default).toBe(true);
 
@@ -318,7 +318,7 @@ describe("confirmation and output", () => {
     await runGenerate(root, options(), test.context);
     expect(test.stdout()).toContain("Nothing was sent.");
     expect(existsSync(record)).toBe(false);
-    expect(existsSync(path.join(root, ".cclinic"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen"))).toBe(false);
   });
 
   it("TC-CLI-012: agreeing generates documents", async () => {
@@ -326,7 +326,7 @@ describe("confirmation and output", () => {
     const root = project();
     const test = harness();
     await runGenerate(root, options(), test.context);
-    expect(existsSync(path.join(root, ".cclinic/sdd/README.md"))).toBe(true);
+    expect(existsSync(path.join(root, ".luseen/sdd/README.md"))).toBe(true);
     expect(test.stderr()).toContain("Project content will be sent to Anthropic.");
   });
 
@@ -342,7 +342,7 @@ describe("confirmation and output", () => {
   });
 
   it("TC-CLI-002: invalid environment and values are usage errors", async () => {
-    const test = harness({ CCLINIC_PROVIDER: "nope" });
+    const test = harness({ LUSEEN_PROVIDER: "nope" });
     await expect(runGenerate(project(), options({ dryRun: true }), test.context)).rejects.toBeInstanceOf(UsageError);
     await expect(runGenerate("/no/such/folder", options(), harness().context)).rejects.toBeInstanceOf(UsageError);
   });
@@ -378,7 +378,7 @@ describe("doctor and clean", () => {
   it("TC-CLI-031: reports pass and fail states with fixes", async () => {
     const ready = harness();
     await expect(runDoctor(project(), {}, ready.context)).resolves.toBe(0);
-    expect(ready.stdout()).toContain("cclinic is ready to run.");
+    expect(ready.stdout()).toContain("luseen is ready to run.");
 
     const notReady = harness({ PATH: makeTempFolder() });
     await expect(runDoctor(project(), { json: true }, notReady.context)).resolves.toBe(3);
@@ -415,18 +415,18 @@ describe("doctor and clean", () => {
 
   it("TC-CLI-035: clean asks first, and honours the answer", async () => {
     const root = project();
-    writeProject(root, { ".cclinic/cache/a.json": "{}", ".cclinic/sdd/README.md": "keep" });
+    writeProject(root, { ".luseen/cache/a.json": "{}", ".luseen/sdd/README.md": "keep" });
     confirmMock.mockResolvedValueOnce(false);
     const declined = harness();
     await runClean(root, {}, declined.context);
     expect(declined.stdout()).toContain("Nothing was deleted");
-    expect(existsSync(path.join(root, ".cclinic/cache/a.json"))).toBe(true);
+    expect(existsSync(path.join(root, ".luseen/cache/a.json"))).toBe(true);
     confirmMock.mockResolvedValueOnce(true);
     const agreed = harness();
     await runClean(root, {}, agreed.context);
     expect(agreed.stdout()).toContain("Freed");
-    expect(existsSync(path.join(root, ".cclinic/cache"))).toBe(false);
-    expect(readFileSync(path.join(root, ".cclinic/sdd/README.md"), "utf8")).toBe("keep");
+    expect(existsSync(path.join(root, ".luseen/cache"))).toBe(false);
+    expect(readFileSync(path.join(root, ".luseen/sdd/README.md"), "utf8")).toBe("keep");
   });
 });
 
@@ -437,7 +437,7 @@ describe("providers and pipeline details", () => {
     const test = harness();
     await runGenerate(root, options({ out, yes: true }), test.context);
     expect(existsSync(path.join(out, "README.md"))).toBe(true);
-    expect(existsSync(path.join(root, ".cclinic/sdd"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/sdd"))).toBe(false);
   });
 
   it("TC-ANA-029: --force doesn't regenerate summaries", async () => {
@@ -454,7 +454,7 @@ describe("providers and pipeline details", () => {
     const record = path.join(makeTempFolder(), "calls.jsonl");
     await runGenerate(root, options({ yes: true }), harness({ FAKE_CLAUDE_RECORD: record }).context);
     expect(readFileSync(record, "utf8")).not.toContain("AKIAIOSFODNN7EXAMPLE");
-    const report = readFileSync(path.join(root, ".cclinic/sdd/scan-report.md"), "utf8");
+    const report = readFileSync(path.join(root, ".luseen/sdd/scan-report.md"), "utf8");
     expect(report).not.toContain("AKIAIOSFODNN7EXAMPLE");
     expect(report).toContain("| src/config.ts | 1 |");
   });
@@ -613,7 +613,7 @@ describe("providers and pipeline details", () => {
       effort: "medium",
       concurrency: 1,
       noCache: false,
-      cclinicVersion: "1",
+      luseenVersion: "1",
     } as const;
     const projectData = (evidence: string[]) => ({
       overview: { purpose: "P", users: [], scope: [], nonGoals: [], glossary: [] },
@@ -669,12 +669,12 @@ describe("providers and pipeline details", () => {
     const root = project();
     const test = harness();
     await runGenerate(root, options({ yes: true }), test.context);
-    const out = path.join(root, ".cclinic/sdd");
+    const out = path.join(root, ".luseen/sdd");
     const { renameSync, mkdirSync, writeFileSync } = await import("node:fs");
     // A kill between the two renames leaves only the backup, plus an unfinished temp folder.
-    renameSync(out, `${out}.cclinic-old-1`);
-    mkdirSync(`${out}.cclinic-tmp-1`);
-    writeFileSync(`${out}.cclinic-tmp-1/partial.md`, "partial");
+    renameSync(out, `${out}.luseen-old-1`);
+    mkdirSync(`${out}.luseen-tmp-1`);
+    writeFileSync(`${out}.luseen-tmp-1/partial.md`, "partial");
     await recoverInterruptedWrite(out);
     const manifest = JSON.parse(readFileSync(path.join(out, "manifest.json"), "utf8")) as {
       generatedFiles: Record<string, string>;
@@ -682,6 +682,6 @@ describe("providers and pipeline details", () => {
     for (const [file, hash] of Object.entries(manifest.generatedFiles)) {
       expect(sha256(readFileSync(path.join(out, file), "utf8"))).toBe(hash);
     }
-    expect(readdirSync(path.dirname(out)).filter((name) => name.includes("cclinic-"))).toEqual([]);
+    expect(readdirSync(path.dirname(out)).filter((name) => name.includes("luseen-"))).toEqual([]);
   });
 });

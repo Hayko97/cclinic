@@ -26,7 +26,7 @@ const request = (change: Partial<GuiRequest> & { headers?: Record<string, string
   query: {},
   readBody: () => Promise.resolve(undefined),
   ...change,
-  headers: { host: `127.0.0.1:${PORT}`, "x-cclinic-token": TOKEN, ...change.headers },
+  headers: { host: `127.0.0.1:${PORT}`, "x-luseen-token": TOKEN, ...change.headers },
 });
 const access = (change: Parameters<typeof request>[0]) => checkAccess(request(change), { port: PORT, token: TOKEN });
 
@@ -55,18 +55,18 @@ describe("access", () => {
   });
 
   it("TC-GUI-012: a missing or wrong token is refused; the header or the cookie lets a request in", () => {
-    const noToken = { "x-cclinic-token": "" };
+    const noToken = { "x-luseen-token": "" };
     expect(access({ headers: noToken })).toEqual({ kind: "denied", status: HTTP_STATUS.unauthorized });
-    expect(access({ headers: { "x-cclinic-token": `${TOKEN.slice(1)}x` } }).kind).toBe("denied");
-    expect(access({ headers: { ...noToken, cookie: `a=1; cclinic_token_${PORT}=${TOKEN}` } })).toEqual({
+    expect(access({ headers: { "x-luseen-token": `${TOKEN.slice(1)}x` } }).kind).toBe("denied");
+    expect(access({ headers: { ...noToken, cookie: `a=1; luseen_token_${PORT}=${TOKEN}` } })).toEqual({
       kind: "allowed",
       isFirstLoad: false,
     });
-    expect(access({ headers: { ...noToken, cookie: `cclinic_token_${PORT + 1}=${TOKEN}` } }).kind).toBe("denied");
+    expect(access({ headers: { ...noToken, cookie: `luseen_token_${PORT + 1}=${TOKEN}` } }).kind).toBe("denied");
   });
 
   it("TC-GUI-013: only the first page load may carry the token in its query", () => {
-    const noToken = { "x-cclinic-token": "" };
+    const noToken = { "x-luseen-token": "" };
     expect(access({ path: "/", query: { token: TOKEN }, headers: noToken })).toEqual({
       kind: "allowed",
       isFirstLoad: true,
@@ -178,7 +178,7 @@ describe("jobs", () => {
       "--json",
       "--no-git",
     ]);
-    expect(describeJob(["--include=a b", "doctor"])).toBe('cclinic "--include=a b" doctor');
+    expect(describeJob(["--include=a b", "doctor"])).toBe('luseen "--include=a b" doctor');
     expect(exitMeaning(0)).toBe("Finished");
     expect(exitMeaning(130)).toBe("Stopped");
     expect(exitMeaning(9)).toBe("Exited with code 9");

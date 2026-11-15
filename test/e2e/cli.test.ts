@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 import { makeTempFolder, writeProject } from "../support/helpers.js";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
-const BIN = path.join(REPO, "bin/cclinic.js");
+const BIN = path.join(REPO, "bin/luseen.js");
 const FAKE = path.join(REPO, "test/fixtures/fake-claude/claude");
 
 interface RunOutput {
@@ -43,7 +43,7 @@ function pathFolder(includeClaude: boolean): string {
   return folder;
 }
 
-function cclinic(args: readonly string[], options: RunOptions = {}): Promise<RunOutput> {
+function luseen(args: readonly string[], options: RunOptions = {}): Promise<RunOutput> {
   const home = makeTempFolder();
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [BIN, ...args], {
@@ -94,14 +94,14 @@ async function waitFor(check: () => boolean, timeoutMs = 10_000): Promise<void> 
 describe("running", () => {
   it("TC-CLI-001: uses the current folder by default", async () => {
     const root = sampleProject();
-    const { code, stdout } = await cclinic(["--dry-run"], { cwd: root });
+    const { code, stdout } = await luseen(["--dry-run"], { cwd: root });
     expect(code).toBe(0);
     expect(stdout).toContain(path.basename(root));
   });
 
   it("TC-CLI-002: uses a given path", async () => {
     const root = sampleProject();
-    const { code, stdout } = await cclinic([root, "--dry-run"]);
+    const { code, stdout } = await luseen([root, "--dry-run"]);
     expect(code).toBe(0);
     expect(stdout).toContain(path.basename(root));
   });
@@ -109,14 +109,14 @@ describe("running", () => {
   it("TC-CLI-003: a missing path or file exits 2, naming it", async () => {
     const root = sampleProject();
     for (const target of ["/no/such/path", path.join(root, "package.json")]) {
-      const { code, stderr } = await cclinic([target]);
+      const { code, stderr } = await luseen([target]);
       expect(code).toBe(2);
       expect(stderr).toContain(target);
     }
   });
 
   it("TC-CLI-004: help lists model and every option", async () => {
-    const { code, stdout } = await cclinic(["--help"]);
+    const { code, stdout } = await luseen(["--help"]);
     expect(code).toBe(0);
     for (const text of [
       "model",
@@ -152,7 +152,7 @@ describe("running", () => {
 
   it("TC-CLI-005: the version matches package.json", async () => {
     const expected = (JSON.parse(readFileSync(path.join(REPO, "package.json"), "utf8")) as { version: string }).version;
-    for (const flag of ["--version", "-v"]) expect((await cclinic([flag])).stdout.trim()).toBe(expected);
+    for (const flag of ["--version", "-v"]) expect((await luseen([flag])).stdout.trim()).toBe(expected);
   });
 
   it.each([
@@ -162,7 +162,7 @@ describe("running", () => {
     ["--max-budget-usd", "-1"],
     ["--unknown"],
   ])("TC-CLI-006: rejects %s %s", async (...args) => {
-    const { code, stdout } = await cclinic([
+    const { code, stdout } = await luseen([
       ...args.filter((item): item is string => typeof item === "string"),
       "--dry-run",
     ]);
@@ -172,7 +172,7 @@ describe("running", () => {
 
   it("TC-CLI-007: options reach the pipeline", async () => {
     const root = sampleProject({ "vendor/kept.ts": "x", "src/drop.ts": "y" });
-    const { stdout } = await cclinic([
+    const { stdout } = await luseen([
       root,
       "--dry-run",
       "--json",
@@ -189,14 +189,14 @@ describe("running", () => {
   it("TC-CLI-008: --dry-run makes no generation calls or files", async () => {
     const root = sampleProject();
     const record = path.join(makeTempFolder(), "calls.jsonl");
-    const { code } = await cclinic([root, "--dry-run"], { env: { FAKE_CLAUDE_RECORD: record } });
+    const { code } = await luseen([root, "--dry-run"], { env: { FAKE_CLAUDE_RECORD: record } });
     expect(code).toBe(0);
     expect(existsSync(record)).toBe(false);
-    expect(existsSync(path.join(root, ".cclinic"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen"))).toBe(false);
   });
 
   it("TC-CLI-009: the summary has all fields, and says content goes to Anthropic", async () => {
-    const { stdout } = await cclinic([sampleProject(), "--dry-run"]);
+    const { stdout } = await luseen([sampleProject(), "--dry-run"]);
     for (const text of [
       "Target:",
       "Provider:   claude-cli",
@@ -213,7 +213,7 @@ describe("running", () => {
   });
 
   it("TC-CLI-010: the API shows a cost, and a subscription shows tokens only", async () => {
-    const api = await cclinic([sampleProject(), "--dry-run", "--provider", "anthropic-api"], {
+    const api = await luseen([sampleProject(), "--dry-run", "--provider", "anthropic-api"], {
       noClaude: true,
       env: { ANTHROPIC_API_KEY: "sk-ant-test", ANTHROPIC_BASE_URL: "http://127.0.0.1:9" },
     });
@@ -221,12 +221,12 @@ describe("running", () => {
     expect(api.stdout).toContain("for summarising only");
     expect(api.stdout).toContain("Combining and writing specs use more");
     expect(api.stderr).toContain("estimated from characters");
-    expect((await cclinic([sampleProject(), "--dry-run"])).stdout).not.toContain("Cost:");
+    expect((await luseen([sampleProject(), "--dry-run"])).stdout).not.toContain("Cost:");
   });
 
   it("TC-CLI-013: with no terminal and no --yes, exits 2 without waiting", async () => {
     const record = path.join(makeTempFolder(), "calls.jsonl");
-    const { code, stderr } = await cclinic([sampleProject()], {
+    const { code, stderr } = await luseen([sampleProject()], {
       env: { FAKE_CLAUDE_RECORD: record },
       timeoutMs: 10_000,
     });
@@ -237,15 +237,15 @@ describe("running", () => {
 
   it("TC-CLI-014: --yes runs a full generation without prompting", async () => {
     const root = sampleProject();
-    const { code, stdout } = await cclinic([root, "--yes"]);
+    const { code, stdout } = await luseen([root, "--yes"]);
     expect(code).toBe(0);
     expect(stdout).toContain("Documents written to");
     expect(stdout).toContain("1 specs, 1 requirements, 1 test cases");
-    expect(existsSync(path.join(root, ".cclinic/sdd/specs/core-feature/verification.md"))).toBe(true);
+    expect(existsSync(path.join(root, ".luseen/sdd/specs/core-feature/verification.md"))).toBe(true);
   });
 
   it("TC-CLI-015: progress is on stderr, and content appears in neither stream", async () => {
-    const { stdout, stderr } = await cclinic([sampleProject({ "src/m.ts": "MARKER-CONTENT-123\n" }), "--yes"]);
+    const { stdout, stderr } = await luseen([sampleProject({ "src/m.ts": "MARKER-CONTENT-123\n" }), "--yes"]);
     expect(stderr).toContain("Scanning");
     expect(stdout).not.toContain("Scanning");
     expect(stdout + stderr).not.toContain("MARKER-CONTENT-123");
@@ -257,21 +257,21 @@ describe("running", () => {
     ["no provider", ["--yes"], {}, 3, true],
     ["LLM failure", ["--yes"], { FAKE_CLAUDE_MODE: "auth-error" }, 4, false],
   ])("TC-CLI-016: %s exits with its code", async (_name, args, env, expected, noClaude) => {
-    const { code } = await cclinic([sampleProject(), ...args], { env, noClaude });
+    const { code } = await luseen([sampleProject(), ...args], { env, noClaude });
     expect(code).toBe(expected);
   });
 
-  it("TC-CLI-018: an option beats CCLINIC_PROVIDER, which beats the default", async () => {
+  it("TC-CLI-018: an option beats LUSEEN_PROVIDER, which beats the default", async () => {
     const env = {
-      CCLINIC_PROVIDER: "anthropic-api",
+      LUSEEN_PROVIDER: "anthropic-api",
       ANTHROPIC_API_KEY: "sk-ant-x",
       ANTHROPIC_BASE_URL: "http://127.0.0.1:9",
     };
-    expect((await cclinic([sampleProject(), "--dry-run"], { env })).stdout).toContain("anthropic-api");
-    expect((await cclinic([sampleProject(), "--dry-run", "--provider", "claude-cli"], { env })).stdout).toContain(
+    expect((await luseen([sampleProject(), "--dry-run"], { env })).stdout).toContain("anthropic-api");
+    expect((await luseen([sampleProject(), "--dry-run", "--provider", "claude-cli"], { env })).stdout).toContain(
       "Provider:   claude-cli",
     );
-    expect((await cclinic([sampleProject(), "--dry-run"], { env: { CCLINIC_PROVIDER: "nope" } })).code).toBe(2);
+    expect((await luseen([sampleProject(), "--dry-run"], { env: { LUSEEN_PROVIDER: "nope" } })).code).toBe(2);
   });
 });
 
@@ -279,49 +279,49 @@ describe("help and output", () => {
   it.each(["model", "doctor", "clean"])(
     "TC-CLI-020: help for %s has description, examples and link, in both forms",
     async (command) => {
-      const { stdout } = await cclinic([command, "--help"]);
+      const { stdout } = await luseen([command, "--help"]);
       expect(stdout).toContain("Examples:");
-      expect(stdout).toContain("cclinic guide");
-      expect((await cclinic(["help", command])).stdout).toBe(stdout);
+      expect(stdout).toContain("luseen guide");
+      expect((await luseen(["help", command])).stdout).toBe(stdout);
     },
   );
 
   it("TC-CLI-021: help wins over other flags", async () => {
     const root = sampleProject();
-    const { code, stdout, stderr } = await cclinic([root, "--dry-run", "--help"]);
+    const { code, stdout, stderr } = await luseen([root, "--dry-run", "--help"]);
     expect(code).toBe(0);
     expect(stdout).toContain("Usage:");
     expect(stderr).not.toContain("Scanning");
   });
 
   it("TC-CLI-022: typos get suggestions, and run nothing", async () => {
-    const command = await cclinic(["docter"]);
+    const command = await luseen(["docter"]);
     expect(command.code).toBe(2);
-    expect(command.stderr).toContain('"cclinic doctor"');
-    const option = await cclinic(["--dry-rn"]);
+    expect(command.stderr).toContain('"luseen doctor"');
+    const option = await luseen(["--dry-rn"]);
     expect(option.code).toBe(2);
     expect(option.stderr).toContain("--dry-run");
   });
 
   it("TC-CLI-023: --quiet shows only the result", async () => {
-    const { code, stdout, stderr } = await cclinic([sampleProject(), "--yes", "--quiet"]);
+    const { code, stdout, stderr } = await luseen([sampleProject(), "--yes", "--quiet"]);
     expect(code).toBe(0);
     expect(stderr).toBe("");
     expect(stdout).toContain("Documents written");
   });
 
   it("TC-CLI-024: --debug shows timings, but no content", async () => {
-    const { stderr } = await cclinic([sampleProject({ "src/m.ts": "MARKER-CONTENT-123\n" }), "--yes", "--debug"]);
+    const { stderr } = await luseen([sampleProject({ "src/m.ts": "MARKER-CONTENT-123\n" }), "--yes", "--debug"]);
     expect(stderr).toMatch(/\[\+\d+ms\]/);
     expect(stderr).not.toContain("MARKER-CONTENT-123");
   });
 
   it("TC-CLI-025: --quiet with --debug exits 2", async () => {
-    expect((await cclinic(["--quiet", "--debug"])).code).toBe(2);
+    expect((await luseen(["--quiet", "--debug"])).code).toBe(2);
   });
 
   it("TC-CLI-026: --json gives one object, for success and failure", async () => {
-    const success = await cclinic([sampleProject(), "--yes", "--json"]);
+    const success = await luseen([sampleProject(), "--yes", "--json"]);
     expect(JSON.parse(success.stdout)).toMatchObject({
       status: "success",
       specs: 1,
@@ -329,15 +329,15 @@ describe("help and output", () => {
       testCases: 1,
       cachedChunks: 0,
     });
-    const failure = await cclinic([sampleProject(), "--yes", "--json"], { env: { FAKE_CLAUDE_MODE: "auth-error" } });
+    const failure = await luseen([sampleProject(), "--yes", "--json"], { env: { FAKE_CLAUDE_MODE: "auth-error" } });
     expect(failure.code).toBe(4);
     expect(JSON.parse(failure.stdout)).toMatchObject({ status: "error", exitCode: 4, errorType: "AuthError" });
-    const usage = await cclinic(["--json", "--concurrency", "99"]);
+    const usage = await luseen(["--json", "--concurrency", "99"]);
     expect(JSON.parse(usage.stdout)).toMatchObject({ status: "error", exitCode: 2 });
   });
 
   it("TC-CLI-027: --dry-run --json lists every path with reasons", async () => {
-    const { stdout } = await cclinic([sampleProject({ "vendor/x.ts": "x", "a.dll": "x" }), "--dry-run", "--json"]);
+    const { stdout } = await luseen([sampleProject({ "vendor/x.ts": "x", "a.dll": "x" }), "--dry-run", "--json"]);
     const parsed = JSON.parse(stdout) as { included: { path: string }[]; skipped: { path: string; reason: string }[] };
     expect(parsed.included.map((file) => file.path)).toContain("src/app.ts");
     expect(parsed.skipped).toContainEqual({ path: "vendor/", reason: "dependency or build folder" });
@@ -346,23 +346,23 @@ describe("help and output", () => {
 
   it("TC-CLI-028: color appears only with --color always, and isn't printed in logs", async () => {
     const ANSI = "\u001b[";
-    expect((await cclinic(["--bad"])).stderr).not.toContain(ANSI);
-    const forced = await cclinic([sampleProject(), "--yes", "--color", "always"], {
+    expect((await luseen(["--bad"])).stderr).not.toContain(ANSI);
+    const forced = await luseen([sampleProject(), "--yes", "--color", "always"], {
       env: { FAKE_CLAUDE_MODE: "auth-error" },
     });
     expect(forced.stderr).toContain(ANSI);
-    const never = await cclinic([sampleProject(), "--yes", "--color", "never"], {
+    const never = await luseen([sampleProject(), "--yes", "--color", "never"], {
       env: { FAKE_CLAUDE_MODE: "auth-error", TERM: "xterm" },
     });
     expect(never.stderr).not.toContain(ANSI);
-    const noColor = await cclinic([sampleProject(), "--yes"], {
+    const noColor = await luseen([sampleProject(), "--yes"], {
       env: { FAKE_CLAUDE_MODE: "auth-error", NO_COLOR: "1" },
     });
     expect(noColor.stderr).not.toContain(ANSI);
   });
 
   it("TC-CLI-030: a failure says re-running continues", async () => {
-    const { code, stderr } = await cclinic([sampleProject(), "--yes", "--concurrency", "1"], {
+    const { code, stderr } = await luseen([sampleProject(), "--yes", "--concurrency", "1"], {
       env: { FAKE_CLAUDE_MODE: "fail-after-1", FAKE_CLAUDE_RECORD: path.join(makeTempFolder(), "c.jsonl") },
     });
     expect(code).toBe(4);
@@ -371,7 +371,7 @@ describe("help and output", () => {
 
   it("TC-CLI-051: --debug-file has timings, but no content", async () => {
     const file = path.join(makeTempFolder(), "debug.log");
-    await cclinic([sampleProject({ "src/m.ts": "MARKER-CONTENT-123\n" }), "--yes", "--debug-file", file]);
+    await luseen([sampleProject({ "src/m.ts": "MARKER-CONTENT-123\n" }), "--yes", "--debug-file", file]);
     const log = readFileSync(file, "utf8");
     expect(log).toMatch(/\[\+\d+ms\]/);
     expect(log).not.toContain("MARKER-CONTENT-123");
@@ -380,7 +380,7 @@ describe("help and output", () => {
 
 describe("help page and guide", () => {
   it("TC-CLI-052: the main help explains how it works, with grouped options", async () => {
-    const { code, stdout } = await cclinic(["--help"]);
+    const { code, stdout } = await luseen(["--help"]);
     expect(code).toBe(0);
     for (const text of [
       "How it works:",
@@ -398,7 +398,7 @@ describe("help page and guide", () => {
   });
 
   it("TC-CLI-053: the guide works with no provider, and covers everything", async () => {
-    const { code, stdout } = await cclinic(["guide"], { noClaude: true });
+    const { code, stdout } = await luseen(["guide"], { noClaude: true });
     expect(code).toBe(0);
     for (const text of [
       "STEP 1",
@@ -417,20 +417,20 @@ describe("help page and guide", () => {
       "write-code",
       "implement-spec",
       "test-spec",
-      "cclinic doctor",
-      "cclinic skills",
-      "cclinic clean",
-      "cclinic model",
+      "luseen doctor",
+      "luseen skills",
+      "luseen clean",
+      "luseen model",
     ]) {
       expect(stdout).toContain(text);
     }
-    expect((await cclinic(["guid"])).stderr).toContain('"cclinic guide"');
+    expect((await luseen(["guid"])).stderr).toContain('"luseen guide"');
   });
 
   it("TC-CLI-054: the guide's limits match the real defaults", async () => {
     const root = sampleProject();
-    const { stdout } = await cclinic(["guide"]);
-    const help = (await cclinic(["--help"], { cwd: root })).stdout.replace(/\s+/g, " ");
+    const { stdout } = await luseen(["guide"]);
+    const help = (await luseen(["--help"], { cwd: root })).stdout.replace(/\s+/g, " ");
     for (const [flag, value] of [
       ["--max-files", "10000"],
       ["--max-input-tokens", "2000000"],
@@ -445,53 +445,53 @@ describe("help page and guide", () => {
   });
 
   it("TC-CLI-055: a successful run says what to do next", async () => {
-    const { stdout } = await cclinic([sampleProject(), "--yes"]);
+    const { stdout } = await luseen([sampleProject(), "--yes"]);
     expect(stdout).toContain("Next:");
-    expect(stdout).toContain("cclinic guide");
+    expect(stdout).toContain("luseen guide");
   });
 });
 
 describe("doctor and clean", () => {
   it("TC-CLI-031: each failure has a fix", async () => {
-    const { stdout } = await cclinic(["doctor"], { noClaude: true });
+    const { stdout } = await luseen(["doctor"], { noClaude: true });
     expect(stdout).toContain("FAIL Claude CLI: not found");
     expect(stdout).toContain("Install Claude Code");
-    const loggedOut = await cclinic(["doctor"], { env: { FAKE_CLAUDE_LOGGED_OUT: "1" } });
+    const loggedOut = await luseen(["doctor"], { env: { FAKE_CLAUDE_LOGGED_OUT: "1" } });
     expect(loggedOut.stdout).toContain("claude auth login");
   });
 
   it("TC-CLI-032: doctor never shows the key or calls Claude", async () => {
     const record = path.join(makeTempFolder(), "calls.jsonl");
     const env = { ANTHROPIC_API_KEY: "MARKER-KEY-123", FAKE_CLAUDE_RECORD: record };
-    const { stdout } = await cclinic(["doctor"], { env });
+    const { stdout } = await luseen(["doctor"], { env });
     expect(stdout).toContain("ANTHROPIC_API_KEY: set");
     expect(stdout).not.toContain("MARKER-KEY-123");
-    expect(JSON.parse((await cclinic(["doctor", "--json"], { env })).stdout)).toMatchObject({ ready: true });
+    expect(JSON.parse((await luseen(["doctor", "--json"], { env })).stdout)).toMatchObject({ ready: true });
     expect(existsSync(record)).toBe(false);
   });
 
   it("TC-CLI-033: exits 0 when usable, and 3 when not", async () => {
-    expect((await cclinic(["doctor"])).code).toBe(0);
-    expect((await cclinic(["doctor"], { noClaude: true })).code).toBe(3);
+    expect((await luseen(["doctor"])).code).toBe(0);
+    expect((await luseen(["doctor"], { noClaude: true })).code).toBe(3);
   });
 
   it("TC-CLI-035: clean removes only the cache and failed drafts", async () => {
     const root = sampleProject();
-    await cclinic([root, "--yes"]);
-    const readme = path.join(root, ".cclinic/sdd/README.md");
+    await luseen([root, "--yes"]);
+    const readme = path.join(root, ".luseen/sdd/README.md");
     const before = readFileSync(readme, "utf8");
-    const { code, stdout } = await cclinic(["clean", root, "--yes"]);
+    const { code, stdout } = await luseen(["clean", root, "--yes"]);
     expect(code).toBe(0);
     expect(stdout).toContain("Freed");
-    expect(existsSync(path.join(root, ".cclinic/cache"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/cache"))).toBe(false);
     expect(readFileSync(readme, "utf8")).toBe(before);
   });
 
   it("TC-CLI-036: clean with no terminal and no --yes exits 2", async () => {
     const root = sampleProject();
-    await cclinic([root, "--yes"]);
-    expect((await cclinic(["clean", root])).code).toBe(2);
-    expect(existsSync(path.join(root, ".cclinic/cache"))).toBe(true);
+    await luseen([root, "--yes"]);
+    expect((await luseen(["clean", root])).code).toBe(2);
+    expect(existsSync(path.join(root, ".luseen/cache"))).toBe(true);
   });
 });
 
@@ -503,7 +503,7 @@ describe("safety and limits", () => {
     const record = path.join(makeTempFolder(), "c.jsonl");
     const root = sampleProject();
     const start = Date.now();
-    const { code, stderr } = await cclinic([root, "--yes"], {
+    const { code, stderr } = await luseen([root, "--yes"], {
       env: { FAKE_CLAUDE_MODE: "hang", FAKE_CLAUDE_RECORD: record },
       onStart: (child) => {
         void waitFor(() => existsSync(record)).then(() => child.kill(signal as NodeJS.Signals));
@@ -512,7 +512,7 @@ describe("safety and limits", () => {
     expect(code).toBe(expected);
     expect(stderr).toContain("Stopping");
     expect(Date.now() - start).toBeLessThan(15_000);
-    expect(existsSync(path.join(root, ".cclinic/.lock"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/.lock"))).toBe(false);
   });
 
   it.skipIf(process.getuid?.() === 0)("TC-CLI-040: a read-only output folder exits 2 before any call", async () => {
@@ -520,7 +520,7 @@ describe("safety and limits", () => {
     mkdirSync(path.join(root, "readonly"));
     chmodSync(path.join(root, "readonly"), 0o555);
     const record = path.join(makeTempFolder(), "c.jsonl");
-    const { code, stderr } = await cclinic([root, "--yes", "--out", path.join(root, "readonly/sdd")], {
+    const { code, stderr } = await luseen([root, "--yes", "--out", path.join(root, "readonly/sdd")], {
       env: { FAKE_CLAUDE_RECORD: record },
     });
     chmodSync(path.join(root, "readonly"), 0o755);
@@ -531,13 +531,13 @@ describe("safety and limits", () => {
 
   it("TC-CLI-041: a second run is refused while the first works", async () => {
     const root = sampleProject();
-    const lock = path.join(root, ".cclinic/.lock");
+    const lock = path.join(root, ".luseen/.lock");
     let second: RunOutput | undefined;
-    const first = await cclinic([root, "--yes"], {
+    const first = await luseen([root, "--yes"], {
       env: { FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_DELAY_MS: "1500" },
       onStart: () => {
         void waitFor(() => existsSync(lock)).then(async () => {
-          second = await cclinic([root, "--yes"]);
+          second = await luseen([root, "--yes"]);
         });
       },
     });
@@ -549,26 +549,26 @@ describe("safety and limits", () => {
 
   it("TC-CLI-042: a lock from a dead process is replaced", async () => {
     const root = sampleProject();
-    writeProject(root, { ".cclinic/.lock": "999999" });
-    expect((await cclinic([root, "--yes"])).code).toBe(0);
-    expect(existsSync(path.join(root, ".cclinic/.lock"))).toBe(false);
+    writeProject(root, { ".luseen/.lock": "999999" });
+    expect((await luseen([root, "--yes"])).code).toBe(0);
+    expect(existsSync(path.join(root, ".luseen/.lock"))).toBe(false);
   });
 
   it("TC-CLI-043: --dry-run and doctor don't need the lock", async () => {
     const root = sampleProject();
-    writeProject(root, { ".cclinic/.lock": String(process.pid) });
-    expect((await cclinic([root, "--dry-run"])).code).toBe(0);
-    expect((await cclinic(["doctor", root])).code).toBe(0);
-    expect((await cclinic([root, "--yes"])).code).toBe(2);
+    writeProject(root, { ".luseen/.lock": String(process.pid) });
+    expect((await luseen([root, "--dry-run"])).code).toBe(0);
+    expect((await luseen(["doctor", root])).code).toBe(0);
+    expect((await luseen([root, "--yes"])).code).toBe(2);
   });
 
   it("TC-CLI-044: a home folder needs --allow-broad-target", async () => {
     const home = makeTempFolder();
     writeProject(home, { "a.ts": "a" });
-    const refused = await cclinic([home, "--yes"], { env: { HOME: home } });
+    const refused = await luseen([home, "--yes"], { env: { HOME: home } });
     expect(refused.code).toBe(2);
     expect(refused.stderr).toContain("--allow-broad-target");
-    expect((await cclinic([home, "--allow-broad-target", "--dry-run"], { env: { HOME: home } })).code).toBe(0);
+    expect((await luseen([home, "--allow-broad-target", "--dry-run"], { env: { HOME: home } })).code).toBe(0);
   });
 
   it.each([
@@ -582,7 +582,7 @@ describe("safety and limits", () => {
     ["--max-retries", "11"],
     ["--max-budget-usd", "0"],
   ])("TC-CLI-046: rejects %s %s", async (flag, value) => {
-    expect((await cclinic([sampleProject(), flag, value, "--dry-run"])).code).toBe(2);
+    expect((await luseen([sampleProject(), flag, value, "--dry-run"])).code).toBe(2);
   });
 
   it.each([
@@ -595,17 +595,17 @@ describe("safety and limits", () => {
   ])("TC-CLI-046: accepts %s %s", async (flag, value) => {
     const root = makeTempFolder();
     writeProject(root, { "a.ts": "a\n" });
-    expect((await cclinic([root, flag, value, "--dry-run"])).code).toBe(0);
+    expect((await luseen([root, flag, value, "--dry-run"])).code).toBe(0);
   });
 
   it("TC-CLI-047: limits stop the run before any call, and explain why", async () => {
     const record = path.join(makeTempFolder(), "c.jsonl");
     const env = { FAKE_CLAUDE_RECORD: record };
-    const files = await cclinic([sampleProject(), "--yes", "--max-files", "1"], { env });
+    const files = await luseen([sampleProject(), "--yes", "--max-files", "1"], { env });
     expect(files.code).toBe(2);
     expect(files.stderr).toContain("--max-files");
     expect(files.stderr).toContain("--exclude");
-    const tokens = await cclinic([sampleProject(), "--yes", "--max-input-tokens", "1"], { env });
+    const tokens = await luseen([sampleProject(), "--yes", "--max-input-tokens", "1"], { env });
     expect(tokens.code).toBe(2);
     expect(tokens.stderr).toContain("--max-input-tokens");
     expect(existsSync(record)).toBe(false);
@@ -613,24 +613,24 @@ describe("safety and limits", () => {
 
   it("TC-CLI-048: cached modules don't count toward the token limit", async () => {
     const root = sampleProject();
-    await cclinic([root, "--yes"]);
-    expect((await cclinic([root, "--yes", "--max-input-tokens", "1"])).code).toBe(0);
+    await luseen([root, "--yes"]);
+    expect((await luseen([root, "--yes", "--max-input-tokens", "1"])).code).toBe(0);
   });
 
   it("TC-DISC-028: nothing to analyse exits 2, with no calls", async () => {
     const root = makeTempFolder();
     writeProject(root, { "node_modules/a.js": "a" });
-    const { code, stderr } = await cclinic([root, "--yes"]);
+    const { code, stderr } = await luseen([root, "--yes"]);
     expect(code).toBe(2);
     expect(stderr).toContain("No files to analyse");
   });
 
   it("TC-OUT-021: a hand edit exits 2 before any call", async () => {
     const root = sampleProject();
-    await cclinic([root, "--yes"]);
-    writeFileSync(path.join(root, ".cclinic/sdd/overview.md"), "edited");
+    await luseen([root, "--yes"]);
+    writeFileSync(path.join(root, ".luseen/sdd/overview.md"), "edited");
     const record = path.join(makeTempFolder(), "c.jsonl");
-    const { code, stderr } = await cclinic([root, "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
+    const { code, stderr } = await luseen([root, "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
     expect(code).toBe(2);
     expect(stderr).toContain("overview.md");
     expect(existsSync(record)).toBe(false);
@@ -640,7 +640,7 @@ describe("safety and limits", () => {
 describe("interruptions", () => {
   it("TC-CLI-039: a second Ctrl+C exits immediately", async () => {
     const record = path.join(makeTempFolder(), "c.jsonl");
-    const { code } = await cclinic([sampleProject(), "--yes"], {
+    const { code } = await luseen([sampleProject(), "--yes"], {
       env: { FAKE_CLAUDE_MODE: "hang", FAKE_CLAUDE_RECORD: record },
       onStart: (child) => {
         void waitFor(() => existsSync(record)).then(() => {
@@ -655,13 +655,13 @@ describe("interruptions", () => {
 
 describe("model selection", () => {
   it("TC-MODEL-010: defaults to Sonnet 5.5 at Medium", async () => {
-    const { stdout } = await cclinic([sampleProject(), "--dry-run"]);
+    const { stdout } = await luseen([sampleProject(), "--dry-run"]);
     expect(stdout).toContain("Sonnet 5.5");
     expect(stdout).toContain("Medium");
   });
 
   it("TC-MODEL-005: values skip the menu", async () => {
-    const { code, stdout } = await cclinic([sampleProject(), "--model", "opus", "--effort", "high", "--dry-run"]);
+    const { code, stdout } = await luseen([sampleProject(), "--model", "opus", "--effort", "high", "--dry-run"]);
     expect(code).toBe(0);
     expect(stdout).toContain("Opus 5.5");
     expect(stdout).toContain("High");
@@ -672,7 +672,7 @@ describe("model selection", () => {
       ["--model", "nope"],
       ["--effort", "nope"],
     ]) {
-      const { code, stderr } = await cclinic([sampleProject(), ...args]);
+      const { code, stderr } = await luseen([sampleProject(), ...args]);
       expect(code).toBe(2);
       expect(stderr).toContain("sonnet");
       expect(stderr).toContain("xhigh");
@@ -681,30 +681,30 @@ describe("model selection", () => {
 
   it("TC-MODEL-012: a menu with no terminal prints the options and exits 2", async () => {
     for (const args of [["--model"], ["--effort"], ["model"]]) {
-      const { code, stderr } = await cclinic(args, { cwd: sampleProject(), timeoutMs: 10_000 });
+      const { code, stderr } = await luseen(args, { cwd: sampleProject(), timeoutMs: 10_000 });
       expect(code).toBe(2);
       expect(stderr).toContain("sonnet");
     }
   });
 
   it("TC-MODEL-016: the full API ID is accepted", async () => {
-    const { code, stdout } = await cclinic([sampleProject(), "--model", "claude-opus-5-5", "--dry-run"]);
+    const { code, stdout } = await luseen([sampleProject(), "--model", "claude-opus-5-5", "--dry-run"]);
     expect(code).toBe(0);
     expect(stdout).toContain("Opus 5.5");
   });
 
   it("TC-MODEL-020: invalid environment values exit 2", async () => {
-    expect((await cclinic([sampleProject(), "--dry-run"], { env: { CCLINIC_MODEL: "nope" } })).code).toBe(2);
-    expect((await cclinic([sampleProject(), "--dry-run"], { env: { CCLINIC_EFFORT: "nope" } })).code).toBe(2);
+    expect((await luseen([sampleProject(), "--dry-run"], { env: { LUSEEN_MODEL: "nope" } })).code).toBe(2);
+    expect((await luseen([sampleProject(), "--dry-run"], { env: { LUSEEN_EFFORT: "nope" } })).code).toBe(2);
   });
 
   it("TC-MODEL-021: --list works with no terminal, and in JSON", async () => {
     const config = makeTempFolder();
-    writeProject(config, { "cclinic/config.json": '{"model":"haiku","effort":"low"}' });
+    writeProject(config, { "luseen/config.json": '{"model":"haiku","effort":"low"}' });
     const env = { XDG_CONFIG_HOME: config };
-    const text = await cclinic(["model", "--list"], { env });
+    const text = await luseen(["model", "--list"], { env });
     expect(text.stdout).toMatch(/\* haiku/);
-    const parsed = JSON.parse((await cclinic(["model", "--list", "--json"], { env })).stdout) as {
+    const parsed = JSON.parse((await luseen(["model", "--list", "--json"], { env })).stdout) as {
       current: unknown;
       models: unknown[];
     };
@@ -714,23 +714,23 @@ describe("model selection", () => {
 
   it("TC-MODEL-022: --reset goes back to the defaults, even with nothing saved", async () => {
     const config = makeTempFolder();
-    writeProject(config, { "cclinic/config.json": '{"model":"haiku"}' });
+    writeProject(config, { "luseen/config.json": '{"model":"haiku"}' });
     const env = { XDG_CONFIG_HOME: config };
-    expect((await cclinic(["model", "--reset"], { env })).code).toBe(0);
-    expect((await cclinic(["model", "--reset"], { env })).code).toBe(0);
-    expect(readdirSync(path.join(config, "cclinic"))).toEqual([]);
-    expect((await cclinic([sampleProject(), "--dry-run"], { env })).stdout).toContain("Sonnet 5.5");
+    expect((await luseen(["model", "--reset"], { env })).code).toBe(0);
+    expect((await luseen(["model", "--reset"], { env })).code).toBe(0);
+    expect(readdirSync(path.join(config, "luseen"))).toEqual([]);
+    expect((await luseen([sampleProject(), "--dry-run"], { env })).stdout).toContain("Sonnet 5.5");
   });
 
   it("TC-MODEL-018: a bad config warns, and keeps the valid setting", async () => {
     const config = makeTempFolder();
-    writeProject(config, { "cclinic/config.json": '{"model":"gone","effort":"high"}' });
-    const { stdout, stderr } = await cclinic([sampleProject(), "--dry-run"], { env: { XDG_CONFIG_HOME: config } });
+    writeProject(config, { "luseen/config.json": '{"model":"gone","effort":"high"}' });
+    const { stdout, stderr } = await luseen([sampleProject(), "--dry-run"], { env: { XDG_CONFIG_HOME: config } });
     expect(stderr).toContain("Warning");
     expect(stdout).toContain("Sonnet 5.5");
     expect(stdout).toContain("High");
-    writeProject(config, { "cclinic/config.json": "{corrupt" });
-    expect((await cclinic([sampleProject(), "--dry-run"], { env: { XDG_CONFIG_HOME: config } })).stderr).toContain(
+    writeProject(config, { "luseen/config.json": "{corrupt" });
+    expect((await luseen([sampleProject(), "--dry-run"], { env: { XDG_CONFIG_HOME: config } })).stderr).toContain(
       "Warning",
     );
   });
@@ -738,13 +738,13 @@ describe("model selection", () => {
 
 describe("Codex models", () => {
   it("TC-LLM-056: they can't be selected yet", async () => {
-    const chosen = await cclinic([sampleProject(), "--model", "gpt-6.1-sol", "--dry-run"]);
+    const chosen = await luseen([sampleProject(), "--model", "gpt-6.1-sol", "--dry-run"]);
     expect(chosen.code).toBe(2);
     expect(chosen.stderr).toContain("isn't a known model");
     // The error repeats what was typed, but must not offer Codex models as options.
     expect(chosen.stderr).not.toContain("Astra");
     expect(chosen.stderr).not.toContain("Sol:");
-    const { stdout } = await cclinic(["model", "--list"]);
+    const { stdout } = await luseen(["model", "--list"]);
     expect(stdout).toContain("Sonnet 5.5");
     expect(stdout).not.toContain("gpt-6");
     expect(stdout).not.toContain("Astra");
@@ -762,7 +762,7 @@ describe("providers through the real process", () => {
   }
 
   it("TC-LLM-002: no provider exits 3, and explains both options", async () => {
-    const { code, stderr } = await cclinic([sampleProject(), "--yes"], { noClaude: true });
+    const { code, stderr } = await luseen([sampleProject(), "--yes"], { noClaude: true });
     expect(code).toBe(3);
     expect(stderr).toContain("claude auth login");
     expect(stderr).toContain("ANTHROPIC_API_KEY");
@@ -771,23 +771,21 @@ describe("providers through the real process", () => {
   it("TC-LLM-004: an explicit provider doesn't fall back", async () => {
     expect(
       (
-        await cclinic([sampleProject(), "--yes", "--provider", "claude-cli"], {
+        await luseen([sampleProject(), "--yes", "--provider", "claude-cli"], {
           noClaude: true,
           env: { ANTHROPIC_API_KEY: "k" },
         })
       ).code,
     ).toBe(3);
-    expect((await cclinic([sampleProject(), "--yes", "--provider", "anthropic-api"])).code).toBe(3);
+    expect((await luseen([sampleProject(), "--yes", "--provider", "anthropic-api"])).code).toBe(3);
   });
 
   it("TC-LLM-003: an empty key counts as missing", async () => {
-    expect((await cclinic([sampleProject(), "--yes"], { noClaude: true, env: { ANTHROPIC_API_KEY: "" } })).code).toBe(
-      3,
-    );
+    expect((await luseen([sampleProject(), "--yes"], { noClaude: true, env: { ANTHROPIC_API_KEY: "" } })).code).toBe(3);
   });
 
   it("TC-LLM-005: a mid-run CLI failure doesn't switch to the API", async () => {
-    const { code } = await cclinic([sampleProject(), "--yes", "--concurrency", "1"], {
+    const { code } = await luseen([sampleProject(), "--yes", "--concurrency", "1"], {
       env: {
         FAKE_CLAUDE_MODE: "fail-after-1",
         FAKE_CLAUDE_RECORD: path.join(makeTempFolder(), "c.jsonl"),
@@ -800,7 +798,7 @@ describe("providers through the real process", () => {
 
   it("TC-LLM-007: arguments match, and the prompt arrives on stdin", async () => {
     const record = path.join(makeTempFolder(), "c.jsonl");
-    await cclinic([sampleProject({ "src/m.ts": "MARKER-CONTENT-123\n" }), "--yes"], {
+    await luseen([sampleProject({ "src/m.ts": "MARKER-CONTENT-123\n" }), "--yes"], {
       env: { FAKE_CLAUDE_RECORD: record },
     });
     const calls = records(record);
@@ -826,7 +824,7 @@ describe("providers through the real process", () => {
   it("TC-LLM-009: runs from an empty folder outside the target, and removes it", async () => {
     const root = sampleProject({ "CLAUDE.md": "project instructions" });
     const record = path.join(makeTempFolder(), "c.jsonl");
-    await cclinic([root, "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
+    await luseen([root, "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
     for (const call of records(record)) {
       expect(call.cwdEntries).toEqual([]);
       expect(call.cwd.startsWith(root)).toBe(false);
@@ -836,9 +834,9 @@ describe("providers through the real process", () => {
 
   it("TC-LLM-014: the summary shows authMethod, and the manifest has the actual model", async () => {
     const root = sampleProject();
-    const { stderr } = await cclinic([root, "--yes"]);
+    const { stderr } = await luseen([root, "--yes"]);
     expect(stderr).toContain("claude.ai");
-    const manifest = JSON.parse(readFileSync(path.join(root, ".cclinic/sdd/manifest.json"), "utf8")) as {
+    const manifest = JSON.parse(readFileSync(path.join(root, ".luseen/sdd/manifest.json"), "utf8")) as {
       actualModels: string[];
       effort: string;
     };
@@ -848,7 +846,7 @@ describe("providers through the real process", () => {
 
   it("TC-LLM-026: Ctrl+C stops a hanging call", async () => {
     const record = path.join(makeTempFolder(), "c.jsonl");
-    const { code } = await cclinic([sampleProject(), "--yes"], {
+    const { code } = await luseen([sampleProject(), "--yes"], {
       env: { FAKE_CLAUDE_MODE: "hang", FAKE_CLAUDE_RECORD: record },
       onStart: (child) => {
         void waitFor(() => existsSync(record)).then(() => child.kill("SIGINT"));
@@ -859,19 +857,19 @@ describe("providers through the real process", () => {
 
   it("TC-LLM-034: the CLI gets no tools", async () => {
     const record = path.join(makeTempFolder(), "c.jsonl");
-    await cclinic([sampleProject(), "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
+    await luseen([sampleProject(), "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
     const args = records(record)[0]?.args ?? [];
     expect(args[args.indexOf("--tools") + 1]).toBe("");
   });
 
   it("TC-LLM-035: a key and prompt never reach output files or errors", async () => {
     const root = sampleProject({ "src/m.ts": "MARKER-CONTENT-123\n" });
-    const { stdout, stderr } = await cclinic([root, "--yes", "--debug"], {
+    const { stdout, stderr } = await luseen([root, "--yes", "--debug"], {
       env: { ANTHROPIC_API_KEY: "MARKER-KEY-123" },
     });
     expect(stdout + stderr).not.toContain("MARKER-KEY-123");
     expect(stdout + stderr).not.toContain("MARKER-CONTENT-123");
-    const failed = await cclinic([root, "--yes", "--no-cache", "--force"], {
+    const failed = await luseen([root, "--yes", "--no-cache", "--force"], {
       env: { FAKE_CLAUDE_MODE: "auth-error", ANTHROPIC_API_KEY: "MARKER-KEY-123" },
     });
     expect(failed.stdout + failed.stderr).not.toContain("MARKER-KEY-123");
@@ -879,7 +877,7 @@ describe("providers through the real process", () => {
 
   it("TC-LLM-046: a key in the shell is removed from claude's environment", async () => {
     const record = path.join(makeTempFolder(), "c.jsonl");
-    await cclinic([sampleProject(), "--yes", "--max-retries", "5"], {
+    await luseen([sampleProject(), "--yes", "--max-retries", "5"], {
       env: { FAKE_CLAUDE_RECORD: record, ANTHROPIC_API_KEY: "k", ANTHROPIC_AUTH_TOKEN: "t" },
     });
     expect(records(record)[0]?.env).toEqual({
@@ -893,7 +891,7 @@ describe("providers through the real process", () => {
 
   it("TC-LLM-027: invalid output gets one retry, then fails", async () => {
     const record = path.join(makeTempFolder(), "c.jsonl");
-    const { code } = await cclinic([sampleProject({}), "--yes", "--concurrency", "1"], {
+    const { code } = await luseen([sampleProject({}), "--yes", "--concurrency", "1"], {
       env: { FAKE_CLAUDE_MODE: "invalid-output", FAKE_CLAUDE_RECORD: record },
     });
     expect(code).toBe(4);
@@ -901,17 +899,17 @@ describe("providers through the real process", () => {
   });
 
   it("TC-LLM-043: a usage limit exits 4, and explains how to continue", async () => {
-    const { code, stderr } = await cclinic([sampleProject(), "--yes"], { env: { FAKE_CLAUDE_MODE: "usage-limit" } });
+    const { code, stderr } = await luseen([sampleProject(), "--yes"], { env: { FAKE_CLAUDE_MODE: "usage-limit" } });
     expect(code).toBe(4);
     expect(stderr).toContain("session limit");
     expect(stderr).toContain("continues from where it stopped");
   });
 
-  it("TC-LLM-050: an unavailable model suggests cclinic model", async () => {
-    const { code, stderr } = await cclinic([sampleProject(), "--yes", "--model", "opus"], {
+  it("TC-LLM-050: an unavailable model suggests luseen model", async () => {
+    const { code, stderr } = await luseen([sampleProject(), "--yes", "--model", "opus"], {
       env: { FAKE_CLAUDE_MODE: "invalid-model" },
     });
     expect(code).toBe(4);
-    expect(stderr).toContain("cclinic model");
+    expect(stderr).toContain("luseen model");
   });
 });

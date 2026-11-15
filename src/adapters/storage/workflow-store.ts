@@ -1,4 +1,4 @@
-/** The saved state of each change in `.cclinic/workflow/`, one file per change (FR-MCP-038). */
+/** The saved state of each change in `.luseen/workflow/`, one file per change (FR-MCP-038). */
 import { existsSync } from "node:fs";
 import { readdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";

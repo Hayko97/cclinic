@@ -182,7 +182,7 @@ describe("rendering", () => {
     expect(renderRoadmapList([summary])).toBe(
       "#1 R1 [in-progress]\n  Goal: First release\n  2 milestones; tasks: 1 open, 1 in-progress, 1 done, 1 blocked",
     );
-    expect(renderRoadmapList([])).toContain("cclinic plan");
+    expect(renderRoadmapList([])).toContain("luseen plan");
   });
 
   it("TC-TASK-024: a dependency cycle is found and named in order", () => {

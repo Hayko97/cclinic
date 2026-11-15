@@ -69,7 +69,7 @@ export interface TaskStore {
   listRoadmaps(): readonly RoadmapRecord[];
   removeMilestone(id: number): void;
   removeRoadmap(id: number): void;
-  /** Saves the task and its dependencies together. A milestone is only given by `cclinic plan`. */
+  /** Saves the task and its dependencies together. A milestone is only given by `luseen plan`. */
   addTask(input: TaskInput): Task;
   addDependency(taskId: number, dependsOnId: number): Task;
   removeDependency(taskId: number, dependsOnId: number): Task;
@@ -96,7 +96,7 @@ function checkVersion(database: DatabaseSync, file: string): number {
   if (version > SCHEMA_VERSION) {
     database.close();
     throw new TaskDatabaseError(
-      `${file} was written by a newer version of cclinic. Update cclinic to use it. It was left unchanged.`,
+      `${file} was written by a newer version of luseen. Update luseen to use it. It was left unchanged.`,
     );
   }
   return version;

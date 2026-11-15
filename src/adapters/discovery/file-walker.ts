@@ -5,7 +5,7 @@ import ignore, { type Ignore } from "ignore";
 import { stripManagedSection } from "../../core/agent-skills.js";
 import { BINARY_DOCUMENT_EXTENSIONS, REASONS } from "../../core/constants/discovery.js";
 import { BINARY_SNIFF_BYTES, BYTES_PER_MIB, MAX_DOCUMENT_BYTES } from "../../core/constants/limits.js";
-import { CCLINIC_IGNORE_FILE, GITIGNORE_FILE, MANAGED_INSTRUCTION_FILES } from "../../core/constants/paths.js";
+import { LUSEEN_IGNORE_FILE, GITIGNORE_FILE, MANAGED_INSTRUCTION_FILES } from "../../core/constants/paths.js";
 import { MCP_CONFIG_FILE } from "../../core/constants/workflow.js";
 import {
   classifyFile,
@@ -16,7 +16,7 @@ import {
   looksBundled,
   type RuleContext,
 } from "../../core/exclusion-rules.js";
-import { holdsOnlyCclinicServer } from "../../core/mcp-config.js";
+import { holdsOnlyLuseenServer } from "../../core/mcp-config.js";
 import type { ScanResult, ScannedFile, SkippedEntry } from "../../core/ports.js";
 
 export interface ScanOptions {
@@ -78,8 +78,8 @@ async function readHead(file: string): Promise<Uint8Array> {
   }
 }
 
-/** cclinic created this file, so counting it would look like a project change on the next run. */
-async function holdsOnlyCclinicSection(file: string): Promise<boolean> {
+/** luseen created this file, so counting it would look like a project change on the next run. */
+async function holdsOnlyLuseenSection(file: string): Promise<boolean> {
   try {
     const content = await readFile(file, "utf8");
     return content.trim() !== "" && stripManagedSection(content).trim() === "";
@@ -88,9 +88,9 @@ async function holdsOnlyCclinicSection(file: string): Promise<boolean> {
   }
 }
 
-/** FR-MCP-042: a `.mcp.json` cclinic created, with only its own server in it. */
-async function holdsOnlyCclinicMcpServer(file: string): Promise<boolean> {
-  return holdsOnlyCclinicServer(await readFile(file, "utf8").catch(() => ""));
+/** FR-MCP-042: a `.mcp.json` luseen created, with only its own server in it. */
+async function holdsOnlyLuseenMcpServer(file: string): Promise<boolean> {
+  return holdsOnlyLuseenServer(await readFile(file, "utf8").catch(() => ""));
 }
 
 /** The scan's rules for a path that may not exist any more, such as one named in Git history (FR-GIT-015). */
@@ -122,8 +122,8 @@ export async function scanFolder(options: ScanOptions): Promise<ScanResult> {
   const outFolder = relativeOut === "" || relativeOut.startsWith("..") ? undefined : relativeOut;
 
   const rootLayers: IgnoreLayer[] = [];
-  const cclinicIgnore = await readIgnoreFile(path.join(target, CCLINIC_IGNORE_FILE));
-  if (cclinicIgnore !== undefined) rootLayers.push({ base: "", matcher: cclinicIgnore });
+  const luseenIgnore = await readIgnoreFile(path.join(target, LUSEEN_IGNORE_FILE));
+  if (luseenIgnore !== undefined) rootLayers.push({ base: "", matcher: luseenIgnore });
 
   const contextFor = (layers: readonly IgnoreLayer[]): RuleContext => ({
     ...(outFolder === undefined ? {} : { outFolder }),
@@ -203,8 +203,8 @@ export async function scanFolder(options: ScanOptions): Promise<ScanResult> {
         continue;
       }
       if (!entry.isFile()) continue;
-      if (MANAGED_INSTRUCTION_FILES.includes(relative) && (await holdsOnlyCclinicSection(absolute))) continue;
-      if (relative === MCP_CONFIG_FILE && (await holdsOnlyCclinicMcpServer(absolute))) continue;
+      if (MANAGED_INSTRUCTION_FILES.includes(relative) && (await holdsOnlyLuseenSection(absolute))) continue;
+      if (relative === MCP_CONFIG_FILE && (await holdsOnlyLuseenMcpServer(absolute))) continue;
       const decision = evaluatePath(relative, false, context);
       if (decision.keep) await inspectFile(relative, absolute, decision.forced);
       else skipped.push({ path: relative, reason: decision.reason });

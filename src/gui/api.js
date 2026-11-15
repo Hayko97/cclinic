@@ -28,11 +28,11 @@ function failureOf(job, lines) {
 }
 
 /**
- * FR-GUI-020: runs a `cclinic tasks` change as a job and waits for it to end. Rejects with the CLI's own
+ * FR-GUI-020: runs a `luseen tasks` change as a job and waits for it to end. Rejects with the CLI's own
  * message when it fails, so the GUI shows the same checks and messages as the terminal.
  */
 /** Sent on `document` when a job starts or ends. */
-export const JOBS_CHANGED = "cclinic:jobs";
+export const JOBS_CHANGED = "luseen:jobs";
 
 /** Jobs whose starter reports their result itself, so the job notice (FR-GUI-062) doesn't repeat it. */
 export const REPORTED_JOBS = new Set();
@@ -190,7 +190,7 @@ export function startClock() {
 /** What the browser remembers between visits (FR-GUI-054, FR-GUI-070); the page works without it. */
 export function remembered(key, fallback) {
   try {
-    return localStorage.getItem(`cclinic.${key}`) ?? fallback;
+    return localStorage.getItem(`luseen.${key}`) ?? fallback;
   } catch {
     return fallback;
   }
@@ -198,7 +198,7 @@ export function remembered(key, fallback) {
 
 export function remember(key, value) {
   try {
-    localStorage.setItem(`cclinic.${key}`, value);
+    localStorage.setItem(`luseen.${key}`, value);
   } catch {
     // Private windows may refuse; the choice then lasts only for this visit.
   }

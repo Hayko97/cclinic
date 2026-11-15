@@ -57,7 +57,7 @@ const context: TaskContext = {
   roadmapGoal: "First release",
   milestoneTitle: "Security",
   milestoneGoal: "Stop guessing",
-  docsPath: ".cclinic/sdd",
+  docsPath: ".luseen/sdd",
 };
 
 describe("run IDs and branches", () => {
@@ -148,7 +148,7 @@ describe("agent prompts", () => {
       "The PM agent gives every approval",
       "never wait for a human",
       "Don't commit, push or run git",
-      ".cclinic/tasks.db",
+      ".luseen/tasks.db",
       "refine-spec",
     ]) {
       expect(prompt, part).toContain(part);
@@ -212,7 +212,7 @@ describe("commits, report and notification", () => {
     runId: "20261109-080503",
     roadmapId: 1,
     roadmapTitle: "Launch",
-    runBranch: "cclinic/auto/20261109-080503/run",
+    runBranch: "luseen/auto/20261109-080503/run",
     startedAt: TIME,
     finishedAt: TIME,
     outcome: "partial",
@@ -223,7 +223,7 @@ describe("commits, report and notification", () => {
     spentUsd: 1.5,
     developers: 2,
     tasks: [
-      { ...run(1, [], "done"), branch: "cclinic/auto/20261109-080503/task-1", costUsd: 1 },
+      { ...run(1, [], "done"), branch: "luseen/auto/20261109-080503/task-1", costUsd: 1 },
       { ...run(2, [], "blocked"), reason: "Stopped after 3 QA runs. Last: TC-X-001", costUsd: 0.5 },
       { ...run(3, [2], "skipped"), reason: "Blocked by task #2" },
     ],
@@ -234,11 +234,11 @@ describe("commits, report and notification", () => {
     const report = renderReport(state);
     for (const part of [
       "Roadmap: #1 Launch",
-      "`cclinic/auto/20261109-080503/run`",
+      "`luseen/auto/20261109-080503/run`",
       "Outcome: partial",
-      "| #1 T1 | done | `cclinic/auto/20261109-080503/task-1` |",
+      "| #1 T1 | done | `luseen/auto/20261109-080503/task-1` |",
       "Stopped after 3 QA runs. Last: TC-X-001",
-      "git merge cclinic/auto/20261109-080503/run",
+      "git merge luseen/auto/20261109-080503/run",
       "#4 T4",
     ]) {
       expect(report, part).toContain(part);
@@ -247,7 +247,7 @@ describe("commits, report and notification", () => {
   });
 
   it("TC-AUTO-034: the notification names the roadmap, the outcome and the counts", () => {
-    expect(notificationText(state)).toEqual({ title: "cclinic: Launch", message: "Run partial: 1 done, 2 blocked." });
+    expect(notificationText(state)).toEqual({ title: "luseen: Launch", message: "Run partial: 1 done, 2 blocked." });
   });
 
   it("TC-AUTO-008: the plan lists the roadmap, run order, dependencies, branch and developers, and no budget", () => {
@@ -256,13 +256,13 @@ describe("commits, report and notification", () => {
       runnable: [task(1), task(2, [1])],
       blockedBefore: new Map([[3, "Blocked by task #9"]]),
       inProgress: [task(4)],
-      runBranch: "cclinic/auto/x",
+      runBranch: "luseen/auto/x",
       developers: 2,
     });
     expect(plan).not.toContain("$");
     for (const part of [
       "Roadmap #1: Launch",
-      "Run branch: cclinic/auto/x",
+      "Run branch: luseen/auto/x",
       "Developers: 2",
       "#2 T2 (after #1)",
       "#3: Blocked by task #9",

@@ -1,4 +1,4 @@
-/** The `cclinic plan` command: a chat with the PM agent in its own Claude session (spec: roadmap-planning). */
+/** The `luseen plan` command: a chat with the PM agent in its own Claude session (spec: roadmap-planning). */
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import path from "node:path";
@@ -88,7 +88,7 @@ function roadmapChoices(overview: RoadmapOverview) {
 async function chooseTarget(options: PlanOptions, overview: RoadmapOverview): Promise<PlanTarget> {
   const roadmapId = options.roadmap;
   if (roadmapId !== undefined && !overview.roadmaps.some((roadmap) => roadmap.id === roadmapId)) {
-    throw new UsageError(`Roadmap ${roadmapId} doesn't exist. See your roadmaps with: cclinic tasks roadmaps`);
+    throw new UsageError(`Roadmap ${roadmapId} doesn't exist. See your roadmaps with: luseen tasks roadmaps`);
   }
   if (options.task === true) {
     if (roadmapId !== undefined) return { kind: "task", roadmapId };
@@ -116,9 +116,9 @@ async function chooseTarget(options: PlanOptions, overview: RoadmapOverview): Pr
   return { kind: "extend-roadmap", roadmapId: Number(choice) };
 }
 
-/** The checks `cclinic plan` makes before anything else: Claude Code and the documents (FR-PLAN-003). */
+/** The checks `luseen plan` makes before anything else: Claude Code and the documents (FR-PLAN-003). */
 export async function checkPlanning(target: string, context: CommandContext): Promise<void> {
-  await requireClaudeCli("cclinic plan", context);
+  await requireClaudeCli("luseen plan", context);
   requireDocuments(projectPaths(target, undefined).out);
 }
 
@@ -240,7 +240,7 @@ async function sendTurn(state: ChatState, message: string): Promise<void> {
 }
 
 /**
- * FR-PLAN-031: the conversation so far, from the Claude session's transcript. cclinic's own notes are left out, except
+ * FR-PLAN-031: the conversation so far, from the Claude session's transcript. luseen's own notes are left out, except
  * for a message one repeats, and a message still waiting for its reply is shown even when Claude Code hadn't written it yet (FR-PLAN-014).
  */
 async function showHistory(state: ChatState): Promise<void> {
@@ -411,11 +411,11 @@ async function chooseSession(records: PlanStore, given: string | true): Promise<
   if (given !== true) {
     const found = open.find((session) => session.id === given);
     if (found === undefined)
-      throw new UsageError(`There's no open planning session ${given}. See them with: cclinic plan --resume`);
+      throw new UsageError(`There's no open planning session ${given}. See them with: luseen plan --resume`);
     return found;
   }
   if (open.length === 0)
-    throw new UsageError("There's no open planning session to resume. Start one with: cclinic plan");
+    throw new UsageError("There's no open planning session to resume. Start one with: luseen plan");
   return chooseFrom(
     "Which planning session?",
     open.map((session) => ({
@@ -490,7 +490,7 @@ export async function runPlanCommand(options: PlanOptions, context: CommandConte
   await checkOptions(target, options);
   await checkPlanning(target, context);
   if (!isInteractive()) {
-    throw new UsageError("cclinic plan is a chat with the PM, so it needs an interactive terminal.");
+    throw new UsageError("luseen plan is a chat with the PM, so it needs an interactive terminal.");
   }
   const { model, effort }: { model: ModelChoice; effort: Effort } = await resolveModelAndEffort(
     { model: options.model, effort: options.effort },

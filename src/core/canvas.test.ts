@@ -56,7 +56,7 @@ function run(roadmapId: number, taskIds: number[], sessions: AgentSession[], isL
     runId: "20261111-110000",
     roadmapId,
     roadmapTitle: `Roadmap ${roadmapId}`,
-    runBranch: "cclinic/auto/20261111-110000/run",
+    runBranch: "luseen/auto/20261111-110000/run",
     startedAt: minutesAgo(30),
     finishedAt: null,
     outcome: null,

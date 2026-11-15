@@ -58,7 +58,7 @@ describe("GUI on port 80", () => {
     });
     server = await startGuiServer({ host: "127.0.0.1", port: 0, isPortFixed: true, handle });
     const port = server.port;
-    const auth = { "x-cclinic-token": TOKEN };
+    const auth = { "x-luseen-token": TOKEN };
 
     expect((await send(port, "GET", "/api/project", { host: "127.0.0.1", ...auth })).status).toBe(200);
     expect((await send(port, "GET", "/api/project", { host: "127.0.0.1:80", ...auth })).status).toBe(200);

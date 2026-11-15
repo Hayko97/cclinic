@@ -311,7 +311,7 @@ function interactiveSessionViews(state: WorkflowState, activity: Activity, now: 
   });
 }
 
-/** Every session cclinic knows of: agents of runs (FR-AUTO-039) and the user's own (FR-MCP-045). */
+/** Every session luseen knows of: agents of runs (FR-AUTO-039) and the user's own (FR-MCP-045). */
 export function allSessions(sources: Pick<CanvasSources, "runs" | "workflows" | "activity">, now: Date): SessionView[] {
   return [
     ...sources.runs.flatMap((run) =>
@@ -415,7 +415,7 @@ export function buildCanvas(sources: CanvasSources, now: Date): CanvasView {
         !isRunning &&
         newest !== undefined &&
         CONTINUABLE_OUTCOMES.has(newest.state.outcome ?? "") &&
-        // Tasks a new run takes; one in progress is left alone, as `cclinic auto` leaves it.
+        // Tasks a new run takes; one in progress is left alone, as `luseen auto` leaves it.
         own.some((task) => task.status === "open" || task.status === "blocked")
           ? continueSettings(newest.state)
           : null,

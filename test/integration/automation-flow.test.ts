@@ -108,7 +108,7 @@ function fake(options: FakeOptions) {
     saveLog: () => Promise.resolve(),
     now: () => new Date(TIME),
     signal: options.signal ?? new AbortController().signal,
-    docsPath: ".cclinic/sdd",
+    docsPath: ".luseen/sdd",
   };
   return { ports, calls, statuses, commits, merged, removed, events, states, mostActive: () => mostActive };
 }
@@ -130,7 +130,7 @@ function initial(tasks: readonly Task[], extra: Partial<RunState> = {}): RunStat
     runId: "r1",
     roadmapId: 1,
     roadmapTitle: "Launch",
-    runBranch: "cclinic/auto/r1/run",
+    runBranch: "luseen/auto/r1/run",
     startedAt: TIME,
     finishedAt: null,
     outcome: null,
@@ -223,10 +223,10 @@ describe("automated run", () => {
   it("TC-AUTO-018: an approved task is committed with its requirements, then merged", async () => {
     const { commits, merged, byId } = await run({ tasks: [task(1)] });
     expect(commits).toEqual([
-      { worktree: "/worktrees/cclinic/auto/r1/task-1", message: "#1 T1\n\nRequirements: FR-X-001" },
+      { worktree: "/worktrees/luseen/auto/r1/task-1", message: "#1 T1\n\nRequirements: FR-X-001" },
     ]);
-    expect(merged).toEqual(["cclinic/auto/r1/task-1"]);
-    expect(byId(1)).toMatchObject({ status: "done", branch: "cclinic/auto/r1/task-1", requirementIds: ["FR-X-001"] });
+    expect(merged).toEqual(["luseen/auto/r1/task-1"]);
+    expect(byId(1)).toMatchObject({ status: "done", branch: "luseen/auto/r1/task-1", requirementIds: ["FR-X-001"] });
   });
 
   it("TC-AUTO-019: a conflicting merge blocks the task, naming the files", async () => {
@@ -234,7 +234,7 @@ describe("automated run", () => {
     expect(byId(1)?.status).toBe("done");
     expect(byId(2)).toMatchObject({ status: "blocked" });
     expect(byId(2)?.reason).toContain("src/shared.ts");
-    expect(merged).toEqual(["cclinic/auto/r1/task-1"]);
+    expect(merged).toEqual(["luseen/auto/r1/task-1"]);
   });
 
   it("TC-AUTO-020: worktrees are removed, and a blocked task's work is committed as WIP", async () => {
@@ -244,7 +244,7 @@ describe("automated run", () => {
         qa: (call) => (taskOf(call) === 2 ? { output: { result: "fail", failures: [], summary: "bad" } } : {}),
       },
     });
-    expect(removed.sort()).toEqual(["/worktrees/cclinic/auto/r1/task-1", "/worktrees/cclinic/auto/r1/task-2"]);
+    expect(removed.sort()).toEqual(["/worktrees/luseen/auto/r1/task-1", "/worktrees/luseen/auto/r1/task-2"]);
     expect(commits.find((commit) => commit.worktree.endsWith("task-2"))?.message).toContain("WIP");
   });
 
@@ -264,7 +264,7 @@ describe("automated run", () => {
     });
     const review = calls.find((call) => call.stage === "spec-review");
     for (const part of ["T1", "About 1", "Start", "Ship"]) expect(review?.prompt).toContain(part);
-    expect(review?.prompt).toContain("diff of /worktrees/cclinic/auto/r1/task-1 in .cclinic/sdd");
+    expect(review?.prompt).toContain("diff of /worktrees/luseen/auto/r1/task-1 in .luseen/sdd");
     const specs = calls.filter((call) => call.stage === "spec");
     expect(specs[1]?.prompt).toContain("add an error case");
     expect(byId(1)?.status).toBe("done");
@@ -308,7 +308,7 @@ describe("automated run", () => {
     const stages = calls.map((call) => call.stage);
     expect(stages).toEqual(["spec", "spec-review", "implement", "qa", "review", "implement", "qa", "review"]);
     const review = calls.find((call) => call.stage === "review");
-    expect(review?.prompt).toContain("diff of /worktrees/cclinic/auto/r1/task-1");
+    expect(review?.prompt).toContain("diff of /worktrees/luseen/auto/r1/task-1");
     expect(review?.prompt).toContain('"result":"pass"');
     expect(calls[5]?.prompt).toContain("rename it");
     expect(byId(1)?.status).toBe("done");

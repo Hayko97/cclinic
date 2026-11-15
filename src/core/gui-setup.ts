@@ -1,4 +1,4 @@
-/** Setup in the GUI: the questions generate asks, and how a host agent connects to `cclinic mcp` (spec: gui). Pure. */
+/** Setup in the GUI: the questions generate asks, and how a host agent connects to `luseen mcp` (spec: gui). Pure. */
 import { z } from "zod";
 import { MCP_CONFIG_FILE } from "./constants/workflow.js";
 import { ENVIRONMENT_CONSENT_MESSAGE } from "./environment.js";
@@ -6,7 +6,7 @@ import type { GenerateOptions } from "./gui.js";
 import { mergeMcpConfig } from "./mcp-config.js";
 import { labelForEffort, labelForModel, parseEffort, parseModel } from "./models.js";
 
-/** What `cclinic --dry-run --json` prints (FR-GUI-016). Only the fields the questions need are read. */
+/** What `luseen --dry-run --json` prints (FR-GUI-016). Only the fields the questions need are read. */
 export const dryRunSchema = z.object({
   status: z.literal("dry-run"),
   provider: z.string().nullable(),
@@ -47,7 +47,7 @@ function summaryOf(dryRun: DryRun): string {
       : dryRun.estimatedCostUsd < MIN_SHOWN_COST_USD
         ? "Estimated cost: under $0.01."
         : `Estimated cost: $${dryRun.estimatedCostUsd.toFixed(COST_DECIMALS)}.`;
-  return `cclinic will analyse ${files} file${files === 1 ? "" : "s"}, about ${dryRun.estimatedTokens.toLocaleString(
+  return `luseen will analyse ${files} file${files === 1 ? "" : "s"}, about ${dryRun.estimatedTokens.toLocaleString(
     "en-US",
   )} input tokens, with ${using}. ${cost} Continue?`;
 }
@@ -70,7 +70,7 @@ export function generateQuestions(options: GenerateOptions, dryRun: DryRun): Set
   if (dryRun.git.status === "no-repository" && !options.noGit)
     questions.push({
       id: "git",
-      text: "This folder has no Git repository, so cclinic will create a local one. It never commits or pushes.",
+      text: "This folder has no Git repository, so luseen will create a local one. It never commits or pushes.",
       answers: [
         { value: "create", label: "Create it" },
         { value: "no-git", label: "Continue without Git" },
@@ -88,7 +88,7 @@ export function generateQuestions(options: GenerateOptions, dryRun: DryRun): Set
   if (options.force)
     questions.push({
       id: "force",
-      text: "--force replaces .cclinic/sdd completely, including any changes made to it by hand.",
+      text: "--force replaces .luseen/sdd completely, including any changes made to it by hand.",
       answers: [
         { value: "replace", label: "Replace them" },
         { value: "cancel", label: "Cancel" },
@@ -99,9 +99,9 @@ export function generateQuestions(options: GenerateOptions, dryRun: DryRun): Set
 
 export interface McpInfo {
   readonly file: string;
-  /** installed: cclinic's entry is there; changed: someone edited it; missing; or unreadable JSON. */
+  /** installed: luseen's entry is there; changed: someone edited it; missing; or unreadable JSON. */
   readonly status: "installed" | "changed" | "missing" | "unreadable";
-  /** What `.mcp.json` holds with cclinic's entry, for a project that has none yet. */
+  /** What `.mcp.json` holds with luseen's entry, for a project that has none yet. */
   readonly entry: string;
 }
 
@@ -109,7 +109,7 @@ export interface McpInfo {
 export type McpFile =
   { readonly kind: "missing" } | { readonly kind: "read"; readonly content: string } | { readonly kind: "unreadable" };
 
-/** FR-GUI-018: whether a host agent finds `cclinic mcp`, read from the project's `.mcp.json`. */
+/** FR-GUI-018: whether a host agent finds `luseen mcp`, read from the project's `.mcp.json`. */
 export function mcpInfo(file: McpFile): McpInfo {
   const fresh = mergeMcpConfig(undefined);
   const entry = "content" in fresh ? fresh.content : "";

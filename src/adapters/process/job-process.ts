@@ -42,7 +42,7 @@ export function startProcess(
     stdio: ["ignore", "pipe", "pipe"],
     shell: false,
     // Its own process group, so Ctrl+C in the GUI's terminal reaches only the GUI, which then stops the
-    // job once. A second SIGINT would make cclinic exit at once, skipping its own clean stop. Windows has
+    // job once. A second SIGINT would make luseen exit at once, skipping its own clean stop. Windows has
     // no process groups, and there it would only open a console window.
     detached: process.platform !== "win32",
     windowsHide: true,

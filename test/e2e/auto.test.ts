@@ -1,4 +1,4 @@
-/** `cclinic auto` through the built binary, with a scripted fake `claude`. */
+/** `luseen auto` through the built binary, with a scripted fake `claude`. */
 import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, copyFileSync, existsSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -43,8 +43,8 @@ function environment(
   };
 }
 
-function cclinic(args: readonly string[], env: NodeJS.ProcessEnv) {
-  const result = spawnSync(process.execPath, [path.join(REPO, "bin/cclinic.js"), ...args], {
+function luseen(args: readonly string[], env: NodeJS.ProcessEnv) {
+  const result = spawnSync(process.execPath, [path.join(REPO, "bin/luseen.js"), ...args], {
     encoding: "utf8",
     env,
     input: "",
@@ -56,7 +56,7 @@ function project(taskCount = 1): string {
   const root = makeTempFolder();
   writeProject(root, {
     "src/app.txt": "app\n",
-    ".cclinic/sdd/README.md": "# Specs\n",
+    ".luseen/sdd/README.md": "# Specs\n",
     ...Object.fromEntries(AUTO_REQUIRED_SKILLS.map((skill) => [`.claude/skills/${skill}/SKILL.md`, `# ${skill}\n`])),
   });
   git(root, "init", "-q", "-b", "main");
@@ -64,7 +64,7 @@ function project(taskCount = 1): string {
   git(root, "config", "user.name", "Dev");
   git(root, "add", "-A");
   git(root, "commit", "-q", "-m", "start");
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   store?.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
     milestones: [
@@ -94,7 +94,7 @@ const approving: FakeClaudeRule[] = [
 
 const base = (root: string): string[] => ["auto", "-C", root, "--roadmap", "1", "--yes"];
 
-describe("cclinic auto", () => {
+describe("luseen auto", () => {
   it("TC-AUTO-002, TC-AUTO-064: invalid options, and the removed --max-budget-usd, exit 2, and nothing starts", () => {
     const root = project();
     const { env, record } = environment(approving);
@@ -104,20 +104,20 @@ describe("cclinic auto", () => {
       ["--max-budget-usd", "5"],
       ["--roadmap", "abc"],
     ]) {
-      const result = cclinic([...base(root), ...args], env);
+      const result = luseen([...base(root), ...args], env);
       expect(result.code, args.join(" ")).toBe(2);
       expect(result.stderr).toContain(args[0]);
     }
-    const unknown = cclinic([...base(root), "--roadmap", "99"], env);
+    const unknown = luseen([...base(root), "--roadmap", "99"], env);
     expect(unknown.code).toBe(2);
     expect(unknown.stderr).toContain("Roadmap 99");
     expect(existsSync(record)).toBe(false);
-    expect(git(root, "branch", "--list", "cclinic/*")).toBe("");
+    expect(git(root, "branch", "--list", "luseen/*")).toBe("");
   });
 
   it("TC-AUTO-003: each failed check exits 2, names it, and creates nothing", () => {
     const cases: [string, (root: string) => NodeJS.ProcessEnv | undefined, string][] = [
-      ["provider", () => ({ CCLINIC_PROVIDER: "anthropic-api" }), "CCLINIC_PROVIDER"],
+      ["provider", () => ({ LUSEEN_PROVIDER: "anthropic-api" }), "LUSEEN_PROVIDER"],
       ["no claude", () => undefined, "Install Claude Code"],
       [
         "not a repository",
@@ -136,12 +136,12 @@ describe("cclinic auto", () => {
           git(root, "commit", "-qm", "drop skills");
           return undefined;
         },
-        "cclinic skills",
+        "luseen skills",
       ],
       [
         "nothing to run",
         (root) => {
-          const store = openTaskStore(path.join(root, ".cclinic"), "update");
+          const store = openTaskStore(path.join(root, ".luseen"), "update");
           store?.setStatus(1, "done");
           store?.close();
           return undefined;
@@ -156,25 +156,25 @@ describe("cclinic auto", () => {
         withClaude: name !== "no claude",
         ...(extra === undefined ? {} : { env: extra }),
       });
-      const result = cclinic(base(root), env);
+      const result = luseen(base(root), env);
       expect(result.code, name).toBe(2);
       expect(result.stderr, name).toContain(message);
       expect(existsSync(record), name).toBe(false);
-      expect(existsSync(path.join(root, ".cclinic/auto")), name).toBe(false);
+      expect(existsSync(path.join(root, ".luseen/auto")), name).toBe(false);
     }
   });
 
   it("TC-AUTO-007: with no terminal and no --yes, it exits 2", () => {
     const root = project();
     const { env } = environment(approving);
-    const result = cclinic(["auto", "-C", root, "--roadmap", "1"], env);
+    const result = luseen(["auto", "-C", root, "--roadmap", "1"], env);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("--yes");
   });
 
   it("TC-AUTO-036, TC-AUTO-064: with no budget, --json prints one document, exit 0 when all is done, 1 when a task is blocked", () => {
     const done = project();
-    const ok = cclinic([...base(done), "--json"], environment(approving).env);
+    const ok = luseen([...base(done), "--json"], environment(approving).env);
     expect(ok.code).toBe(0);
     expect(ok.stdout).not.toContain("costUsd");
     const parsed = JSON.parse(ok.stdout) as {
@@ -184,7 +184,7 @@ describe("cclinic auto", () => {
       tasks: { status: string }[];
     };
     expect(parsed).toMatchObject({ outcome: "completed" });
-    expect(parsed.runBranch).toMatch(/^cclinic\/auto\/\d{8}-\d{6}\/run$/);
+    expect(parsed.runBranch).toMatch(/^luseen\/auto\/\d{8}-\d{6}\/run$/);
     expect(existsSync(parsed.report)).toBe(true);
     expect(parsed.tasks.map((task) => task.status)).toEqual(["done"]);
 
@@ -193,37 +193,37 @@ describe("cclinic auto", () => {
       { match: "QA agent", times: 0, output: { result: "fail", failures: [], summary: "no" } },
       ...approving,
     ];
-    const partial = cclinic([...base(blocked), "--json"], environment(failing).env);
+    const partial = luseen([...base(blocked), "--json"], environment(failing).env);
     expect(partial.code).toBe(1);
     expect(JSON.parse(partial.stdout)).toMatchObject({ outcome: "partial", tasks: [{ status: "blocked" }] });
 
-    const usage = cclinic([...base(blocked), "--json", "--developers", "0"], environment(approving).env);
+    const usage = luseen([...base(blocked), "--json", "--developers", "0"], environment(approving).env);
     expect(usage.code).toBe(2);
     expect(JSON.parse(usage.stdout)).toMatchObject({ status: "error", exitCode: 2 });
   });
 
-  it("TC-AUTO-043, TC-AUTO-044: without --roadmap and a terminal, it lists the roadmaps or points to cclinic plan", () => {
+  it("TC-AUTO-043, TC-AUTO-044: without --roadmap and a terminal, it lists the roadmaps or points to luseen plan", () => {
     const root = project();
-    const store = openTaskStore(path.join(root, ".cclinic"), "update");
+    const store = openTaskStore(path.join(root, ".luseen"), "update");
     store?.savePlan({ roadmap: { title: "Second", goal: "" }, milestones: [] });
     store?.close();
     const { env } = environment(approving);
-    const listed = cclinic(["auto", "-C", root, "--yes"], env);
+    const listed = luseen(["auto", "-C", root, "--yes"], env);
     expect(listed.code).toBe(2);
     expect(listed.stderr).toContain("Roadmaps: 1, 2");
-    expect(listed.stderr).toContain("cclinic tasks roadmaps");
+    expect(listed.stderr).toContain("luseen tasks roadmaps");
     const empty = project();
-    const removing = openTaskStore(path.join(empty, ".cclinic"), "update");
+    const removing = openTaskStore(path.join(empty, ".luseen"), "update");
     removing?.removeRoadmap(1);
     removing?.close();
-    const none = cclinic(["auto", "-C", empty, "--yes"], env);
+    const none = luseen(["auto", "-C", empty, "--yes"], env);
     expect(none.code).toBe(2);
-    expect(none.stderr).toContain("cclinic plan");
+    expect(none.stderr).toContain("luseen plan");
   });
 
   it("TC-AUTO-049: --task is not an option", () => {
     const root = project();
-    const result = cclinic(["auto", "-C", root, "--task", "1", "--yes"], environment(approving).env);
+    const result = luseen(["auto", "-C", root, "--task", "1", "--yes"], environment(approving).env);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("unknown option");
   });
@@ -232,10 +232,10 @@ describe("cclinic auto", () => {
     const root = project();
     const slow = [{ match: "developer agent", times: 0, delayMs: 3000 }, ...approving];
     const first = environment(slow);
-    const running = spawn(process.execPath, [path.join(REPO, "bin/cclinic.js"), ...base(root)], { env: first.env });
+    const running = spawn(process.execPath, [path.join(REPO, "bin/luseen.js"), ...base(root)], { env: first.env });
     const finished = new Promise<number | null>((resolve) => running.on("close", resolve));
     await waitFor(() => existsSync(first.pids));
-    const second = cclinic(base(root), environment(approving).env);
+    const second = luseen(base(root), environment(approving).env);
     expect(second.code).toBe(2);
     expect(second.stderr).toMatch(/Automated run \d{8}-\d{6} \(process \d+\) is already working/);
     expect(await finished).toBe(0);
@@ -249,7 +249,7 @@ describe("cclinic auto", () => {
       const root = project(2);
       const hanging = [{ match: "developer agent.*Task #2:", times: 0, hang: true }, ...approving];
       const { env, pids } = environment(hanging);
-      const child = spawn(process.execPath, [path.join(REPO, "bin/cclinic.js"), ...base(root), "--developers", "1"], {
+      const child = spawn(process.execPath, [path.join(REPO, "bin/luseen.js"), ...base(root), "--developers", "1"], {
         env,
       });
       const finished = new Promise<number | null>((resolve) => child.on("close", resolve));
@@ -259,18 +259,18 @@ describe("cclinic auto", () => {
       for (const pid of readFileSync(pids, "utf8").trim().split("\n").map(Number)) {
         expect(() => process.kill(pid, 0), String(pid)).toThrow();
       }
-      const runs = git(root, "branch", "--list", "cclinic/*", "--format=%(refname:short)").split("\n");
+      const runs = git(root, "branch", "--list", "luseen/*", "--format=%(refname:short)").split("\n");
       expect(runs.some((branch) => branch.endsWith("/run"))).toBe(true);
       expect(runs.some((branch) => branch.endsWith("/task-2"))).toBe(true);
       expect(git(root, "worktree", "list").split("\n")).toHaveLength(1);
-      const store = openTaskStore(path.join(root, ".cclinic"), "read");
+      const store = openTaskStore(path.join(root, ".luseen"), "read");
       expect(store?.getTask(1)?.status).toBe("done");
       expect(store?.getTask(2)?.status).toBe("open");
       store?.close();
       const runId = runs[0]?.split("/")[2] ?? "";
-      const runBranch = `cclinic/auto/${runId}/run`;
+      const runBranch = `luseen/auto/${runId}/run`;
       expect(git(root, "log", "--format=%s", runBranch)).not.toContain("#2");
-      expect(readFileSync(path.join(root, ".cclinic/auto", runId, "report.md"), "utf8")).toContain(
+      expect(readFileSync(path.join(root, ".luseen/auto", runId, "report.md"), "utf8")).toContain(
         "Outcome: interrupted",
       );
     }

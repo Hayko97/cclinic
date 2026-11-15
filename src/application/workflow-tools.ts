@@ -110,7 +110,7 @@ export interface WorkflowPorts {
 type Reply = Awaited<ReturnType<WorkflowTool["run"]>>;
 
 const NO_BRANCH = "no-branch";
-const APPROVE_COMMAND = "cclinic approve";
+const APPROVE_COMMAND = "luseen approve";
 const NO_INPUT = advanceInputSchema.pick({});
 
 function ok(message: string, extra: Record<string, unknown> = {}): Reply {
@@ -149,7 +149,7 @@ export function createWorkflowTools(ports: WorkflowPorts): {
   };
 
   /**
-   * Asks the user, or, when the host can't, saves the question for `cclinic approve` (FR-MCP-028, FR-MCP-029).
+   * Asks the user, or, when the host can't, saves the question for `luseen approve` (FR-MCP-028, FR-MCP-029).
    * An answer given that way is picked up the next time the agent asks.
    */
   const askUser = async (
@@ -390,7 +390,7 @@ export function createWorkflowTools(ports: WorkflowPorts): {
     },
     {
       name: "task_add",
-      description: "Adds one task with no milestone. Roadmaps and their tasks are planned with cclinic plan instead.",
+      description: "Adds one task with no milestone. Roadmaps and their tasks are planned with luseen plan instead.",
       inputSchema: taskInputSchema,
       run: (input) => {
         const parsed = taskInputSchema.parse(input);
@@ -510,7 +510,7 @@ function changeTask(run: () => Task): Task | string {
   }
 }
 
-/** Task errors become refusals, as `cclinic tasks` reports them. */
+/** Task errors become refusals, as `luseen tasks` reports them. */
 function tasksCall(run: () => Task): Reply {
   const task = changeTask(run);
   return typeof task === "string" ? refused(task) : json({ task });

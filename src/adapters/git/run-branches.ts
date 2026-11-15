@@ -8,12 +8,12 @@ import {
   RUN_WORKTREES_FOLDER,
 } from "../../core/constants/agents.js";
 import { TASKS_DB_FILE, TOOL_FOLDER_NAME } from "../../core/constants/paths.js";
-import { CclinicError } from "../../core/errors.js";
+import { LuseenError } from "../../core/errors.js";
 
 const TASKS_DB_PATH = `${TOOL_FOLDER_NAME}/${TASKS_DB_FILE}`;
 import { runGit, type GitOptions, type GitOutcome } from "./git-repository.js";
 
-export class RunGitError extends CclinicError {}
+export class RunGitError extends LuseenError {}
 
 export interface RepositoryState {
   readonly isRepository: boolean;
@@ -28,7 +28,7 @@ export async function readRepositoryState(target: string, options: GitOptions): 
   }
   const head = await runGit(["rev-parse", "--verify", "--quiet", "HEAD"], target, options);
   // New files are allowed, staged or not, because worktrees start from HEAD without them. The task
-  // database is allowed too: cclinic updates it during every run (FR-AUTO-003, FR-AUTO-009).
+  // database is allowed too: luseen updates it during every run (FR-AUTO-003, FR-AUTO-009).
   const changed = head.isOk
     ? await runGit(
         ["diff", "HEAD", "--name-only", "--diff-filter=a", "--", ".", `:(exclude)${TASKS_DB_PATH}`],
@@ -62,7 +62,7 @@ function expectOk(outcome: GitOutcome, what: string): string {
 }
 
 /** Keeps worktrees and run files out of `git status` in the user's own working tree. */
-async function excludeRunFolder(target: string, options: GitOptions): Promise<void> {
+export async function excludeRunFolder(target: string, options: GitOptions): Promise<void> {
   const common = expectOk(
     await runGit(["rev-parse", "--git-common-dir"], target, options),
     "find the repository",

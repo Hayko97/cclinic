@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { GUI_ASSETS, GUI_MAX_BODY_BYTES, GUI_MAX_UPLOAD_BODY_BYTES, HTTP_STATUS } from "../../core/constants/gui.js";
-import { CclinicError, UsageError } from "../../core/errors.js";
+import { LuseenError, UsageError } from "../../core/errors.js";
 import { SECURITY_HEADERS, type GuiRequest, type GuiResponse } from "../../core/gui.js";
 
 export interface GuiServer {
@@ -23,7 +23,7 @@ export interface GuiServerOptions {
   readonly handle: (request: GuiRequest) => Promise<GuiResponse>;
 }
 
-class BodyTooLarge extends CclinicError {}
+class BodyTooLarge extends LuseenError {}
 
 /**
  * The JSON body, up to `maxBytes`, which only the route reading it chooses (FR-PLAN-033). The rest of a larger body

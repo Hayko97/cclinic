@@ -1,4 +1,4 @@
-/** Planning session records and their attachments in `.cclinic/plans/<id>/` (FR-PLAN-023, FR-PLAN-030). */
+/** Planning session records and their attachments in `.luseen/plans/<id>/` (FR-PLAN-023, FR-PLAN-030). */
 import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -177,7 +177,7 @@ export function openPlanStore(target: string, readDocument?: DocumentReader): Pl
           if (readDocument === undefined) throw new UsageError(`${file.name} needs a document reader to be attached.`);
           const textName = uniqueName(`${name}.md`, used);
           used.add(textName.toLowerCase());
-          // Secrets are redacted, as in every text cclinic writes for an agent (FR-PLAN-023).
+          // Secrets are redacted, as in every text luseen writes for an agent (FR-PLAN-023).
           await writeFile(path.join(attachments, textName), redact(await readDocument(copy, file.name)).text);
           textPath = path.relative(target, path.join(attachments, textName));
         }

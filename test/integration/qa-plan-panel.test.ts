@@ -36,8 +36,8 @@ afterEach(async () => {
 
 function project(): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   for (const title of ["Launch", "Payments"])
     store.savePlan({
@@ -555,7 +555,7 @@ describe("QA: the Plan panel in the browser", () => {
           {
             type: "tool_use",
             id: `s${index}`,
-            name: "mcp__cclinic__plan_suggest",
+            name: "mcp__luseen__plan_suggest",
             input: {
               suggestions: ["Yes"],
               sources: [{ title: `Source ${index}`, url: `https://site${index}.example.org/` }],
@@ -865,7 +865,7 @@ describe("QA run 3: late replies, uploads per page, and sources", () => {
           {
             type: "tool_use",
             id: "s1",
-            name: "mcp__cclinic__plan_suggest",
+            name: "mcp__luseen__plan_suggest",
             input: { suggestions: ["Yes"], sources: [{ title: "One", url: "https://first.example.org/a" }] },
           },
         ]),
@@ -902,7 +902,7 @@ describe("QA run 3: late replies, uploads per page, and sources", () => {
           {
             type: "tool_use",
             id: "s1",
-            name: "mcp__cclinic__plan_suggest",
+            name: "mcp__luseen__plan_suggest",
             input: { suggestions: ["Yes"], sources: [{ title: "One", url: "https://first.example.org/a" }] },
           },
         ]),

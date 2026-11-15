@@ -1,4 +1,4 @@
-/** The local environment step, shared by `cclinic environment` and the end of a generation run. */
+/** The local environment step, shared by `luseen environment` and the end of a generation run. */
 import { runEnvironmentAgent } from "../adapters/llm/environment-agent.js";
 import { readEnvironmentFile, snapshotFiles } from "../adapters/storage/environment-store.js";
 import { relativeDocsPath } from "../adapters/storage/skill-installer.js";

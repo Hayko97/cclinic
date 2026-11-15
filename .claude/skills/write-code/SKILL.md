@@ -2,8 +2,8 @@
 name: write-code
 description: "Writes or changes code the way a careful maintainer of this project would: following its stack, architecture and conventions, in small changes without unnecessary comments or abstractions. Use whenever writing, changing or refactoring production code in this project."
 metadata:
-  generated-by: cclinic
-  content-hash: "729110a6c710f3d2f11961137940f1fd5794c28c164c23933bac929149375769"
+  generated-by: luseen
+  content-hash: "65e3196278199c13ba8b414587e8336be4d4b1f27c5191e4219808f64829f4a3"
 ---
 
 # Write code
@@ -12,7 +12,7 @@ Write what an experienced maintainer of this project would write. A reviewer sho
 
 ## Before writing
 
-1. **Read the project's rules:** `.cclinic/sdd/stack.md`, `architecture.md` and `developer-guidelines.md`. They set the languages, versions, layers, naming and test tools. Where they conflict with habit, they win.
+1. **Read the project's rules:** `.luseen/sdd/stack.md`, `architecture.md` and `developer-guidelines.md`. They set the languages, versions, layers, naming and test tools. Where they conflict with habit, they win.
 2. **Read the code nearby.** Read the file you'll change, its neighbours and its tests. Where nearby code and general best practice differ, follow the project, and mention the difference instead of introducing a second style.
 3. **Search before creating.** Look for an existing function, type, helper or pattern that does this. Extend or reuse it.
 
@@ -50,7 +50,7 @@ Write what an experienced maintainer of this project would write. A reviewer sho
 
 ## Before finishing
 
-1. Run the project's formatter, linter, type checker and tests, using the commands in `.cclinic/sdd/stack.md` or the project's own scripts.
+1. Run the project's formatter, linter, type checker and tests, using the commands in `.luseen/sdd/stack.md` or the project's own scripts.
 2. Read your whole diff as a reviewer would. Remove anything the task doesn't need.
 3. Say plainly what you changed, what you ran and the results, including anything that failed or that you couldn't run.
 

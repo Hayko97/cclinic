@@ -1,4 +1,4 @@
-/** `cclinic gui`: the local web GUI for a project (spec: gui). */
+/** `luseen gui`: the local web GUI for a project (spec: gui). */
 import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -29,7 +29,7 @@ import { GUI_DEFAULT_PORT, GUI_HOST, GUI_TOKEN_BYTES, GUI_TOKEN_QUERY } from "..
 import { PLAN_ATTACHMENTS_FOLDER } from "../core/constants/agents.js";
 import { UsageError } from "../core/errors.js";
 import { LIMITS } from "../core/constants/limits.js";
-import { cclinicBin } from "./cclinic-bin.js";
+import { luseenBin } from "./luseen-bin.js";
 import { resolveModelAndEffort } from "./generate-command.js";
 import { checkPlanning, pmSkill } from "./plan-command.js";
 import { decisionPorts, documentPaths, planStoreFor, transcriptChecks, turnPorts } from "./planning-ports.js";
@@ -44,7 +44,7 @@ export interface GuiOptions {
 }
 
 export interface GuiDependencies {
-  /** Starts `cclinic` with these arguments in the project; replaced in tests. */
+  /** Starts `luseen` with these arguments in the project; replaced in tests. */
   readonly startJob?: (args: readonly string[], cwd: string) => JobProcess;
   /** Whether stdout is a terminal, so a person is there to see the browser open (FR-GUI-004). */
   readonly isTerminal?: boolean;
@@ -59,7 +59,7 @@ function every(ms: number, run: () => Promise<void>): () => void {
   };
 }
 
-/** Whether `cclinic` has generated the project's documents (FR-GUI-014, FR-GUI-053). */
+/** Whether `luseen` has generated the project's documents (FR-GUI-014, FR-GUI-053). */
 function documentsCheck(target: string): () => boolean {
   return () => existsSync(projectPaths(target, undefined).out);
 }
@@ -132,7 +132,7 @@ function waitForStop(signal: AbortSignal): Promise<void> {
 
 /**
  * FR-GUI-023, FR-PLAN-033: the Plan panel's planner, with the same checks, options, defaults and PM as
- * `cclinic plan`. A turn's PM is stopped by its own signal (Stop) as well as by the GUI stopping.
+ * `luseen plan`. A turn's PM is stopped by its own signal (Stop) as well as by the GUI stopping.
  */
 function plannerPorts(
   target: string,
@@ -143,7 +143,7 @@ function plannerPorts(
   const checks = transcriptChecks();
   // Made once, private to this user (mkdtemp gives 0700), on the first upload, and removed when the GUI stops.
   let uploadFolder: Promise<string> | undefined;
-  const folder = (): Promise<string> => (uploadFolder ??= mkdtemp(path.join(os.tmpdir(), "cclinic-plan-uploads-")));
+  const folder = (): Promise<string> => (uploadFolder ??= mkdtemp(path.join(os.tmpdir(), "luseen-plan-uploads-")));
   return {
     prepare: async (options) => {
       await checkPlanning(target, context);
@@ -223,7 +223,7 @@ export async function runGuiCommand(
     const startJob =
       dependencies.startJob ??
       ((args: readonly string[], cwd: string) =>
-        startProcess(process.execPath, [cclinicBin(), ...args], { cwd, environment: context.environment }));
+        startProcess(process.execPath, [luseenBin(), ...args], { cwd, environment: context.environment }));
     const jobs = createJobs({
       start: (args) => startJob(args, target),
       now: () => new Date(),
@@ -266,7 +266,7 @@ export async function runGuiCommand(
     try {
       await lock.setPort(port);
       const url = `http://${GUI_HOST}:${port}/?${GUI_TOKEN_QUERY}=${token}`;
-      context.reporter.info(`cclinic GUI for ${target}. Press Ctrl+C to stop.`);
+      context.reporter.info(`luseen GUI for ${target}. Press Ctrl+C to stop.`);
       context.reporter.result(options.json === true ? JSON.stringify({ url, port }) : url);
       if (options.open && (dependencies.isTerminal ?? process.stdout.isTTY)) {
         await openInBrowser(url, context.environment).catch((error: unknown) => {

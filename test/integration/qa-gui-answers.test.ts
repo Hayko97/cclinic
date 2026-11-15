@@ -50,8 +50,8 @@ async function project(
   branch?: { name: string; pending: PendingQuestion },
 ): Promise<{ root: string; taskChange: WorkflowState; branchChange?: WorkflowState }> {
   const root = makeTempFolder();
-  mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.addTask({ title: "Store card token", dependsOn: [] });
   store.addTask({ title: "Charge on checkout", dependsOn: [] });
@@ -362,7 +362,7 @@ describe("QA run 3: refused bodies and damaged states", () => {
   it("a damaged state file of the same change is refused with 409 naming it, and the file is left as it was", async () => {
     const { root, taskChange } = await project(G1);
     const { gui } = await start(root);
-    const file = path.join(root, ".cclinic/workflow", `${taskChange.key}.json`);
+    const file = path.join(root, ".luseen/workflow", `${taskChange.key}.json`);
     writeFileSync(file, "{ not json");
     const reply = await sendTo(gui, "POST", answerPath(taskChange.key), { question: G1.question, answer: "approve" });
     expect(reply.status).toBe(409);
@@ -379,12 +379,12 @@ describe("QA run 3: refused bodies and damaged states", () => {
     const { gui } = await start(root);
     const page = await openPage(gui);
     const section = await openTask2(page);
-    writeFileSync(path.join(root, ".cclinic/workflow/branch-broken.json"), "{ not json");
+    writeFileSync(path.join(root, ".luseen/workflow/branch-broken.json"), "{ not json");
     await section.locator('[data-answer="approve"]').click();
     await expect
       .poll(() => page.locator("#notice").textContent())
       .toMatch(/branch-broken\.json isn't a readable workflow state\. Delete it to start the change again\./);
-    rmSync(path.join(root, ".cclinic/workflow/branch-broken.json"));
+    rmSync(path.join(root, ".luseen/workflow/branch-broken.json"));
     expect(await stateOf(root, taskChange.key)).toEqual(taskChange);
   });
 });

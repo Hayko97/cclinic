@@ -133,7 +133,7 @@ describe("Setup through the API", () => {
     expect((await post(gui, { command: "environment", options: {} })).status).toBe(400);
   });
 
-  it("TC-GUI-026: Setup says whether .mcp.json has cclinic's entry, and starts no cclinic mcp", async () => {
+  it("TC-GUI-026: Setup says whether .mcp.json has luseen's entry, and starts no luseen mcp", async () => {
     const root = makeTempFolder();
     const jobs = scriptedJobs();
     const gui = await open(root, jobs);

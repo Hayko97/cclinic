@@ -1,4 +1,4 @@
-/** The environment file, which tells agents and cclinic how to preview a project (spec: local-environment). */
+/** The environment file, which tells agents and luseen how to preview a project (spec: local-environment). */
 import { z } from "zod";
 import {
   ENVIRONMENT_ALIAS_MAX_LENGTH,
@@ -54,7 +54,7 @@ export type EnvironmentFile = z.infer<typeof environmentFileSchema>;
 export const ENVIRONMENT_FILE_PATH = `${ENVIRONMENT_FOLDER}/${ENVIRONMENT_FILE}`;
 
 /** For anyone without the Claude CLI, or who said no: their own agent can do the same work (FR-ENV-007). */
-export const ENVIRONMENT_NEXT_STEP = `To set up a preview later, run "cclinic environment", or ask your coding agent: "Use the local-env skill to set up the local environment for this project."`;
+export const ENVIRONMENT_NEXT_STEP = `To set up a preview later, run "luseen environment", or ask your coding agent: "Use the local-env skill to set up the local environment for this project."`;
 
 export const ENVIRONMENT_CONSENT_MESSAGE = `Set up a local environment for previewing changes? Claude will create files in ${ENVIRONMENT_FOLDER} and run build and Docker commands, which can build and run this project's code.`;
 

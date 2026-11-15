@@ -2,8 +2,8 @@
 name: create-spec
 description: "Writes a new spec for a feature or capability, with requirements, acceptance criteria and test cases. Use when the user asks to spec, plan or document something new before building it, or describes a feature that has no spec yet."
 metadata:
-  generated-by: cclinic
-  content-hash: "d4141238d5b9262f6d31dfb41616180fd80ccaf4e1f210a8a3c6968ad5999e8b"
+  generated-by: luseen
+  content-hash: "85623972a0bb380e60a27a8dfe9a9e2c42390d7d4c7754dd94cb6b36de4727ae"
 ---
 
 # Create a spec
@@ -12,12 +12,12 @@ Write a spec that a developer and an automation tester could each work from with
 
 ## Steps
 
-1. **Read the context.** Read `.cclinic/sdd/README.md`, `overview.md`, `architecture.md` and `open-questions.md`. If `.cclinic/sdd` doesn't exist, stop and ask the user to run `cclinic` in the project root to generate it.
-2. **Check for overlap.** Read the goals of the existing specs in `.cclinic/sdd/specs/`. If this belongs in an existing spec, use the `refine-spec` skill instead.
+1. **Read the context.** Read `.luseen/sdd/README.md`, `overview.md`, `architecture.md` and `open-questions.md`. If `.luseen/sdd` doesn't exist, stop and ask the user to run `luseen` in the project root to generate it.
+2. **Check for overlap.** Read the goals of the existing specs in `.luseen/sdd/specs/`. If this belongs in an existing spec, use the `refine-spec` skill instead.
 3. **Look at the code.** Find what already exists for this capability, so that requirements reflect reality and can cite evidence.
 4. **Ask before assuming.** If the goal, users or scope are unclear, ask the user. Ask only about what would change the spec, and record anything unresolved as an open question.
 5. **Write the three files,** using the format below. Scope one capability per spec, and split it if it's growing into several.
-6. **Add it to the specs table** in `.cclinic/sdd/README.md`.
+6. **Add it to the specs table** in `.luseen/sdd/README.md`.
 7. **Check your work** using the checklist below.
 8. **Ask for review, and stop.** Summarise the spec and any open questions. Then offer the user three options, and stop until they choose one:
    - **`approve`:** the spec is ready to implement.
@@ -28,7 +28,7 @@ Write a spec that a developer and an automation tester could each work from with
 
 ## Spec format
 
-Each spec is a folder, `.cclinic/sdd/specs/<kebab-case-name>/`, with exactly three files. Copy the structure of an existing spec if there is one.
+Each spec is a folder, `.luseen/sdd/specs/<kebab-case-name>/`, with exactly three files. Copy the structure of an existing spec if there is one.
 
 **`spec.md`:** a goal, then requirements, then edge cases and non-goals.
 
@@ -61,16 +61,16 @@ Each spec is a folder, `.cclinic/sdd/specs/<kebab-case-name>/`, with exactly thr
 - **Requirements:** one testable behaviour each, using "must". Avoid words that can't be tested, such as "fast", "secure" or "user-friendly".
 - **Status:** `confirmed` (code and documents agree), `code-only` (only in code), or `docs-only` (not built yet, or only in documents).
 - **Evidence:** cite `path:line`, `path:start-end`, `document.pdf:page` or `document.docx#Heading`. For a new request with no document, cite where it came from, such as `user request`.
-- **Unknowns:** never invent an answer. Add it to `.cclinic/sdd/open-questions.md`.
+- **Unknowns:** never invent an answer. Add it to `.luseen/sdd/open-questions.md`.
 
 ## Checklist
 
 - [ ] Every requirement is one testable behaviour, with a status and evidence
 - [ ] Every requirement has at least one `VAL` and one `TC`
 - [ ] Error and edge cases have test cases, not only the success path
-- [ ] The area code and IDs don't clash with another spec, or with `retiredIds` in `.cclinic/sdd/manifest.json`
+- [ ] The area code and IDs don't clash with another spec, or with `retiredIds` in `.luseen/sdd/manifest.json`
 - [ ] Nothing was invented. Unknowns are open questions
 
 ## Don't lose this work
 
-cclinic treats edits in `.cclinic/sdd` as hand edits. Re-running `cclinic` then refuses to continue, and `cclinic --force` replaces the whole folder, including these edits. Never run `cclinic --force` without asking the user first.
+luseen treats edits in `.luseen/sdd` as hand edits. Re-running `luseen` then refuses to continue, and `luseen --force` replaces the whole folder, including these edits. Never run `luseen --force` without asking the user first.

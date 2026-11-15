@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-/** Answering a change's waiting question from the GUI, as `cclinic approve` does (spec: gui FR-GUI-038). */
+/** Answering a change's waiting question from the GUI, as `luseen approve` does (spec: gui FR-GUI-038). */
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { chromium, type Browser } from "@playwright/test";
@@ -54,8 +54,8 @@ afterEach(async () => {
 /** Tasks 1 and 2 with no roadmap; task 2's change waits at G1, and a change on branch `fix-x` waits at G6. */
 async function project(): Promise<{ root: string; taskChange: WorkflowState; branchChange: WorkflowState }> {
   const root = makeTempFolder();
-  mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.addTask({ title: "Store card token", dependsOn: [] });
   store.addTask({ title: "Charge on checkout", dependsOn: [] });
@@ -91,7 +91,7 @@ const stateOf = async (root: string, key: string) =>
 const answerPath = (key: string) => `/api/changes/${key}/answer`;
 
 describe("answering through the API", () => {
-  it("TC-GUI-052: an answer is recorded exactly as cclinic approve records it, and the question no longer waits", async () => {
+  it("TC-GUI-052: an answer is recorded exactly as luseen approve records it, and the question no longer waits", async () => {
     const { root, taskChange } = await project();
     const gui = await start(root);
     const reply = await sendTo(gui, "POST", answerPath(taskChange.key), { question: G1_QUESTION, answer: "approve" });
@@ -141,25 +141,25 @@ describe("answering through the API", () => {
   it("TC-GUI-125: an unknown change key, or one that isn't a safe file name, gets 404 and writes nothing", async () => {
     const { root } = await project();
     const gui = await start(root);
-    const before = readdirSync(path.join(root, ".cclinic/workflow")).sort();
+    const before = readdirSync(path.join(root, ".luseen/workflow")).sort();
     for (const key of ["task-99", "..", "..%2F..%2Fescape", "a%00b", "a/b"]) {
       const reply = await sendTo(gui, "POST", answerPath(key), { question: G1_QUESTION, answer: "approve" });
       expect(reply.status, key).toBe(404);
     }
-    expect(readdirSync(path.join(root, ".cclinic/workflow")).sort()).toEqual(before);
+    expect(readdirSync(path.join(root, ".luseen/workflow")).sort()).toEqual(before);
     expect(existsSync(path.join(root, "escape"))).toBe(false);
   });
 
   it("a damaged state of another change is named, with how to fix it, and nothing is recorded", async () => {
     const { root, branchChange } = await project();
-    writeFileSync(path.join(root, ".cclinic/workflow/branch-broken.json"), "{ not json");
+    writeFileSync(path.join(root, ".luseen/workflow/branch-broken.json"), "{ not json");
     const gui = await start(root);
     const reply = await sendTo(gui, "POST", answerPath(branchChange.key), { question: G6.question, answer: "yes" });
     expect(reply.status).toBe(409);
     expect((JSON.parse(reply.body) as { error: string }).error).toMatch(
       /branch-broken\.json isn't a readable workflow state\. Delete it to start the change again\.$/,
     );
-    rmSync(path.join(root, ".cclinic/workflow/branch-broken.json"));
+    rmSync(path.join(root, ".luseen/workflow/branch-broken.json"));
     expect(await stateOf(root, branchChange.key)).toEqual(branchChange);
   });
 

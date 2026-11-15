@@ -18,12 +18,12 @@ function binFolder(withClaude: boolean): string {
   return folder;
 }
 
-function cclinic(
+function luseen(
   args: readonly string[],
   options: { withClaude?: boolean; cwd?: string; env?: NodeJS.ProcessEnv } = {},
 ) {
   const home = makeTempFolder();
-  const result = spawnSync(process.execPath, [path.join(REPO, "bin/cclinic.js"), ...args], {
+  const result = spawnSync(process.execPath, [path.join(REPO, "bin/luseen.js"), ...args], {
     cwd: options.cwd ?? makeTempFolder(),
     encoding: "utf8",
     env: {
@@ -38,7 +38,7 @@ function cclinic(
 }
 
 function tasks(root: string, ...args: string[]) {
-  return cclinic(["tasks", ...args, "-C", root]);
+  return luseen(["tasks", ...args, "-C", root]);
 }
 
 describe("tasks commands", () => {
@@ -47,18 +47,18 @@ describe("tasks commands", () => {
     expect(tasks(root, "list")).toMatchObject({ code: 0, stdout: "No tasks.\n" });
     expect(tasks(root, "roadmap")).toMatchObject({ code: 0, stdout: "No roadmaps or tasks.\n" });
     expect(tasks(root, "show", "1", "--json").code).toBe(2);
-    expect(existsSync(path.join(root, ".cclinic"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen"))).toBe(false);
   });
 
-  it("TC-TASK-008: a task for a milestone exits 2 pointing to cclinic plan, and nothing is saved", () => {
+  it("TC-TASK-008: a task for a milestone exits 2 pointing to luseen plan, and nothing is saved", () => {
     const root = makeTempFolder();
     const { code, stderr } = tasks(root, "add", "--title", "X", "--milestone", "9");
     expect(code).toBe(2);
-    expect(stderr).toContain("cclinic plan");
+    expect(stderr).toContain("luseen plan");
     expect(JSON.parse(tasks(root, "list", "--all", "--json").stdout)).toEqual({ status: "success", tasks: [] });
   });
 
-  it("TC-TASK-004, TC-TASK-029: creating a milestone or roadmap exits 2 and points to cclinic plan", () => {
+  it("TC-TASK-004, TC-TASK-029: creating a milestone or roadmap exits 2 and points to luseen plan", () => {
     const root = makeTempFolder();
     for (const args of [
       ["milestone", "add", "--title", "M", "--goal", "G"],
@@ -66,9 +66,9 @@ describe("tasks commands", () => {
     ]) {
       const { code, stderr } = tasks(root, ...args);
       expect(code, args.join(" ")).toBe(2);
-      expect(stderr).toContain("cclinic plan");
+      expect(stderr).toContain("luseen plan");
     }
-    expect(existsSync(path.join(root, ".cclinic"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen"))).toBe(false);
   });
 
   it("TC-TASK-010: show prints every field as JSON", () => {
@@ -101,7 +101,7 @@ describe("tasks commands", () => {
     const root = makeTempFolder();
     expect(tasks(root, "roadmaps")).toMatchObject({ code: 0 });
     expect(tasks(root, "roadmaps").stdout).toContain("No roadmaps");
-    expect(existsSync(path.join(root, ".cclinic"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen"))).toBe(false);
   });
 
   it("TC-TASK-038: roadmap show and remove with wrong IDs exit 2 and name the ID", () => {
@@ -109,7 +109,7 @@ describe("tasks commands", () => {
     tasks(root, "add", "--title", "Keep");
     for (const command of ["show", "remove"]) {
       for (const id of ["0", "-1", "abc", "1.5", "99"]) {
-        const { code, stderr } = cclinic(["tasks", "roadmap", command, "-C", root, "--", id]);
+        const { code, stderr } = luseen(["tasks", "roadmap", command, "-C", root, "--", id]);
         expect(code, `${command} ${id}`).toBe(2);
         expect(stderr).toContain(id);
       }
@@ -119,11 +119,11 @@ describe("tasks commands", () => {
   it("TC-TASK-013: wrong IDs exit 2 and name the ID", () => {
     const root = makeTempFolder();
     tasks(root, "add", "--title", "Keep");
-    const file = path.join(root, ".cclinic/tasks.db");
+    const file = path.join(root, ".luseen/tasks.db");
     const before = readFileSync(file);
     for (const command of [["show"], ["start"], ["done"], ["remove"], ["milestone", "remove"]]) {
       for (const id of ["0", "-1", "abc", "1.5", "99"]) {
-        const { code, stderr } = cclinic(["tasks", ...command, "-C", root, "--", id]);
+        const { code, stderr } = luseen(["tasks", ...command, "-C", root, "--", id]);
         expect(code, `${command.join(" ")} ${id}`).toBe(2);
         expect(stderr).toContain(id);
       }
@@ -167,8 +167,8 @@ describe("tasks commands", () => {
   it("TC-TASK-016: -C and --dir choose the project, not the current folder", () => {
     const root = makeTempFolder();
     const elsewhere = makeTempFolder();
-    expect(cclinic(["tasks", "add", "-C", root, "--title", "There"], { cwd: elsewhere }).code).toBe(0);
-    expect(cclinic(["tasks", "list", "--dir", root], { cwd: elsewhere }).stdout).toContain("There");
+    expect(luseen(["tasks", "add", "-C", root, "--title", "There"], { cwd: elsewhere }).code).toBe(0);
+    expect(luseen(["tasks", "list", "--dir", root], { cwd: elsewhere }).stdout).toContain("There");
     expect(readdirSync(elsewhere)).toEqual([]);
   });
 
@@ -197,8 +197,8 @@ describe("tasks commands", () => {
   it("TC-TASK-022: changing tasks doesn't make a re-run reprocess anything", () => {
     const root = makeTempFolder();
     writeProject(root, { "src/a.ts": "export const a = 1;\n" });
-    expect(cclinic([root, "--yes"], { withClaude: true }).code).toBe(0);
-    const out = path.join(root, ".cclinic/sdd");
+    expect(luseen([root, "--yes"], { withClaude: true }).code).toBe(0);
+    const out = path.join(root, ".luseen/sdd");
     const snapshot = (): Map<string, string> =>
       new Map(
         readdirSync(out)
@@ -208,7 +208,7 @@ describe("tasks commands", () => {
     const before = snapshot();
     expect(tasks(root, "add", "--title", "Next").code).toBe(0);
     const record = path.join(makeTempFolder(), "calls.jsonl");
-    expect(cclinic([root, "--yes"], { withClaude: true, env: { FAKE_CLAUDE_RECORD: record } }).code).toBe(0);
+    expect(luseen([root, "--yes"], { withClaude: true, env: { FAKE_CLAUDE_RECORD: record } }).code).toBe(0);
     expect(existsSync(record)).toBe(false);
     expect(snapshot()).toEqual(before);
   });

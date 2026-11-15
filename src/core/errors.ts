@@ -1,15 +1,15 @@
 /** Typed errors. Only cli/ turns these into messages and exit codes. */
 
-export class CclinicError extends Error {
+export class LuseenError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = new.target.name;
   }
 }
 
-export class UsageError extends CclinicError {}
-export class NoProviderError extends CclinicError {}
-export class ValidationFailedError extends CclinicError {
+export class UsageError extends LuseenError {}
+export class NoProviderError extends LuseenError {}
+export class ValidationFailedError extends LuseenError {
   constructor(
     message: string,
     readonly problems: readonly string[],
@@ -17,9 +17,9 @@ export class ValidationFailedError extends CclinicError {
     super(message);
   }
 }
-export class CancelledError extends CclinicError {}
+export class CancelledError extends LuseenError {}
 /** Exits like a Claude failure, but re-running starts this step again rather than continuing it. */
-export class EnvironmentStepError extends CclinicError {}
+export class EnvironmentStepError extends LuseenError {}
 /** A planning session approved or cancelled elsewhere, so it takes no more turns (FR-PLAN-032). */
 export class SessionClosedError extends UsageError {
   constructor(
@@ -31,9 +31,9 @@ export class SessionClosedError extends UsageError {
   }
 }
 /** A PM, developer or QA session stopped at a limit or on unusable replies. Re-running starts it again. */
-export class AgentSessionError extends CclinicError {}
+export class AgentSessionError extends LuseenError {}
 
-export class LlmError extends CclinicError {}
+export class LlmError extends LuseenError {}
 export class AuthError extends LlmError {}
 export class RateLimitError extends LlmError {
   constructor(message: string, options?: ErrorOptions & { retryAfterMs?: number }) {
@@ -74,7 +74,7 @@ export class AgentCallError extends LlmError {
 }
 
 /** The task database can't be used. It's expected, so it's reported without "unexpected" (FR-TASK-016). */
-export class TaskDatabaseError extends CclinicError {}
+export class TaskDatabaseError extends LuseenError {}
 
 export const EXIT_CODES = {
   success: 0,

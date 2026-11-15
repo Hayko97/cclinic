@@ -198,7 +198,7 @@ try {
   const project = await api("/api/project");
   document.getElementById("project-name").textContent = project.name;
   document.getElementById("project-folder").textContent = project.folder;
-  setTitleBase(`cclinic · ${project.name}`);
+  setTitleBase(`luseen · ${project.name}`);
   // FR-GUI-014: a project that isn't set up opens on Setup, where generating is the first step.
   // A shared link names its own view, which wins (FR-GUI-063).
   if (!project.hasDocuments && location.hash === "") showView("setup");

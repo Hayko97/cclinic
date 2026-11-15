@@ -1,5 +1,5 @@
 /** Values for Git setup and history (FR-GIT-024). */
-import { MANAGED_INSTRUCTION_FILES, SKILL_FOLDERS, TOOL_FOLDER_NAME } from "./paths.js";
+import { LEGACY_TOOL_FOLDER_NAME, MANAGED_INSTRUCTION_FILES, SKILL_FOLDERS, TOOL_FOLDER_NAME } from "./paths.js";
 import { MCP_CONFIG_FILE } from "./workflow.js";
 
 export const GIT_COMMAND = "git";
@@ -14,9 +14,10 @@ export const MS_PER_DAY = 86_400_000;
 export const MAX_HISTORY_COMMITS = 300;
 export const MAX_HISTORY_CHARS = 100_000;
 
-/** Commits touching only these are cclinic's own output, so they aren't project changes (FR-GIT-014). */
+/** Commits touching only these are luseen's own output, so they aren't project changes (FR-GIT-014). */
 export const HISTORY_EXCLUDED_PATHS: readonly string[] = [
   TOOL_FOLDER_NAME,
+  LEGACY_TOOL_FOLDER_NAME,
   ...SKILL_FOLDERS.map((folder) => folder.slice(0, folder.indexOf("/"))),
   ...MANAGED_INSTRUCTION_FILES,
   MCP_CONFIG_FILE,

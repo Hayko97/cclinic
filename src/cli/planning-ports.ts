@@ -1,6 +1,6 @@
 /**
  * The planning session's ports for a project: its records, what exists, saving, and the PM's Claude session
- * (spec: roadmap-planning). Shared by `cclinic plan`, the GUI and `cclinic mcp`.
+ * (spec: roadmap-planning). Shared by `luseen plan`, the GUI and `luseen mcp`.
  */
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -29,7 +29,7 @@ import {
   type PlanTarget,
   type WaitingProposal,
 } from "../core/planning.js";
-import { cclinicBin } from "./cclinic-bin.js";
+import { luseenBin } from "./luseen-bin.js";
 import type { CommandContext } from "./command-context.js";
 import { readOverview } from "./tasks-command.js";
 
@@ -57,7 +57,7 @@ export function savePlan(target: string, planTarget: PlanTarget, proposal: Waiti
   try {
     if (proposal.kind === "roadmap") {
       const { roadmapId } = store.savePlan(toRoadmapPlan(proposal.proposal, planTarget));
-      return `Saved roadmap #${roadmapId}. Run it with: cclinic auto --roadmap ${roadmapId}`;
+      return `Saved roadmap #${roadmapId}. Run it with: luseen auto --roadmap ${roadmapId}`;
     }
     const { task, milestoneId } = proposal.proposal;
     const saved = store.addTask({
@@ -68,8 +68,8 @@ export function savePlan(target: string, planTarget: PlanTarget, proposal: Waiti
       ...(milestoneId === null ? {} : { milestoneId }),
     });
     return planTarget.kind === "task" && planTarget.roadmapId !== null
-      ? `Saved task #${saved.id}. It runs with its roadmap: cclinic auto --roadmap ${planTarget.roadmapId}`
-      : `Saved task #${saved.id}. It's standalone, so cclinic auto doesn't run it. Ask your coding agent to work on task ${saved.id}, which takes it through the project's lifecycle.`;
+      ? `Saved task #${saved.id}. It runs with its roadmap: luseen auto --roadmap ${planTarget.roadmapId}`
+      : `Saved task #${saved.id}. It's standalone, so luseen auto doesn't run it. Ask your coding agent to work on task ${saved.id}, which takes it through the project's lifecycle.`;
   } finally {
     store.close();
   }
@@ -117,7 +117,7 @@ export interface PmSettings {
   readonly onEvent?: (event: unknown) => void;
 }
 
-/** FR-PLAN-005: the PM's tools, with only the planning tools of its own `cclinic mcp --plan` server. */
+/** FR-PLAN-005: the PM's tools, with only the planning tools of its own `luseen mcp --plan` server. */
 function pmCallOptions(settings: PmSettings, call: PmCall) {
   const planTools = PLAN_DRIVEN_TOOL_NAMES.map((name) => `mcp__${MCP_SERVER_NAME}__${name}`);
   const sessionId = call.session.claudeSessionId;
@@ -136,7 +136,7 @@ function pmCallOptions(settings: PmSettings, call: PmCall) {
       mcpServers: {
         [MCP_SERVER_NAME]: {
           command: process.execPath,
-          args: [cclinicBin(), "mcp", "--plan", call.session.id, "-C", settings.target],
+          args: [luseenBin(), "mcp", "--plan", call.session.id, "-C", settings.target],
         },
       },
     },

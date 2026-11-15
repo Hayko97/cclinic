@@ -2,8 +2,8 @@
 name: local-env
 description: "Sets up a local environment suited to the project, and shows how to review each change, such as a link or a simulator build. Use when the user asks to set up, run or preview the project locally, or after implementing a change, so the user can try it before approving it."
 metadata:
-  generated-by: cclinic
-  content-hash: "6417f7253140a3e5d0e9d764782590a26b4190a644d6e874e880a167184bee48"
+  generated-by: luseen
+  content-hash: "d8ca74a8732e7e6c72a913512b5105361d7d1e34463c5b70b7eb832ea067c4a4"
 ---
 
 # Set up and use the local environment
@@ -16,14 +16,14 @@ Give the user a real way to try the project and each change. Report only what yo
 - **Don't install or start software on the user's computer,** such as Docker, simulators or SDKs. Say what's needed.
 - **Don't edit the hosts file, or install certificates, DNS tools or a proxy.**
 - **Don't read or copy `.env` files, private keys or other secret files, and don't connect to production services.** Use example configuration and local services. If a real value is needed, use a placeholder and tell the user what's missing.
-- **Don't change the project's existing Docker files.** Put new files in `.cclinic/environment/`.
+- **Don't change the project's existing Docker files.** Put new files in `.luseen/environment/`.
 - **Don't stop anything you didn't start, or delete data volumes,** without asking.
 
 ## Set up the environment
 
-Skip this if `.cclinic/environment/environment.json` already exists and still works.
+Skip this if `.luseen/environment/environment.json` already exists and still works.
 
-1. **Identify what runs.** Read `.cclinic/sdd/stack.md` and `architecture.md` if they exist, plus the project's manifests. List each part that runs, and its type. If it's unclear, ask the user. If nobody can answer, stop and report what you found, without guessing.
+1. **Identify what runs.** Read `.luseen/sdd/stack.md` and `architecture.md` if they exist, plus the project's manifests. List each part that runs, and its type. If it's unclear, ask the user. If nobody can answer, stop and report what you found, without guessing.
 
    | Type | Signs | Preview |
    |---|---|---|
@@ -40,7 +40,7 @@ Skip this if `.cclinic/environment/environment.json` already exists and still wo
 
 3. **Set up each part,** following the section for its type.
 
-4. **Write `.cclinic/environment/environment.json`,** in exactly this form, with no other keys. `stop` is required for anything left running. `url` and `fallbackUrl` are only for `web`, and are required there.
+4. **Write `.luseen/environment/environment.json`,** in exactly this form, with no other keys. `stop` is required for anything left running. `url` and `fallbackUrl` are only for `web`, and are required there.
 
    ```json
    {
@@ -50,8 +50,8 @@ Skip this if `.cclinic/environment/environment.json` already exists and still wo
        {
          "name": "web",
          "type": "web",
-         "start": "docker compose -f .cclinic/environment/compose.yaml -p shop up --build --wait",
-         "stop": "docker compose -f .cclinic/environment/compose.yaml -p shop down",
+         "start": "docker compose -f .luseen/environment/compose.yaml -p shop up --build --wait",
+         "stop": "docker compose -f .luseen/environment/compose.yaml -p shop down",
          "url": "http://shop.localhost:5173",
          "fallbackUrl": "http://localhost:5173",
          "review": "Open the link in a browser"
@@ -65,7 +65,7 @@ Skip this if `.cclinic/environment/environment.json` already exists and still wo
 ### Web projects
 
 1. Check that Docker is installed and running. If not, tell the user what's needed. If the project has its own development command, use that for the preview, and say that Docker wasn't used.
-2. If the project's Docker files can run it, use them unchanged, and report any port that isn't limited to this computer. Otherwise, write new ones in `.cclinic/environment/`.
+2. If the project's Docker files can run it, use them unchanged, and report any port that isn't limited to this computer. Otherwise, write new ones in `.luseen/environment/`.
 3. New Compose files must:
    - publish ports on `127.0.0.1` only, such as `127.0.0.1:5173:5173`
    - give each web service a health check, so `--wait` means it's ready
@@ -98,7 +98,7 @@ Do this after the tests have run, and before asking the user to approve the impl
    - Open: http://shop.localhost:5173
    - If that doesn't open: http://localhost:5173
    - Look at: the checkout page, which now shows the currency symbol
-   - Stop it: docker compose -f .cclinic/environment/compose.yaml -p shop down
+   - Stop it: docker compose -f .luseen/environment/compose.yaml -p shop down
    - Checked: yes, the page returned the new text
    ```
 

@@ -147,7 +147,7 @@ export interface RemoteAlertInput {
   readonly wasCreated: boolean;
 }
 
-/** Steps for any provider. cclinic never creates a remote itself (FR-GIT-009, FR-GIT-010). */
+/** Steps for any provider. luseen never creates a remote itself (FR-GIT-009, FR-GIT-010). */
 export function formatRemoteAlert({ hasCommits, hasGitignore, wasCreated }: RemoteAlertInput): string {
   const lines = [
     wasCreated ? "Git: created a local repository. It has no remote yet." : "Git: this repository has no remote yet.",

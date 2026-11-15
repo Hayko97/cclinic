@@ -1,25 +1,25 @@
-# How `cclinic` setup works
+# How `luseen` setup works
 
-A simple picture of what happens when you run `cclinic` on a project.
+A simple picture of what happens when you run `luseen` on a project.
 
-Source of truth: the specs in [`.cclinic/sdd/specs/`](.cclinic/sdd/specs/) and the code in [`src/cli/generate-command.ts`](src/cli/generate-command.ts). You can also do the whole setup from the GUI's Setup screen: see [GUI_FLOW.md](GUI_FLOW.md). What comes after setup is in [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md), [PLANNING_FLOW.md](PLANNING_FLOW.md) and [AUTO_FLOW.md](AUTO_FLOW.md).
+Source of truth: the specs in [`.luseen/sdd/specs/`](.luseen/sdd/specs/) and the code in [`src/cli/generate-command.ts`](src/cli/generate-command.ts). You can also do the whole setup from the GUI's Setup screen: see [GUI_FLOW.md](GUI_FLOW.md). What comes after setup is in [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md), [PLANNING_FLOW.md](PLANNING_FLOW.md) and [AUTO_FLOW.md](AUTO_FLOW.md).
 
 ---
 
 ## 1. The big picture
 
-You point `cclinic` at a project. It reads the code and documents, asks Claude to describe the project, and writes specs and agent instructions back into the project.
+You point `luseen` at a project. It reads the code and documents, asks Claude to describe the project, and writes specs and agent instructions back into the project.
 
 ```mermaid
 flowchart LR
-    A[Your project] --> B[cclinic]
+    A[Your project] --> B[luseen]
     B -->|reads code + docs| C[Claude]
     C -->|summaries + specs| B
-    B --> D[.cclinic/sdd/<br/>specs and docs]
+    B --> D[.luseen/sdd/<br/>specs and docs]
     B --> E[.agents/skills/<br/>.claude/skills/]
     B --> F[AGENTS.md<br/>CLAUDE.md]
     B --> H[.mcp.json<br/>.claude/settings.json hook]
-    B --> G[.cclinic/environment/<br/>local preview]
+    B --> G[.luseen/environment/<br/>local preview]
 ```
 
 ---
@@ -28,7 +28,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Start([cclinic path]) --> T{Is the path a<br/>project folder?}
+    Start([luseen path]) --> T{Is the path a<br/>project folder?}
     T -- no --> X2[Exit 2]
     T -- yes --> M[Pick model + effort]
     M --> P{Find Claude}
@@ -43,30 +43,30 @@ flowchart TD
     D -- yes --> DR([Print summary.<br/>Nothing sent or written])
     D -- no --> C{You confirm?<br/>or --yes}
     C -- no --> X0([Exit 0.<br/>Nothing sent])
-    C -- yes --> LK[Take lock<br/>.cclinic/.lock]
+    C -- yes --> LK[Take lock<br/>.luseen/.lock]
     LK --> GI[git init<br/>only if no repo]
     GI --> AI[Ask Claude:<br/>summarise, combine,<br/>generate specs]
     AI --> V{Specs valid?}
-    V -- no --> X5[Save draft to .cclinic/failed<br/>Exit 5]
-    V -- yes --> W[Write .cclinic/sdd]
+    V -- no --> X5[Save draft to .luseen/failed<br/>Exit 5]
+    V -- yes --> W[Write .luseen/sdd]
     W --> SK[Install skills +<br/>AGENTS.md / CLAUDE.md]
     SK --> ENV[Optional:<br/>set up local environment]
     ENV --> Done([Done. Exit 0])
 ```
 
-| Step        | What happens                                                                          | Spec                                                                                                                         |
-| ----------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Check path  | Must be a folder. Home folder or `/` is refused unless `--allow-broad-target`.        | [cli-commands](.cclinic/sdd/specs/cli-commands/spec.md)                                                                      |
-| Pick model  | Option → env var → saved default → built-in (Sonnet, medium).                         | [model-selection](.cclinic/sdd/specs/model-selection/spec.md)                                                                |
-| Find Claude | Claude CLI if logged in, else `ANTHROPIC_API_KEY`, else exit 3.                       | [llm-providers](.cclinic/sdd/specs/llm-providers/spec.md)                                                                    |
-| Check Git   | Only looks. Never commits, stages or pushes.                                          | [git-setup](.cclinic/sdd/specs/git-setup/spec.md)                                                                            |
-| Scan        | Finds the project's own files. Every skipped file gets a reason.                      | [file-discovery](.cclinic/sdd/specs/file-discovery/spec.md)                                                                  |
-| Read        | Text from code, PDF, DOCX with line/page positions.                                   | [content-extraction](.cclinic/sdd/specs/content-extraction/spec.md)                                                          |
-| Confirm     | Shows a summary, then asks. No terminal and no `--yes` → exit 2.                      | [cli-commands](.cclinic/sdd/specs/cli-commands/spec.md)                                                                      |
-| Ask Claude  | The 3 LLM stages, below.                                                              | [spec-analysis](.cclinic/sdd/specs/spec-analysis/spec.md)                                                                    |
-| Write       | Validate first, then write all at once.                                               | [spec-output](.cclinic/sdd/specs/spec-output/spec.md)                                                                        |
-| Skills      | Nine skills, workflow sections, the `cclinic mcp` entry and the session hook. No LLM. | [agent-skills](.cclinic/sdd/specs/agent-skills/spec.md), [agent-instructions](.cclinic/sdd/specs/agent-instructions/spec.md) |
-| Environment | Claude sets up `environment.json` with the `local-env` skill, only if you agree.      | [local-environment](.cclinic/sdd/specs/local-environment/spec.md)                                                            |
+| Step        | What happens                                                                         | Spec                                                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Check path  | Must be a folder. Home folder or `/` is refused unless `--allow-broad-target`.       | [cli-commands](.luseen/sdd/specs/cli-commands/spec.md)                                                                     |
+| Pick model  | Option → env var → saved default → built-in (Sonnet, medium).                        | [model-selection](.luseen/sdd/specs/model-selection/spec.md)                                                               |
+| Find Claude | Claude CLI if logged in, else `ANTHROPIC_API_KEY`, else exit 3.                      | [llm-providers](.luseen/sdd/specs/llm-providers/spec.md)                                                                   |
+| Check Git   | Only looks. Never commits, stages or pushes.                                         | [git-setup](.luseen/sdd/specs/git-setup/spec.md)                                                                           |
+| Scan        | Finds the project's own files. Every skipped file gets a reason.                     | [file-discovery](.luseen/sdd/specs/file-discovery/spec.md)                                                                 |
+| Read        | Text from code, PDF, DOCX with line/page positions.                                  | [content-extraction](.luseen/sdd/specs/content-extraction/spec.md)                                                         |
+| Confirm     | Shows a summary, then asks. No terminal and no `--yes` → exit 2.                     | [cli-commands](.luseen/sdd/specs/cli-commands/spec.md)                                                                     |
+| Ask Claude  | The 3 LLM stages, below.                                                             | [spec-analysis](.luseen/sdd/specs/spec-analysis/spec.md)                                                                   |
+| Write       | Validate first, then write all at once.                                              | [spec-output](.luseen/sdd/specs/spec-output/spec.md)                                                                       |
+| Skills      | Nine skills, workflow sections, the `luseen mcp` entry and the session hook. No LLM. | [agent-skills](.luseen/sdd/specs/agent-skills/spec.md), [agent-instructions](.luseen/sdd/specs/agent-instructions/spec.md) |
+| Environment | Claude sets up `environment.json` with the `local-env` skill, only if you agree.     | [local-environment](.luseen/sdd/specs/local-environment/spec.md)                                                           |
 
 ---
 
@@ -88,7 +88,7 @@ flowchart LR
     end
     H[(Git history<br/>last 14 days)] -.-> P
     H -.-> SP1
-    Cache[(.cclinic/cache)] -.->|skip work<br/>already done| Stage1
+    Cache[(.luseen/cache)] -.->|skip work<br/>already done| Stage1
 ```
 
 - **Summarise** runs in parallel (`--concurrency`, default 4). Each chunk is at most 150,000 tokens.
@@ -105,11 +105,11 @@ flowchart TD
     Root[your-project/]
     Root --> A[AGENTS.md<br/>workflow + skills table]
     Root --> B[CLAUDE.md<br/>imports @AGENTS.md]
-    Root --> MC[.mcp.json<br/>runs npx cclinic mcp]
-    Root --> CS[.claude/settings.json<br/>hook: cclinic session-link]
+    Root --> MC[.mcp.json<br/>runs npx luseen mcp]
+    Root --> CS[.claude/settings.json<br/>hook: luseen session-link]
     Root --> Ag[.agents/skills/*/SKILL.md]
     Root --> Cl[.claude/skills/*/SKILL.md]
-    Root --> CC[.cclinic/]
+    Root --> CC[.luseen/]
     CC --> SDD[sdd/]
     SDD --> R[README.md, overview.md,<br/>stack.md, architecture.md,<br/>developer-guidelines.md,<br/>open-questions.md, scan-report.md,<br/>manifest.json]
     SDD --> SPECS[specs/name/<br/>spec.md · validation.md · verification.md]
@@ -118,13 +118,13 @@ flowchart TD
     CC --> Cache[cache/ · failed/ · .lock<br/>temporary]
 ```
 
-`cclinic clean` deletes only `cache/` and `failed/`. It never touches `sdd/`, `tasks.db`, `workflow/`, `auto/` or `gui/`.
+`luseen clean` deletes only `cache/` and `failed/`. It never touches `sdd/`, `tasks.db`, `workflow/`, `auto/` or `gui/`.
 
 ---
 
 ## 5. After setup: how an agent works
 
-`AGENTS.md` tells coding agents to follow this loop for every change, and `cclinic mcp` can enforce it as gates. The full flow is in [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md).
+`AGENTS.md` tells coding agents to follow this loop for every change, and `luseen mcp` can enforce it as gates. The full flow is in [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md).
 
 ```mermaid
 flowchart LR
@@ -145,21 +145,21 @@ flowchart LR
 
 ## 6. Other commands
 
-| Command               | Does                                                                 |
-| --------------------- | -------------------------------------------------------------------- |
-| `cclinic --dry-run`   | Shows what would be scanned and the cost. Sends and writes nothing.  |
-| `cclinic skills`      | Installs only the skills and `AGENTS.md`/`CLAUDE.md`. No LLM.        |
-| `cclinic environment` | Sets up only the local environment.                                  |
-| `cclinic model`       | Lists, chooses or resets the saved default model.                    |
-| `cclinic doctor`      | Checks that everything is ready. Never calls a model.                |
-| `cclinic clean`       | Deletes the cache and failed drafts.                                 |
-| `cclinic guide`       | Offline walkthrough.                                                 |
-| `cclinic tasks`       | See roadmaps and track tasks. No LLM.                                |
-| `cclinic plan`        | Plan a roadmap or one task with the PM agent. Saves only on approve. |
-| `cclinic auto`        | Run a whole roadmap with agents, on its own branches.                |
-| `cclinic mcp`         | The MCP server your coding agent starts, to enforce the stages.      |
-| `cclinic approve`     | Answer a question the MCP server is waiting on, in your terminal.    |
-| `cclinic gui`         | Open the local web GUI for this project.                             |
+| Command              | Does                                                                 |
+| -------------------- | -------------------------------------------------------------------- |
+| `luseen --dry-run`   | Shows what would be scanned and the cost. Sends and writes nothing.  |
+| `luseen skills`      | Installs only the skills and `AGENTS.md`/`CLAUDE.md`. No LLM.        |
+| `luseen environment` | Sets up only the local environment.                                  |
+| `luseen model`       | Lists, chooses or resets the saved default model.                    |
+| `luseen doctor`      | Checks that everything is ready. Never calls a model.                |
+| `luseen clean`       | Deletes the cache and failed drafts.                                 |
+| `luseen guide`       | Offline walkthrough.                                                 |
+| `luseen tasks`       | See roadmaps and track tasks. No LLM.                                |
+| `luseen plan`        | Plan a roadmap or one task with the PM agent. Saves only on approve. |
+| `luseen auto`        | Run a whole roadmap with agents, on its own branches.                |
+| `luseen mcp`         | The MCP server your coding agent starts, to enforce the stages.      |
+| `luseen approve`     | Answer a question the MCP server is waiting on, in your terminal.    |
+| `luseen gui`         | Open the local web GUI for this project.                             |
 
 ## 7. Exit codes
 
@@ -173,4 +173,4 @@ flowchart LR
 | 5         | Generated specs failed validation                                   |
 | 130 / 143 | Stopped with Ctrl+C / SIGTERM                                       |
 
-`cclinic auto` has its own exit codes for its outcomes: see [AUTO_FLOW.md](AUTO_FLOW.md).
+`luseen auto` has its own exit codes for its outcomes: see [AUTO_FLOW.md](AUTO_FLOW.md).

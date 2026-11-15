@@ -1,4 +1,4 @@
-/** Also checked in bin/cclinic.js, which must run on old Node.js versions. */
+/** Also checked in bin/luseen.js, which must run on old Node.js versions. */
 import { TESTED_CLAUDE_VERSION } from "./constants/llm.js";
 import { MINIMUM_NODE } from "./constants/limits.js";
 

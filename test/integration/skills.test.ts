@@ -15,7 +15,7 @@ import { REASONS } from "../../src/core/constants/discovery.js";
 import { makeTempFolder, writeProject } from "../support/helpers.js";
 
 function install(target: string, isForced = false) {
-  return installSkills({ target, out: path.join(target, ".cclinic/sdd"), isForced });
+  return installSkills({ target, out: path.join(target, ".luseen/sdd"), isForced });
 }
 
 function statusOf(entries: Awaited<ReturnType<typeof install>>, file: string): string | undefined {
@@ -45,7 +45,7 @@ describe("installing", () => {
     await install(root);
     const agents = readFileSync(path.join(root, "AGENTS.md"), "utf8");
     for (const { name } of AGENT_SKILLS) expect(agents).toContain(name);
-    expect(agents).toContain(".cclinic/sdd/README.md");
+    expect(agents).toContain(".luseen/sdd/README.md");
   });
 
   it("TC-SKILL-009: paths are relative to the project", () => {
@@ -66,8 +66,8 @@ describe("protecting existing work", () => {
     const root = makeTempFolder();
     const mine = "---\nname: write-code\ndescription: My own skill\n---\nMine\n";
     writeProject(root, { [AGENTS_COPY]: mine });
-    expect(statusOf(await install(root), AGENTS_COPY)).toBe("skipped: not created by cclinic");
-    expect(statusOf(await install(root, true), AGENTS_COPY)).toBe("skipped: not created by cclinic");
+    expect(statusOf(await install(root), AGENTS_COPY)).toBe("skipped: not created by luseen");
+    expect(statusOf(await install(root, true), AGENTS_COPY)).toBe("skipped: not created by luseen");
     expect(readFileSync(path.join(root, AGENTS_COPY), "utf8")).toBe(mine);
     expect(statusOf(await install(root), CLAUDE_COPY)).toBe("unchanged");
   });
@@ -98,7 +98,7 @@ describe("protecting existing work", () => {
   it("TC-SKILL-016: an unedited older version is updated", async () => {
     const root = makeTempFolder();
     const older = { name: "write-code", description: "An older description. Use whenever.", body: "Older body\n" };
-    writeProject(root, { [AGENTS_COPY]: renderSkill(older, ".cclinic/sdd", sha256) });
+    writeProject(root, { [AGENTS_COPY]: renderSkill(older, ".luseen/sdd", sha256) });
     expect(statusOf(await install(root), AGENTS_COPY)).toBe("updated");
     expect(readFileSync(path.join(root, AGENTS_COPY), "utf8")).not.toContain("Older body");
   });
@@ -116,7 +116,7 @@ describe("protecting existing work", () => {
 
   it("TC-SKILL-020: damaged markers leave the file alone", async () => {
     const root = makeTempFolder();
-    const damaged = "# Ours\n<!-- cclinic:start -->\nno end marker\n";
+    const damaged = "# Ours\n<!-- luseen:start -->\nno end marker\n";
     writeProject(root, { "AGENTS.md": damaged });
     expect(statusOf(await install(root), "AGENTS.md")).toBe("skipped: damaged markers");
     expect(readFileSync(path.join(root, "AGENTS.md"), "utf8")).toBe(damaged);
@@ -130,7 +130,7 @@ describe("staying out of the analysis", () => {
     await install(root);
     const result = await scanFolder({
       target: root,
-      outFolder: path.join(root, ".cclinic/sdd"),
+      outFolder: path.join(root, ".luseen/sdd"),
       include: ["**"],
       exclude: [],
       maxFileSizeMib: 1,
@@ -152,7 +152,7 @@ describe("staying out of the analysis", () => {
     const extractor = createExtractor();
     const before = await extractor.extract(file);
     await install(root);
-    expect(readFileSync(file.absolutePath, "utf8")).toContain(renderAgentsBlock(".cclinic/sdd"));
+    expect(readFileSync(file.absolutePath, "utf8")).toContain(renderAgentsBlock(".luseen/sdd"));
     const after = await extractor.extract(file);
     expect(after.sha256).toBe(before.sha256);
     expect(after.units).toEqual(before.units);
@@ -168,7 +168,7 @@ describe("staying out of the analysis", () => {
       kind: "document",
       sizeBytes: 1,
     });
-    expect(result.units.map((unit) => unit.text).join("\n")).toContain("cclinic:start");
+    expect(result.units.map((unit) => unit.text).join("\n")).toContain("luseen:start");
     expect(existsSync(path.join(root, "AGENTS.md"))).toBe(false);
   });
 });
@@ -185,7 +185,7 @@ describe("agent instructions", () => {
       expect(agents).toContain(stage);
     }
     for (const { name } of AGENT_SKILLS) expect(agents).toContain(`| \`${name}\` |`);
-    expect(agents).toContain(".cclinic/sdd/specs/");
+    expect(agents).toContain(".luseen/sdd/specs/");
   });
 
   it("TC-INSTR-003: CLAUDE.md only imports AGENTS.md", async () => {
@@ -199,7 +199,7 @@ describe("agent instructions", () => {
 
   it("TC-INSTR-007: only the sections change when the documents folder moves", async () => {
     const root = makeTempFolder();
-    await installSkills({ target: root, out: path.join(root, ".cclinic/sdd"), isForced: false });
+    await installSkills({ target: root, out: path.join(root, ".luseen/sdd"), isForced: false });
     for (const file of [AGENTS, CLAUDE]) {
       const section = readFileSync(path.join(root, file), "utf8").trim();
       writeFileSync(path.join(root, file), `# Before ${file}\n\n${section}\n\nAfter ${file}\n`);
@@ -209,7 +209,7 @@ describe("agent instructions", () => {
     expect(agents.startsWith(`# Before ${AGENTS}\n\n`)).toBe(true);
     expect(agents.endsWith(`\n\nAfter ${AGENTS}\n`)).toBe(true);
     expect(agents).toContain("docs/sdd/specs/");
-    expect(agents).not.toContain(".cclinic/sdd");
+    expect(agents).not.toContain(".luseen/sdd");
     expect(statusOf(entries, AGENTS)).toBe("updated");
     expect(statusOf(entries, CLAUDE)).toBe("unchanged");
   });
@@ -226,7 +226,7 @@ describe("agent instructions", () => {
 
   it("TC-INSTR-009: damaged markers leave only that file alone", async () => {
     const root = makeTempFolder();
-    const damaged = "<!-- cclinic:start -->\nno end\n";
+    const damaged = "<!-- luseen:start -->\nno end\n";
     writeProject(root, { [CLAUDE]: damaged });
     const entries = await install(root);
     expect(statusOf(entries, CLAUDE)).toBe("skipped: damaged markers");
@@ -264,7 +264,7 @@ describe("agent instructions", () => {
     await install(root);
     const result = await scanFolder({
       target: root,
-      outFolder: path.join(root, ".cclinic/sdd"),
+      outFolder: path.join(root, ".luseen/sdd"),
       include: [],
       exclude: [],
       maxFileSizeMib: 1,
@@ -299,9 +299,9 @@ describe("review-code skill", () => {
     const foreign = makeTempFolder();
     const mine = "---\nname: review-code\ndescription: Our own reviewer\n---\nMine\n";
     writeProject(foreign, { [SHARED_REVIEWER]: mine });
-    expect(statusOf(await install(foreign), SHARED_REVIEWER)).toBe("skipped: not created by cclinic");
+    expect(statusOf(await install(foreign), SHARED_REVIEWER)).toBe("skipped: not created by luseen");
     expect(readFileSync(path.join(foreign, SHARED_REVIEWER), "utf8")).toBe(mine);
-    expect(statusOf(await install(foreign, true), SHARED_REVIEWER)).toBe("skipped: not created by cclinic");
+    expect(statusOf(await install(foreign, true), SHARED_REVIEWER)).toBe("skipped: not created by luseen");
     expect(readFileSync(path.join(foreign, SHARED_REVIEWER), "utf8")).toBe(mine);
   });
 });

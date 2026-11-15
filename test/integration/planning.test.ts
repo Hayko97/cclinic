@@ -1,4 +1,4 @@
-/** `cclinic plan` in-process, with a fake `claude` that keeps a transcript and calls the planning tools. */
+/** `luseen plan` in-process, with a fake `claude` that keeps a transcript and calls the planning tools. */
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { input, select } from "@inquirer/prompts";
@@ -19,7 +19,7 @@ vi.mock("@inquirer/prompts", () => ({ confirm: vi.fn(), select: vi.fn(), input: 
 const selectMock = vi.mocked(select);
 const inputMock = vi.mocked(input);
 
-/** Starting the fake `claude`, and the `cclinic mcp --plan` it starts, can take a few seconds. */
+/** Starting the fake `claude`, and the `luseen mcp --plan` it starts, can take a few seconds. */
 const SPAWN_WAIT = { timeout: 15_000 };
 const SLOW = 60_000;
 
@@ -73,7 +73,7 @@ const menuAt = (index: number): unknown => selectMock.mock.calls[index]?.[0];
 /** A project with documents, and a store with roadmap 1 (milestones 1 and 2) and a task in each. */
 function project(withRoadmap = true): string {
   const root = makeTempFolder();
-  writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
+  writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
   if (withRoadmap) {
     const store = openStore(root);
     store.savePlan({
@@ -89,7 +89,7 @@ function project(withRoadmap = true): string {
 }
 
 function openStore(root: string): TaskStore {
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   return store;
 }
@@ -133,7 +133,7 @@ function toolResults(
     .map((line) => JSON.parse(line) as never);
 }
 
-describe("cclinic plan: starting", () => {
+describe("luseen plan: starting", () => {
   it(
     "TC-PLAN-004: with roadmaps, the user picks one to extend, and the PM is told",
     async () => {
@@ -220,8 +220,8 @@ describe("cclinic plan: starting", () => {
       await plan(root, harness, { attach: ["brief.pdf", "mock.png"] });
       const prompt = harness.calls()[0]?.prompt ?? "";
       expect(prompt).toContain("See attached");
-      expect(prompt).toMatch(/- brief\.pdf \(document\): \.cclinic\/plans\/plan-1\/attachments\/brief\.pdf/);
-      expect(prompt).toMatch(/- mock\.png \(image\): \.cclinic\/plans\/plan-1\/attachments\/mock\.png/);
+      expect(prompt).toMatch(/- brief\.pdf \(document\): \.luseen\/plans\/plan-1\/attachments\/brief\.pdf/);
+      expect(prompt).toMatch(/- mock\.png \(image\): \.luseen\/plans\/plan-1\/attachments\/mock\.png/);
     },
     SLOW,
   );
@@ -254,12 +254,12 @@ describe("cclinic plan: starting", () => {
   );
 });
 
-describe("cclinic plan: the PM's Claude session", () => {
+describe("luseen plan: the PM's Claude session", () => {
   it(
     "TC-PLAN-007, TC-PLAN-026: one persistent session with the PM's tools and its own planning server, never write tools",
     async () => {
       const root = project();
-      const file = tasksDatabaseFile(path.join(root, ".cclinic"));
+      const file = tasksDatabaseFile(path.join(root, ".luseen"));
       const contents = readFileSync(file);
       const harness = agentHarness({
         rules: [says("Who is it for?"), says("Got it."), proposing("Here.", roadmapProposal())],
@@ -284,9 +284,9 @@ describe("cclinic plan: the PM's Claude session", () => {
           call.args.indexOf("--disallowedTools"),
         );
         expect(allowed.filter((tool) => tool.startsWith("mcp__"))).toEqual([
-          "mcp__cclinic__plan_status",
-          "mcp__cclinic__plan_suggest",
-          "mcp__cclinic__plan_propose",
+          "mcp__luseen__plan_status",
+          "mcp__luseen__plan_suggest",
+          "mcp__luseen__plan_propose",
         ]);
         for (const forbidden of ["Write", "Edit", "Bash", "--no-session-persistence"])
           expect(call.args).not.toContain(forbidden);
@@ -294,9 +294,9 @@ describe("cclinic plan: the PM's Claude session", () => {
           expect.arrayContaining(["--permission-mode", "dontAsk", "--safe-mode", "--strict-mcp-config"]),
         );
         const config = JSON.parse(call.args[call.args.indexOf("--mcp-config") + 1] ?? "{}") as {
-          mcpServers: { cclinic: { args: string[] } };
+          mcpServers: { luseen: { args: string[] } };
         };
-        expect(config.mcpServers.cclinic.args.slice(1)).toEqual(["mcp", "--plan", session.id, "-C", root]);
+        expect(config.mcpServers.luseen.args.slice(1)).toEqual(["mcp", "--plan", session.id, "-C", root]);
       }
     },
     SLOW,
@@ -314,9 +314,9 @@ describe("cclinic plan: the PM's Claude session", () => {
       expect(first).toContain("# Plan the work as the PM");
       expect(first).toContain("EXTEND roadmap 1");
       expect(first).toContain('"dependsOn"');
-      expect(first).toContain("- mock.png (image): .cclinic/plans/plan-1/attachments/mock.png");
+      expect(first).toContain("- mock.png (image): .luseen/plans/plan-1/attachments/mock.png");
       expect(second).toBe(
-        "Also\n\nAttached (new in this message):\n- brief.docx (document): .cclinic/plans/plan-1/attachments/brief.docx.md",
+        "Also\n\nAttached (new in this message):\n- brief.docx (document): .luseen/plans/plan-1/attachments/brief.docx.md",
       );
     },
     SLOW,
@@ -396,7 +396,7 @@ describe("cclinic plan: the PM's Claude session", () => {
       expect(exitCodeFor(error)).toBe(4);
       const session = await only(second);
       expect(session.status).toBe("open");
-      expect((error as Error).message).toContain(`cclinic plan --resume ${session.id}`);
+      expect((error as Error).message).toContain(`luseen plan --resume ${session.id}`);
       expect((error as Error).message).toContain(`claude --resume ${session.claudeSessionId ?? ""}`);
       const store = openStore(second);
       expect(store.listRoadmaps()).toHaveLength(1);
@@ -406,7 +406,7 @@ describe("cclinic plan: the PM's Claude session", () => {
   );
 });
 
-describe("cclinic plan: proposals", () => {
+describe("luseen plan: proposals", () => {
   it(
     "TC-PLAN-015, TC-PLAN-017: an approved new roadmap is shown, then saved in order with dependencies",
     async () => {
@@ -427,7 +427,7 @@ describe("cclinic plan: proposals", () => {
       ]) {
         expect(harness.output.err, part).toContain(part);
       }
-      expect(harness.output.out).toBe("Saved roadmap #1. Run it with: cclinic auto --roadmap 1\n");
+      expect(harness.output.out).toBe("Saved roadmap #1. Run it with: luseen auto --roadmap 1\n");
       const store = openStore(root);
       expect(store.listMilestones().map((item) => item.title)).toEqual(["First", "Second"]);
       expect(store.listTasks(true).map((task) => [task.title, task.status, task.dependsOn])).toEqual([
@@ -438,7 +438,7 @@ describe("cclinic plan: proposals", () => {
       store.close();
       const session = await only(root);
       expect(session.status).toBe("approved");
-      expect(existsSync(path.join(root, ".cclinic/plans/plan-1/attachments"))).toBe(false);
+      expect(existsSync(path.join(root, ".luseen/plans/plan-1/attachments"))).toBe(false);
       expect(existsSync(session.transcriptPath ?? "")).toBe(true);
     },
     SLOW,
@@ -527,15 +527,15 @@ describe("cclinic plan: proposals", () => {
     async () => {
       const root = project();
       writeProject(root, { "mock.png": "png" });
-      const before = readFileSync(tasksDatabaseFile(path.join(root, ".cclinic")));
+      const before = readFileSync(tasksDatabaseFile(path.join(root, ".luseen")));
       const harness = agentHarness({ rules: [proposing("Ready", roadmapProposal({ roadmap: null }))] });
       typing("@mock.png", "/cancel");
       await plan(root, harness, { roadmap: 1 });
       expect(harness.output.out).toBe("Cancelled. Nothing was saved.\n");
-      expect(readFileSync(tasksDatabaseFile(path.join(root, ".cclinic"))).equals(before)).toBe(true);
+      expect(readFileSync(tasksDatabaseFile(path.join(root, ".luseen"))).equals(before)).toBe(true);
       const session = await only(root);
       expect(session.status).toBe("cancelled");
-      expect(existsSync(path.join(root, ".cclinic/plans/plan-1/attachments"))).toBe(false);
+      expect(existsSync(path.join(root, ".luseen/plans/plan-1/attachments"))).toBe(false);
       expect(existsSync(session.transcriptPath ?? "")).toBe(true);
     },
     SLOW,
@@ -552,12 +552,12 @@ describe("cclinic plan: proposals", () => {
       await plan(root, harness, { task: true, roadmap: 1 });
       expect(harness.output.err).toContain("Where: milestone #2 of roadmap #1");
       expect(harness.output.err).toContain("Depends on: #1");
-      expect(harness.output.out).toBe("Saved task #3. It runs with its roadmap: cclinic auto --roadmap 1\n");
+      expect(harness.output.out).toBe("Saved task #3. It runs with its roadmap: luseen auto --roadmap 1\n");
       selectMock.mockResolvedValueOnce(null);
       typing("Lock it", "/approve");
       await plan(root, harness, { task: true });
-      expect(harness.output.out).toContain("Saved task #4. It's standalone, so cclinic auto doesn't run it.");
-      expect(harness.output.out.split("\n")[1]).not.toContain("cclinic auto --");
+      expect(harness.output.out).toContain("Saved task #4. It's standalone, so luseen auto doesn't run it.");
+      expect(harness.output.out.split("\n")[1]).not.toContain("luseen auto --");
       const store = openStore(root);
       expect(store.getTask(3)).toMatchObject({ milestoneId: 2, status: "open", dependsOn: [1], spec: null });
       expect(store.getTask(4)?.milestoneId).toBeNull();
@@ -608,7 +608,7 @@ describe("cclinic plan: proposals", () => {
   );
 });
 
-describe("cclinic plan: attachments", () => {
+describe("luseen plan: attachments", () => {
   it(
     "TC-PLAN-039: refused files name the reason, start no turn, and lose nothing",
     async () => {
@@ -664,7 +664,7 @@ describe("cclinic plan: attachments", () => {
       );
       const before = statSync(path.join(root, "a/notes.md")).mtimeMs;
       const harness = agentHarness({ rules: [says("Noted.")] });
-      const folder = path.join(root, ".cclinic/plans/plan-1/attachments");
+      const folder = path.join(root, ".luseen/plans/plan-1/attachments");
       typing("@brief.docx @a/notes.md @b/notes.md");
       inputMock.mockImplementationOnce(() => {
         expect(readdirSync(folder).sort()).toEqual(["brief.docx", "brief.docx.md", "notes-2.md", "notes.md"]);
@@ -677,11 +677,11 @@ describe("cclinic plan: attachments", () => {
       });
       await plan(root, harness, { roadmap: 1 });
       expect(harness.calls()[0]?.prompt).toContain(
-        "- brief.docx (document): .cclinic/plans/plan-1/attachments/brief.docx.md",
+        "- brief.docx (document): .luseen/plans/plan-1/attachments/brief.docx.md",
       );
       expect(existsSync(folder)).toBe(false);
       expect(statSync(path.join(root, "a/notes.md")).mtimeMs).toBe(before);
-      expect(readFileSync(path.join(root, ".cclinic/plans/.gitignore"), "utf8")).toBe("*\n");
+      expect(readFileSync(path.join(root, ".luseen/plans/.gitignore"), "utf8")).toBe("*\n");
     },
     SLOW,
   );
@@ -725,7 +725,7 @@ describe("cclinic plan: attachments", () => {
   );
 });
 
-describe("cclinic plan: stopping and resuming", () => {
+describe("luseen plan: stopping and resuming", () => {
   it(
     "TC-PLAN-021: stopping a turn ends the PM, keeps the session, and resuming asks the PM to answer",
     async () => {
@@ -751,9 +751,9 @@ describe("cclinic plan: stopping and resuming", () => {
         expect(() => process.kill(pid, 0)).toThrow();
       }, SPAWN_WAIT);
       const session = await only(root);
-      expect(harness.output.err).toContain(`cclinic plan --resume ${session.id}`);
+      expect(harness.output.err).toContain(`luseen plan --resume ${session.id}`);
       expect(session).toMatchObject({ status: "open", isAwaitingReply: true, holder: null });
-      expect(existsSync(path.join(root, ".cclinic/tasks.db"))).toBe(false);
+      expect(existsSync(path.join(root, ".luseen/tasks.db"))).toBe(false);
 
       const again = agentHarness({ rules: [says("Answered.")], env: { HOME: harness.environment.HOME } });
       typing("/cancel");
@@ -775,7 +775,7 @@ describe("cclinic plan: stopping and resuming", () => {
       expect(error).toBeInstanceOf(AgentSessionError);
       expect(exitCodeFor(error)).toBe(4);
       expect(String(error)).toContain("40 PM turns");
-      expect(String(error)).toContain("cclinic plan --resume plan-1");
+      expect(String(error)).toContain("luseen plan --resume plan-1");
       expect(harness.calls()).toHaveLength(40);
       expect((await only(root)).status).toBe("open");
     },
@@ -808,7 +808,7 @@ describe("cclinic plan: stopping and resuming", () => {
       const message = (error as Error).message;
       expect(message).toContain("Claude's usage limit is reached.");
       expect(message).toContain(`It resets ${new Date(resetsAt * 1000).toISOString()}.`);
-      expect(message).toContain("cclinic plan --resume plan-1");
+      expect(message).toContain("luseen plan --resume plan-1");
       expect(message).toContain("claude --resume");
       expect(harness.calls()).toHaveLength(2);
     },
@@ -849,7 +849,7 @@ describe("cclinic plan: stopping and resuming", () => {
       });
       typing("A secret plan sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789", "Yes");
       inputMock.mockImplementationOnce(async () => {
-        const file = path.join(root, ".cclinic/plans/plan-1/session.json");
+        const file = path.join(root, ".luseen/plans/plan-1/session.json");
         const saved = JSON.parse(readFileSync(file, "utf8")) as PlanSession;
         expect(saved).toMatchObject({
           id: "plan-1",
@@ -865,7 +865,7 @@ describe("cclinic plan: stopping and resuming", () => {
       });
       await plan(root, harness, { roadmap: 1 });
       expect(harness.output.err).toMatch(
-        /Planning session plan-1\. Continue it later with: cclinic plan --resume plan-1 {2}or {2}claude --resume [0-9a-f-]{36}/,
+        /Planning session plan-1\. Continue it later with: luseen plan --resume plan-1 {2}or {2}claude --resume [0-9a-f-]{36}/,
       );
     },
     SLOW,
@@ -902,7 +902,7 @@ describe("cclinic plan: stopping and resuming", () => {
       const list = menuAt(0) as { choices: { name: string }[] };
       expect(list.choices).toHaveLength(2);
       expect(list.choices.map((choice) => choice.name).join("\n")).toContain('"First idea"');
-      expect(list.choices.map((choice) => choice.name).join("\n")).toContain("a terminal (cclinic plan)");
+      expect(list.choices.map((choice) => choice.name).join("\n")).toContain("a terminal (luseen plan)");
       expect(resumed.output.err).toContain("You › First idea");
       expect(resumed.output.err).toContain("PM › Ready");
       expect(resumed.output.err).toContain("Extending roadmap #1"); // the waiting proposal, shown again
@@ -961,7 +961,7 @@ describe("cclinic plan: stopping and resuming", () => {
         save: { ...session, holder: { place: "terminal", pid: process.ppid } },
         value: undefined,
       }));
-      await expect(plan(root, harness, { resume: "plan-1" })).rejects.toThrow("is open in a terminal (cclinic plan)");
+      await expect(plan(root, harness, { resume: "plan-1" })).rejects.toThrow("is open in a terminal (luseen plan)");
       await records.update("plan-1", (session) => ({
         save: { ...session, holder: { place: "gui", pid: 999_999 } },
         value: undefined,
@@ -982,7 +982,7 @@ describe("cclinic plan: stopping and resuming", () => {
       inputMock.mockImplementationOnce(() => Promise.reject(new CancelledError("Cancelled.")));
       await plan(root, harness, { roadmap: 1 }).catch(() => undefined);
       const session = await only(root);
-      const both = `cclinic plan --resume ${session.id}  or  claude --resume ${session.claudeSessionId ?? ""}`;
+      const both = `luseen plan --resume ${session.id}  or  claude --resume ${session.claudeSessionId ?? ""}`;
       expect(harness.output.err.split(both).length - 1).toBe(2);
     },
     SLOW,

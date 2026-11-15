@@ -1,5 +1,5 @@
 /**
- * A planning session with the PM, the same from `cclinic plan`, the GUI and the MCP tools (spec: roadmap-planning):
+ * A planning session with the PM, the same from `luseen plan`, the GUI and the MCP tools (spec: roadmap-planning):
  * driving one PM turn, and approving or cancelling a proposal.
  */
 import { PLAN_LIMITS } from "../core/constants/agents.js";
@@ -209,7 +209,7 @@ export async function runTurn(ports: TurnPorts, id: string, message: string, cou
     // Approved or cancelled elsewhere meanwhile, such as from the GUI's Needs you (FR-PLAN-032).
     if (current.status !== "open") throw new SessionClosedError(id, current.status, current.outcome);
     // The first prompt is kept as `pendingFirstMessage`; a later message of the user's is kept until it's answered.
-    // cclinic's own notes, such as Retry's request, keep the user's message that's still waiting (FR-PLAN-014).
+    // luseen's own notes, such as Retry's request, keep the user's message that's still waiting (FR-PLAN-014).
     const unansweredMessage = message.startsWith(FIRST_MESSAGE_MARKER)
       ? null
       : isPlanningNote(message)

@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 function tool(root: string): string {
-  return path.join(root, ".cclinic");
+  return path.join(root, ".luseen");
 }
 
 function created(root: string) {
@@ -26,7 +26,7 @@ function created(root: string) {
   return store;
 }
 
-/** Runs `cclinic tasks ...` against a project, returning stdout. Errors propagate, as in main.ts. */
+/** Runs `luseen tasks ...` against a project, returning stdout. Errors propagate, as in main.ts. */
 async function tasks(root: string, ...args: string[]): Promise<string> {
   let out = "";
   const reporter = createReporter({
@@ -44,7 +44,7 @@ async function tasks(root: string, ...args: string[]): Promise<string> {
   return out;
 }
 
-/** A version 1 database, as written by the previous cclinic, with milestones A then B and task 3 removed. */
+/** A version 1 database, as written by the previous luseen, with milestones A then B and task 3 removed. */
 function writeVersion1(file: string): void {
   mkdirSync(path.dirname(file), { recursive: true });
   const database = new DatabaseSync(file);
@@ -66,7 +66,7 @@ function writeVersion1(file: string): void {
 
 type MilestonePlan = readonly [title: string, tasks: readonly string[]];
 
-/** Saves a roadmap plan the way `cclinic plan` does, with tasks keyed by title. */
+/** Saves a roadmap plan the way `luseen plan` does, with tasks keyed by title. */
 function savePlan(
   store: TaskStore,
   roadmap: { title: string; goal: string } | { id: number },
@@ -87,13 +87,13 @@ async function json<T>(root: string, ...args: string[]): Promise<T> {
 }
 
 describe("task store", () => {
-  it("TC-TASK-001: tasks are saved in .cclinic/tasks.db and read back by a new store", () => {
+  it("TC-TASK-001: tasks are saved in .luseen/tasks.db and read back by a new store", () => {
     const root = makeTempFolder();
     const first = created(root);
     first.addTask({ title: "Lock accounts" });
     first.close();
     const file = tasksDatabaseFile(tool(root));
-    expect(file).toBe(path.join(root, ".cclinic/tasks.db"));
+    expect(file).toBe(path.join(root, ".luseen/tasks.db"));
     expect(readFileSync(file).subarray(0, 16).toString("latin1")).toBe("SQLite format 3\u0000");
     const second = openTaskStore(tool(root), "read");
     expect(second?.listTasks(true).map((task) => task.title)).toEqual(["Lock accounts"]);
@@ -201,7 +201,7 @@ describe("task store", () => {
     store.close();
   });
 
-  it("TC-TASK-019: a database from a newer cclinic is refused and left unchanged", async () => {
+  it("TC-TASK-019: a database from a newer luseen is refused and left unchanged", async () => {
     const root = makeTempFolder();
     created(root).close();
     const file = tasksDatabaseFile(tool(root));
@@ -212,7 +212,7 @@ describe("task store", () => {
     for (const mode of ["read", "update", "create"] as const) {
       expect(() => openTaskStore(tool(root), mode)).toThrow(TaskDatabaseError);
     }
-    await expect(tasks(root, "list")).rejects.toThrow(/newer version of cclinic/);
+    await expect(tasks(root, "list")).rejects.toThrow(/newer version of luseen/);
     await expect(tasks(root, "add", "--title", "X")).rejects.toThrow(TaskDatabaseError);
     expect(exitCodeFor(await tasks(root, "list").catch((error: unknown) => error))).toBe(1);
     expect(exitCodeFor(await tasks(root, "add", "--title", "X").catch((error: unknown) => error))).toBe(1);
@@ -221,11 +221,11 @@ describe("task store", () => {
 
   it("TC-TASK-020: a file that isn't a database is refused and left unchanged", async () => {
     const root = makeTempFolder();
-    writeProject(root, { ".cclinic/tasks.db": "plain text, not a database\n" });
+    writeProject(root, { ".luseen/tasks.db": "plain text, not a database\n" });
     await expect(tasks(root, "list")).rejects.toThrow(/isn't a readable task database/);
     await expect(tasks(root, "add", "--title", "X")).rejects.toThrow(TaskDatabaseError);
     expect(exitCodeFor(await tasks(root, "list").catch((error: unknown) => error))).toBe(1);
-    expect(readFileSync(path.join(root, ".cclinic/tasks.db"), "utf8")).toBe("plain text, not a database\n");
+    expect(readFileSync(path.join(root, ".luseen/tasks.db"), "utf8")).toBe("plain text, not a database\n");
   });
 });
 
@@ -271,17 +271,17 @@ describe("tasks commands", () => {
 
   it("TC-TASK-008: invalid input saves nothing", async () => {
     const root = makeTempFolder();
-    await expect(tasks(root, "add", "--title", "X", "--milestone", "9")).rejects.toThrow(/cclinic plan/);
+    await expect(tasks(root, "add", "--title", "X", "--milestone", "9")).rejects.toThrow(/luseen plan/);
     await expect(tasks(root, "add", "--title", " ")).rejects.toThrow(UsageError);
     await expect(tasks(root, "add", "--title", "X", "--spec", "Auth")).rejects.toThrow(UsageError);
     await expect(tasks(root, "add", "--title", "X", "--depends-on", "abc")).rejects.toThrow(UsageError);
     expect(existsSync(tool(root))).toBe(false);
   });
 
-  it("TC-TASK-004, TC-TASK-029: creating milestones and roadmaps by hand is refused and points to cclinic plan", async () => {
+  it("TC-TASK-004, TC-TASK-029: creating milestones and roadmaps by hand is refused and points to luseen plan", async () => {
     const root = makeTempFolder();
-    await expect(tasks(root, "milestone", "add", "--title", "M", "--goal", "G")).rejects.toThrow(/cclinic plan/);
-    await expect(tasks(root, "roadmap", "add", "--title", "Launch")).rejects.toThrow(/cclinic plan/);
+    await expect(tasks(root, "milestone", "add", "--title", "M", "--goal", "G")).rejects.toThrow(/luseen plan/);
+    await expect(tasks(root, "roadmap", "add", "--title", "Launch")).rejects.toThrow(/luseen plan/);
     expect(exitCodeFor(await tasks(root, "roadmap", "add").catch((error: unknown) => error))).toBe(2);
     expect(existsSync(tool(root))).toBe(false);
   });
@@ -544,9 +544,12 @@ describe("tasks commands", () => {
 
   it("TC-TASK-016: -C chooses the project, whatever the current folder", async () => {
     const root = makeTempFolder();
+    const here = path.join(process.cwd(), ".luseen/tasks.db");
+    const hereBefore = existsSync(here) ? readFileSync(here) : undefined;
     await tasks(root, "add", "--title", "There");
     expect(existsSync(tasksDatabaseFile(tool(root)))).toBe(true);
-    expect(existsSync(path.join(process.cwd(), ".cclinic/tasks.db"))).toBe(false);
+    // The current folder may hold a database of its own, such as this repository's, which must stay as it was.
+    expect(existsSync(here) ? readFileSync(here) : undefined).toEqual(hereBefore);
   });
 
   it("TC-TASK-017: a folder that doesn't exist, or a file, is a usage error", async () => {
@@ -558,7 +561,7 @@ describe("tasks commands", () => {
 
   it("TC-TASK-021: cleaning keeps the task database", async () => {
     const root = makeTempFolder();
-    writeProject(root, { ".cclinic/cache/a.json": "{}", ".cclinic/failed/b.json": "{}" });
+    writeProject(root, { ".luseen/cache/a.json": "{}", ".luseen/failed/b.json": "{}" });
     await tasks(root, "add", "--title", "Keep");
     const before = readFileSync(tasksDatabaseFile(tool(root)));
     const reporter = createReporter({
@@ -574,8 +577,8 @@ describe("tasks commands", () => {
       { yes: true },
       { reporter, environment: {}, signal: new AbortController().signal, version: "0" },
     );
-    expect(existsSync(path.join(root, ".cclinic/cache"))).toBe(false);
-    expect(existsSync(path.join(root, ".cclinic/failed"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/cache"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/failed"))).toBe(false);
     expect(readFileSync(tasksDatabaseFile(tool(root))).equals(before)).toBe(true);
   });
 });

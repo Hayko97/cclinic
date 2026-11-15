@@ -37,7 +37,7 @@ export interface GenerateQuestions {
 }
 
 /**
- * FR-GUI-016: runs `cclinic --dry-run --json` with the form's options, which uses no Claude usage, and turns its
+ * FR-GUI-016: runs `luseen --dry-run --json` with the form's options, which uses no Claude usage, and turns its
  * summary into the questions the CLI would ask. A dry run the CLI refuses is refused with its own message.
  */
 export async function askGenerate(jobs: Jobs, options: GenerateOptions): Promise<GenerateQuestions> {

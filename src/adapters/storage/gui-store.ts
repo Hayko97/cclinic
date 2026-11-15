@@ -1,4 +1,4 @@
-/** The GUI's lock in `.cclinic/gui/`, which allows one GUI per project (FR-GUI-007, FR-GUI-047). */
+/** The GUI's lock in `.luseen/gui/`, which allows one GUI per project (FR-GUI-007, FR-GUI-047). */
 import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -25,9 +25,9 @@ function alreadyRunning(holder: LockHolder, lockFile: string): UsageError {
   const port = typeof holder["port"] === "number" ? holder["port"] : undefined;
   const where =
     port === undefined
-      ? `A cclinic GUI is starting for this project (process ${holder.pid}).`
-      : `A cclinic GUI is already running for this project on port ${port}: http://${GUI_HOST}:${port}/`;
-  return new UsageError(`${where} If no cclinic GUI is running, delete ${lockFile}.`);
+      ? `A luseen GUI is starting for this project (process ${holder.pid}).`
+      : `A luseen GUI is already running for this project on port ${port}: http://${GUI_HOST}:${port}/`;
+  return new UsageError(`${where} If no luseen GUI is running, delete ${lockFile}.`);
 }
 
 export async function acquireGuiLock(target: string): Promise<GuiLock> {

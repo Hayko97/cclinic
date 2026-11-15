@@ -44,7 +44,7 @@ function repository(): string {
   writeProject(root, {
     "README.md": "# App\n",
     "src/shared.txt": "base\n",
-    ".cclinic/sdd/README.md": "# Specs\n",
+    ".luseen/sdd/README.md": "# Specs\n",
     ...Object.fromEntries(AUTO_REQUIRED_SKILLS.map((skill) => [`.claude/skills/${skill}/SKILL.md`, `# ${skill}\n`])),
   });
   git(root, "init", "-q", "-b", "main");
@@ -52,7 +52,7 @@ function repository(): string {
   git(root, "config", "user.name", "Dev");
   git(root, "add", "-A");
   git(root, "commit", "-q", "-m", "start");
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
@@ -71,7 +71,7 @@ function repository(): string {
   return root;
 }
 
-/** A GUI whose jobs are real `cclinic` processes, with the fake `claude` on their PATH. */
+/** A GUI whose jobs are real `luseen` processes, with the fake `claude` on their PATH. */
 async function startReal(root: string, rules: FakeClaudeRule[] = []): Promise<TestGui> {
   const harness = agentHarness({ rules });
   const gui = await startTestGui(root, {}, {}, harness.environment);
@@ -131,7 +131,7 @@ function runState(runId: string, change: Partial<RunState> = {}): RunState {
     runId,
     roadmapId: 1,
     roadmapTitle: "Launch",
-    runBranch: `cclinic/auto/${runId}/run`,
+    runBranch: `luseen/auto/${runId}/run`,
     startedAt: new Date(Date.now() - 600_000).toISOString(),
     finishedAt: null,
     outcome: null,
@@ -147,7 +147,7 @@ function runState(runId: string, change: Partial<RunState> = {}): RunState {
         title: "Task a",
         dependsOn: [],
         status: "running",
-        branch: `cclinic/auto/${runId}/task-1`,
+        branch: `luseen/auto/${runId}/task-1`,
         rounds: { specReviews: 1, qaRuns: 2, implementationReviews: 0 },
         costUsd: 1.25,
         reason: null,
@@ -160,7 +160,7 @@ function runState(runId: string, change: Partial<RunState> = {}): RunState {
 }
 
 function writeRun(root: string, state: RunState, files: { report?: string; logs?: Record<string, string> } = {}) {
-  const folder = path.join(root, ".cclinic/auto", state.runId);
+  const folder = path.join(root, ".luseen/auto", state.runId);
   mkdirSync(path.join(folder, "logs"), { recursive: true });
   writeFileSync(path.join(folder, "run.json"), JSON.stringify(state));
   if (files.report !== undefined) writeFileSync(path.join(folder, "report.md"), files.report);
@@ -170,7 +170,7 @@ function writeRun(root: string, state: RunState, files: { report?: string; logs?
 /** A live run of roadmap 1, held by this test's own process, and two finished runs. */
 function withRuns(root: string): void {
   writeRun(root, runState(LIVE_RUN));
-  writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
+  writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
   const finished = { finishedAt: new Date().toISOString(), outcome: "completed" as const, spentUsd: 2 };
   writeRun(root, runState(OLD_RUN, finished), {
     report: "# Automated run\n\nOutcome: completed\n",
@@ -195,7 +195,7 @@ describe("Run with AI through the API", () => {
     expect(jobs.started).toEqual([["auto", "--roadmap=1", "--developers=2", "--dry-run", "--json"]]);
   });
 
-  it("TC-GUI-038: a confirmed run starts cclinic auto with the form's options and --yes --json", async () => {
+  it("TC-GUI-038: a confirmed run starts luseen auto with the form's options and --yes --json", async () => {
     const jobs = scriptedJobs(PLAN);
     const gui = await startScripted(makeTempFolder(), jobs);
     const options = { roadmap: 1, developers: 2, model: "haiku", effort: "low", timeoutMinutes: 10 };
@@ -240,8 +240,8 @@ describe("Run with AI through the API", () => {
     expect((JSON.parse(changed.body) as { error: string }).error).toMatch(/tracked|commit|changes/i);
 
     const locked = repository();
-    mkdirSync(path.join(locked, ".cclinic/auto"), { recursive: true });
-    writeFileSync(path.join(locked, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
+    mkdirSync(path.join(locked, ".luseen/auto"), { recursive: true });
+    writeFileSync(path.join(locked, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
     const lockedGui = await startReal(locked);
     const busy = await postJob(lockedGui, { command: "auto", options: { roadmap: 1 } });
     expect(busy.status).toBe(409);
@@ -278,11 +278,9 @@ describe("Run with AI through the API", () => {
       { timeout: 20_000, interval: 200 },
     );
     expect(ended.exitCode).toBe(130);
-    const state = JSON.parse(
-      readFileSync(path.join(root, ".cclinic/auto", live.runId, "run.json"), "utf8"),
-    ) as RunState;
+    const state = JSON.parse(readFileSync(path.join(root, ".luseen/auto", live.runId, "run.json"), "utf8")) as RunState;
     expect(state.outcome).toBe("interrupted");
-    const store = openTaskStore(path.join(root, ".cclinic"), "read");
+    const store = openTaskStore(path.join(root, ".luseen"), "read");
     expect(store?.getTask(1)?.status).toBe("open");
     store?.close();
   }, 60_000);
@@ -341,10 +339,10 @@ describe("Run with AI through the API", () => {
     const line = (entry: unknown) => `${JSON.stringify(entry)}\n`;
     writeFileSync(transcript, line({ type: "user", message: { content: "Test task 1" } }));
     writeRun(root, runState(LIVE_RUN));
-    writeFileSync(path.join(root, ".cclinic/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
-    mkdirSync(path.join(root, ".cclinic/auto", LIVE_RUN, "sessions"), { recursive: true });
+    writeFileSync(path.join(root, ".luseen/auto/.lock"), JSON.stringify({ pid: process.pid, runId: LIVE_RUN }));
+    mkdirSync(path.join(root, ".luseen/auto", LIVE_RUN, "sessions"), { recursive: true });
     writeFileSync(
-      path.join(root, ".cclinic/auto", LIVE_RUN, "sessions", `${sessionId}.json`),
+      path.join(root, ".luseen/auto", LIVE_RUN, "sessions", `${sessionId}.json`),
       JSON.stringify({
         sessionId,
         taskId: 1,
@@ -416,7 +414,7 @@ describe("Run with AI through the API", () => {
     expect(JSON.stringify(files)).not.toContain("sk-ant-api03-abcdefghijklmnop");
     expect((await sendTo(gui, "GET", "/api/runs/20991231-000000")).status).toBe(404);
     // A report that can't be read is reported with its name, not shown as missing.
-    const report = path.join(root, ".cclinic/auto", OLDER_RUN, "report.md");
+    const report = path.join(root, ".luseen/auto", OLDER_RUN, "report.md");
     chmodSync(report, 0o000);
     const unreadable = await sendTo(gui, "GET", `/api/runs/${OLDER_RUN}`);
     chmodSync(report, 0o644);
@@ -448,7 +446,7 @@ describe("Run with AI and the roadmap panel in the browser", () => {
     await expect
       .poll(() => dialog.locator("#auto-plan").textContent(), { timeout: 15_000 })
       .toContain("Roadmap #1: Launch");
-    expect(existsSync(path.join(root, ".cclinic/auto/.lock"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/auto/.lock"))).toBe(false);
     await dialog.locator("#auto-start").click();
     await expect.poll(() => frame.locator('button[data-action="stop-run"]').count(), { timeout: 20_000 }).toBe(1);
     expect(await frame.locator(".run-progress").textContent()).toMatch(/^Running for /);
@@ -460,7 +458,7 @@ describe("Run with AI and the roadmap panel in the browser", () => {
     await expect.poll(() => frame.locator('button[data-action="continue-run"]').count(), { timeout: 20_000 }).toBe(1);
     const [runId] = (await canvasOf(gui)).roadmaps[0]?.pastRuns.map((run) => run.runId) ?? [];
     const state = JSON.parse(
-      readFileSync(path.join(root, ".cclinic/auto", runId ?? "", "run.json"), "utf8"),
+      readFileSync(path.join(root, ".luseen/auto", runId ?? "", "run.json"), "utf8"),
     ) as RunState;
     expect(state.outcome).toBe("interrupted");
   }, 60_000);

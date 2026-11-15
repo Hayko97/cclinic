@@ -1,5 +1,5 @@
 /**
- * Plan with the PM from the GUI: a chat in the side panel, on the same planning sessions as `cclinic plan` and
+ * Plan with the PM from the GUI: a chat in the side panel, on the same planning sessions as `luseen plan` and
  * Claude Code (spec: roadmap-planning FR-PLAN-033 to FR-PLAN-043, gui FR-GUI-023 to FR-GUI-026). One session is
  * open in a GUI at a time; its conversation is read from the session's Claude transcript.
  */
@@ -62,7 +62,7 @@ import {
 export type TurnMaker = (signal: AbortSignal) => TurnPorts;
 
 export interface PlannerPorts {
-  /** Makes `cclinic plan`'s checks and resolves the model and effort (FR-GUI-023). Throws what the CLI refuses. */
+  /** Makes `luseen plan`'s checks and resolves the model and effort (FR-GUI-023). Throws what the CLI refuses. */
   prepare(options: PlanOptionsRequest): Promise<TurnMaker>;
   readonly records: PlanRecords & {
     copyAttachments(id: string, files: readonly { file: string; name: string }[]): Promise<StoredAttachment[]>;
@@ -258,7 +258,7 @@ function messageOf(error: unknown): string {
 }
 
 /**
- * The user's message a stopped turn left unanswered, as theirs; never one of cclinic's own notes. Its time is when the
+ * The user's message a stopped turn left unanswered, as theirs; never one of luseen's own notes. Its time is when the
  * turn started, so the panel can tell whether the transcript has it yet (FR-PLAN-038).
  */
 function unansweredItem(session: PlanSession): PlanChatItem | null {

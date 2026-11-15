@@ -382,7 +382,7 @@ describe("prompts", () => {
 
   it("TC-ANA-022: prior IDs and retired IDs are in the spec prompt", () => {
     const manifest = {
-      cclinicVersion: "1",
+      luseenVersion: "1",
       promptVersion: "1",
       generatedAt: "",
       provider: "",

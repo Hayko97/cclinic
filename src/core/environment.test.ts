@@ -62,12 +62,12 @@ describe("the environment file", () => {
     const before = new Map([
       ["a.ts", "1"],
       ["gone.ts", "1"],
-      [".cclinic/environment/compose.yaml", "1"],
+      [".luseen/environment/compose.yaml", "1"],
     ]);
     const after = new Map([
       ["a.ts", "2"],
       ["new.ts", "1"],
-      [".cclinic/environment/compose.yaml", "2"],
+      [".luseen/environment/compose.yaml", "2"],
     ]);
     expect(changedOutsideEnvironment(before, after)).toEqual(["a.ts", "gone.ts", "new.ts"]);
   });
@@ -114,7 +114,7 @@ describe("the local-env skill", () => {
     const stage3 = AGENT_WORKFLOW.slice(AGENT_WORKFLOW.indexOf("**3. Implement"), AGENT_WORKFLOW.indexOf("**4. Ask"));
     expect(stage3.indexOf("real results")).toBeLessThan(stage3.indexOf("`local-env`"));
     expect(stage3.indexOf("`local-env`")).toBeLessThan(stage3.indexOf("Ask the user to approve"));
-    expect(stage3).toContain(".cclinic/environment/environment.json");
+    expect(stage3).toContain(".luseen/environment/environment.json");
     expect(stage3).toContain("A server you start yourself doesn't count");
     const body = AGENT_SKILLS.find((skill) => skill.name === "implement-spec")?.body ?? "";
     expect(body.indexOf("`local-env`")).toBeGreaterThan(body.indexOf("Verify everything"));

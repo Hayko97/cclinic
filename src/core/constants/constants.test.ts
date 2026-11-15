@@ -103,10 +103,39 @@ describe("other constants", () => {
     }
   });
 
-  it("bin/cclinic.js checks the same minimum Node.js version", () => {
-    const bin = readFileSync(path.join(SOURCE_ROOT, "../bin/cclinic.js"), "utf8");
+  it("bin/luseen.js checks the same minimum Node.js version", () => {
+    const bin = readFileSync(path.join(SOURCE_ROOT, "../bin/luseen.js"), "utf8");
     expect(bin).toContain(`parts[0] < ${MINIMUM_NODE.major}`);
     expect(bin).toContain(`parts[1] < ${MINIMUM_NODE.minor}`);
     expect(bin).toContain(`Node.js ${MINIMUM_NODE.major}.${MINIMUM_NODE.minor}`);
+  });
+});
+
+describe("the Luseen names", () => {
+  it("TC-CLI-064: every name is Luseen's", async () => {
+    const paths = await import("./paths.js");
+    const workflow = await import("./workflow.js");
+    const agents = await import("./agents.js");
+    const gui = await import("./gui.js");
+    const { renderClaudeBlock, renderSkill, AGENT_SKILLS } = await import("../agent-skills.js");
+    expect(paths.TOOL_FOLDER_NAME).toBe(".luseen");
+    expect(paths.LUSEEN_IGNORE_FILE).toBe(".luseenignore");
+    expect(paths.USER_CONFIG_FOLDER).toBe("luseen");
+    expect(paths.TEMP_FOLDER_SUFFIX).toBe(".luseen-tmp-");
+    expect(paths.BACKUP_FOLDER_SUFFIX).toBe(".luseen-old-");
+    expect(workflow.MCP_SERVER_NAME).toBe("luseen");
+    expect(Object.values(workflow.RESOURCE_URIS)).toEqual([
+      "luseen://specs",
+      "luseen://specs/{name}",
+      "luseen://roadmap",
+    ]);
+    expect(renderClaudeBlock()).toBe("<!-- luseen:start -->\n@AGENTS.md\n<!-- luseen:end -->");
+    const [skill] = AGENT_SKILLS;
+    if (skill === undefined) throw new Error("no skills");
+    expect(renderSkill(skill, ".luseen/sdd", () => "h")).toContain("  generated-by: luseen\n");
+    expect(agents.AUTO_BRANCH_PREFIX).toBe("luseen/auto");
+    expect(agents.AUTO_COMMIT_IDENTITY).toEqual({ name: "luseen", email: "luseen@localhost" });
+    expect(gui.GUI_TOKEN_HEADER).toBe("x-luseen-token");
+    expect(gui.GUI_COOKIE_PREFIX).toBe("luseen_token_");
   });
 });

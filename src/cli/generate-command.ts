@@ -127,13 +127,13 @@ export async function resolveTarget(given: string | undefined, allowBroad: boole
   const absolute = path.resolve(given ?? process.cwd());
   if (!(await isDirectory(absolute))) {
     const suggestion = given === undefined ? undefined : closestCommand(given);
-    const hint = suggestion === undefined ? "" : ` Did you mean "cclinic ${suggestion}"?`;
+    const hint = suggestion === undefined ? "" : ` Did you mean "luseen ${suggestion}"?`;
     throw new UsageError(`"${given ?? absolute}" isn't a folder, and isn't a command.${hint}`);
   }
   const target = await realpath(absolute);
   if (!allowBroad && isBroadTarget(target, await realpath(homedir()).catch(() => homedir()))) {
     throw new UsageError(
-      `${target} is a home folder or filesystem root, which is probably not what you meant. Run cclinic on a project folder, or use --allow-broad-target.`,
+      `${target} is a home folder or filesystem root, which is probably not what you meant. Run luseen on a project folder, or use --allow-broad-target.`,
     );
   }
   return target;
@@ -151,13 +151,13 @@ export async function resolveModelAndEffort(
   const envEffort = environment[ENV_VARS.EFFORT];
   const resolvedModel = resolveSetting<ModelChoice>({
     option: typeof values.model === "string" ? requireModel(values.model, "--model") : undefined,
-    environment: envModel === undefined || envModel === "" ? undefined : requireModel(envModel, "CCLINIC_MODEL"),
+    environment: envModel === undefined || envModel === "" ? undefined : requireModel(envModel, "LUSEEN_MODEL"),
     saved: saved.model,
     fallback: DEFAULT_MODEL,
   });
   const resolvedEffort = resolveSetting<Effort>({
     option: typeof values.effort === "string" ? requireEffort(values.effort, "--effort") : undefined,
-    environment: envEffort === undefined || envEffort === "" ? undefined : requireEffort(envEffort, "CCLINIC_EFFORT"),
+    environment: envEffort === undefined || envEffort === "" ? undefined : requireEffort(envEffort, "LUSEEN_EFFORT"),
     saved: saved.effort,
     fallback: DEFAULT_EFFORT,
   });
@@ -176,7 +176,7 @@ export function resolveProviderChoice(
   try {
     return oneOf(PROVIDER_CHOICES)(value);
   } catch (error) {
-    throw new UsageError(`CCLINIC_PROVIDER: ${(error as Error).message}`, { cause: error });
+    throw new UsageError(`LUSEEN_PROVIDER: ${(error as Error).message}`, { cause: error });
   }
 }
 
@@ -287,7 +287,7 @@ async function loadHistory(
 }
 
 function limitMessage(what: string, actual: number, limit: number, flag: string): string {
-  return `This project has ${actual.toLocaleString("en-US")} ${what}, which is above the limit of ${limit.toLocaleString("en-US")}. Use ${flag} to raise the limit, or exclude files with --exclude or .cclinicignore.`;
+  return `This project has ${actual.toLocaleString("en-US")} ${what}, which is above the limit of ${limit.toLocaleString("en-US")}. Use ${flag} to raise the limit, or exclude files with --exclude or .luseenignore.`;
 }
 
 export async function runGenerate(
@@ -433,7 +433,7 @@ export async function runGenerate(
         effort,
         concurrency: options.concurrency,
         noCache: !options.cache,
-        cclinicVersion: context.version,
+        luseenVersion: context.version,
         ...(options.maxBudgetUsd === undefined ? {} : { maxBudgetUsd: options.maxBudgetUsd }),
         ...(history === undefined
           ? {}
@@ -457,7 +457,7 @@ export async function runGenerate(
       } catch (error) {
         // The documents are already saved, so a skills problem mustn't fail the run (FR-SKILL-005).
         const reason = error instanceof Error ? error.message : "unknown error";
-        reporter.warn(`Couldn't install the agent skills: ${reason}. Run "cclinic skills" to try again.`);
+        reporter.warn(`Couldn't install the agent skills: ${reason}. Run "luseen skills" to try again.`);
       }
     }
     const remoteAlert =

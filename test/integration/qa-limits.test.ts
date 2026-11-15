@@ -99,11 +99,11 @@ describe("QA: reading the limits", () => {
   it("limits.json: saved atomically next to config.json; unreadable, garbage, partial or newer files read as none", async () => {
     const home = makeTempFolder();
     const environment = { HOME: home, XDG_CONFIG_HOME: path.join(home, "cfg") };
-    expect(limitsFile(environment)).toBe(path.join(home, "cfg", "cclinic", "limits.json"));
+    expect(limitsFile(environment)).toBe(path.join(home, "cfg", "luseen", "limits.json"));
     expect(await readPlanLimits(environment)).toBeNull();
     const limits = limitsFromEvent(REAL_EVENT, now) as PlanLimits;
     await savePlanLimits(environment, limits);
-    expect(readdirSync(path.join(home, "cfg", "cclinic"))).toEqual(["limits.json"]);
+    expect(readdirSync(path.join(home, "cfg", "luseen"))).toEqual(["limits.json"]);
     expect(await readPlanLimits(environment)).toEqual(limits);
     const file = limitsFile(environment);
     for (const text of [
@@ -131,7 +131,7 @@ function repository(): string {
   const root = makeTempFolder();
   writeProject(root, {
     "README.md": "# App\n",
-    ".cclinic/sdd/README.md": "# Specs\n",
+    ".luseen/sdd/README.md": "# Specs\n",
     ...Object.fromEntries(AUTO_REQUIRED_SKILLS.map((skill) => [`.claude/skills/${skill}/SKILL.md`, `# ${skill}\n`])),
   });
   git(root, "init", "-q", "-b", "main");
@@ -143,7 +143,7 @@ function repository(): string {
 }
 
 function roadmap(root: string, keys: string[]) {
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Launch", goal: "Ship" },
@@ -165,7 +165,7 @@ function happyRules(taskIds: readonly number[], overrides: FakeClaudeRule[] = []
       {
         match: `developer agent.*Task #${id}:.*## Stage: spec`,
         times: 0,
-        write: { [`.cclinic/sdd/specs/t${id}.md`]: `# t${id}\n` },
+        write: { [`.luseen/sdd/specs/t${id}.md`]: `# t${id}\n` },
       },
       {
         match: `developer agent.*Task #${id}:.*## Stage: (implement|fix)`,
@@ -191,12 +191,12 @@ async function auto(root: string, harness: ReturnType<typeof agentHarness>, opti
 }
 
 function runState(root: string): RunState {
-  const folder = path.join(root, ".cclinic/auto");
+  const folder = path.join(root, ".luseen/auto");
   const [runId] = readdirSync(folder).filter((name) => name !== ".lock");
   return JSON.parse(readFileSync(path.join(folder, runId ?? "", "run.json"), "utf8")) as RunState;
 }
 function report(root: string): string {
-  const folder = path.join(root, ".cclinic/auto");
+  const folder = path.join(root, ".luseen/auto");
   const [runId] = readdirSync(folder).filter((name) => name !== ".lock");
   return readFileSync(path.join(folder, runId ?? "", "report.md"), "utf8");
 }
@@ -211,7 +211,7 @@ describe("limits.json saves", () => {
       readAt: new Date(index * 1000).toISOString(),
     }));
     await Promise.all(reports.map((limits) => savePlanLimits(environment, limits)));
-    expect(readdirSync(path.join(home, "cfg", "cclinic"))).toEqual(["limits.json"]);
+    expect(readdirSync(path.join(home, "cfg", "luseen"))).toEqual(["limits.json"]);
     expect(await readPlanLimits(environment)).toEqual(reports.at(-1));
   });
 });
@@ -310,7 +310,7 @@ describe("QA: auto at a plan usage limit", () => {
       match: "developer agent.*Task #1:.*## Stage: spec",
       times: 1,
       delayMs: 1500,
-      write: { ".cclinic/sdd/specs/t1.md": "# t1\n" },
+      write: { ".luseen/sdd/specs/t1.md": "# t1\n" },
     };
     const limit: FakeClaudeRule = {
       match: "developer agent.*Task #2:",
@@ -325,7 +325,7 @@ describe("QA: auto at a plan usage limit", () => {
     expect(state.outcome).toBe("limit-reached");
     expect(state.tasks.map((task) => task.status)).toEqual(["open", "open"]);
     expect(harness.calls()).toHaveLength(2);
-    const store = openTaskStore(path.join(root, ".cclinic"), "create");
+    const store = openTaskStore(path.join(root, ".luseen"), "create");
     expect(store?.listTasks(true).map((task) => task.status)).toEqual(["open", "open"]);
     store?.close();
   });
@@ -337,7 +337,7 @@ describe("QA: auto at a plan usage limit", () => {
       match: "developer agent.*## Stage: spec",
       times: 1,
       events: [rejectedEvent],
-      write: { ".cclinic/sdd/specs/t1.md": "# t1\n" },
+      write: { ".luseen/sdd/specs/t1.md": "# t1\n" },
     };
     const harness = agentHarness({ rules: happyRules([1], [limit]) });
     const code = await auto(root, harness);
@@ -350,7 +350,7 @@ describe("QA: auto at a plan usage limit", () => {
     expect(state.limitResetsAt).toBe(RESETS_ISO);
     expect(state.tasks.map((task) => task.status)).toEqual(["open"]);
     expect(state.tasks[0]?.rounds).toEqual({ specReviews: 1, qaRuns: 0, implementationReviews: 0 });
-    const store = openTaskStore(path.join(root, ".cclinic"), "create");
+    const store = openTaskStore(path.join(root, ".luseen"), "create");
     expect(store?.listTasks(true).map((task) => task.status)).toEqual(["open"]);
     store?.close();
   });
@@ -375,7 +375,7 @@ describe("QA: auto at a plan usage limit", () => {
     expect(json).not.toHaveProperty("limitResetsAt");
     expect(report(root)).toContain("- Outcome: completed");
     expect(report(root)).not.toMatch(/continue|usage limit/i);
-    const store = openTaskStore(path.join(root, ".cclinic"), "create");
+    const store = openTaskStore(path.join(root, ".luseen"), "create");
     expect(store?.listTasks(true).map((task) => task.status)).toEqual(["done"]);
     store?.close();
   });
@@ -412,7 +412,7 @@ describe("QA: auto at a plan usage limit", () => {
 describe("QA: plan at a plan usage limit", () => {
   function project(): string {
     const root = makeTempFolder();
-    writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
+    writeProject(root, { ".luseen/sdd/overview.md": "# Overview\n", ".luseen/sdd/README.md": "# Specs\n" });
     roadmap(root, ["x"]);
     return root;
   }
@@ -436,7 +436,7 @@ describe("QA: plan at a plan usage limit", () => {
     expect(existsSync(limitsFile(harness.environment))).toBe(true);
     expect((error as Error).message).toMatch(
       new RegExp(
-        `^The PM stopped: Claude's usage limit is reached\\. It resets ${RESETS_ISO.replaceAll(".", "\\.")}\\. Nothing was saved to the roadmap\\. Continue later with: cclinic plan --resume plan-1 {2}or {2}claude --resume [0-9a-f-]{36}$`,
+        `^The PM stopped: Claude's usage limit is reached\\. It resets ${RESETS_ISO.replaceAll(".", "\\.")}\\. Nothing was saved to the roadmap\\. Continue later with: luseen plan --resume plan-1 {2}or {2}claude --resume [0-9a-f-]{36}$`,
       ),
     );
   });
@@ -499,8 +499,8 @@ function scriptedJobs() {
 /** Roadmap 1 with task 1 done and task 2 as given, and one run.json written as given (raw, to allow old shapes). */
 function guiProject(run: Record<string, unknown>, task2Status = "open") {
   const root = makeTempFolder();
-  mkdirSync(path.join(root, ".cclinic/sdd"), { recursive: true });
-  const store = openTaskStore(path.join(root, ".cclinic"), "create");
+  mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
+  const store = openTaskStore(path.join(root, ".luseen"), "create");
   if (store === undefined) throw new Error("No store");
   store.savePlan({
     roadmap: { title: "Payments", goal: "Card checkout" },
@@ -522,7 +522,7 @@ function guiProject(run: Record<string, unknown>, task2Status = "open") {
   if (task2Status !== "open") store.setStatus(2, task2Status as "in-progress" | "blocked");
   store.close();
   const runId = "20261112-150000";
-  const folder = path.join(root, ".cclinic/auto", runId);
+  const folder = path.join(root, ".luseen/auto", runId);
   mkdirSync(path.join(folder, "sessions"), { recursive: true });
   writeFileSync(
     path.join(folder, "run.json"),
@@ -530,7 +530,7 @@ function guiProject(run: Record<string, unknown>, task2Status = "open") {
       runId,
       roadmapId: 1,
       roadmapTitle: "Payments",
-      runBranch: `cclinic/auto/${runId}/run`,
+      runBranch: `luseen/auto/${runId}/run`,
       startedAt: new Date(Date.now() - 3_600_000).toISOString(),
       finishedAt: new Date(Date.now() - 1_800_000).toISOString(),
       outcome: "interrupted",
@@ -567,7 +567,7 @@ function guiProject(run: Record<string, unknown>, task2Status = "open") {
   writeFileSync(path.join(folder, "report.md"), "# Report\n");
   const home = makeTempFolder();
   const config = path.join(home, "config");
-  mkdirSync(path.join(config, "cclinic"), { recursive: true });
+  mkdirSync(path.join(config, "luseen"), { recursive: true });
   return { root, home, config };
 }
 
@@ -594,7 +594,7 @@ async function openGui(
   return { page, jobs };
 }
 
-const limitsPath = (config: string) => path.join(config, "cclinic", "limits.json");
+const limitsPath = (config: string) => path.join(config, "luseen", "limits.json");
 const inHours = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
 const limits = (change: Partial<PlanLimits> = {}): PlanLimits => ({
   version: 1,

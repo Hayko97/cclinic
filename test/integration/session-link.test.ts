@@ -13,11 +13,11 @@ import { makeTempFolder, writeProject } from "../support/helpers.js";
 
 /** No process has this ID: process IDs are far smaller on every supported system. */
 const ENDED_PID = 2 ** 30;
-const HOOK = { matcher: "mcp__cclinic__.*", hooks: [{ type: "command", command: "npx cclinic session-link" }] };
+const HOOK = { matcher: "mcp__luseen__.*", hooks: [{ type: "command", command: "npx luseen session-link" }] };
 const SETTINGS = ".claude/settings.json";
 
 const install = async (root: string) =>
-  (await installSkills({ target: root, out: path.join(root, ".cclinic/sdd"), isForced: false })).find(
+  (await installSkills({ target: root, out: path.join(root, ".luseen/sdd"), isForced: false })).find(
     (entry) => entry.path === SETTINGS,
   )?.status;
 const settings = (root: string) => readFileSync(path.join(root, SETTINGS), "utf8");
@@ -55,11 +55,11 @@ const hookInput = (root: string, sessionId: string) =>
     transcript_path: `/home/me/.claude/projects/p/${sessionId}.jsonl`,
     cwd: root,
     hook_event_name: "PostToolUse",
-    tool_name: "mcp__cclinic__workflow_status",
+    tool_name: "mcp__luseen__workflow_status",
   });
 
 describe(".claude/settings.json", () => {
-  it("TC-MCP-069: adds the hook to a new file, next to other settings and hooks, and leaves a changed cclinic hook", async () => {
+  it("TC-MCP-069: adds the hook to a new file, next to other settings and hooks, and leaves a changed luseen hook", async () => {
     const empty = makeTempFolder();
     expect(await install(empty)).toBe("installed");
     expect(JSON.parse(settings(empty))).toEqual({ hooks: { PostToolUse: [HOOK] } });
@@ -105,20 +105,20 @@ describe(".claude/settings.json", () => {
     expect(JSON.parse(settings(lookalike))).toEqual({ hooks: { PostToolUse: [linker, HOOK] } });
 
     const changed = makeTempFolder();
-    const changedHook = { ...HOOK, hooks: [{ type: "command", command: "node ./cclinic.js session-link" }] };
+    const changedHook = { ...HOOK, hooks: [{ type: "command", command: "node ./luseen.js session-link" }] };
     const mine = JSON.stringify({ hooks: { PostToolUse: [changedHook] } });
     writeProject(changed, { [SETTINGS]: mine });
-    expect(await install(changed)).toBe("skipped: not created by cclinic");
+    expect(await install(changed)).toBe("skipped: not created by luseen");
     expect(settings(changed)).toBe(mine);
   });
 
-  it("TC-MCP-070: a settings file with only cclinic's hook isn't analysed", async () => {
+  it("TC-MCP-070: a settings file with only luseen's hook isn't analysed", async () => {
     const root = makeTempFolder();
     writeProject(root, { "index.ts": "export const a = 1;\n" });
     await install(root);
     const scan = await scanFolder({
       target: root,
-      outFolder: path.join(root, ".cclinic/sdd"),
+      outFolder: path.join(root, ".luseen/sdd"),
       include: [],
       exclude: [],
       maxFileSizeMib: 1,
@@ -127,7 +127,7 @@ describe(".claude/settings.json", () => {
   });
 });
 
-describe("cclinic session-link", () => {
+describe("luseen session-link", () => {
   it("TC-MCP-071: adds each session once, moves its last-seen time, and prints nothing", async () => {
     const root = makeTempFolder();
     const store = await changeForTask(root, 3);
@@ -156,7 +156,7 @@ describe("cclinic session-link", () => {
     for (let round = 0; round < 10; round += 1) {
       const root = makeTempFolder();
       const store = await changeForTask(root, 3);
-      const lock = path.join(root, ".cclinic/workflow/.state.lock");
+      const lock = path.join(root, ".luseen/workflow/.state.lock");
       writeFileSync(lock, JSON.stringify({ pid: ENDED_PID, owner: "gone" }));
       const ids = Array.from({ length: 12 }, (_, index) => `s${index}`);
       await Promise.all(ids.map((id) => link(hookInput(root, id))));
@@ -168,7 +168,7 @@ describe("cclinic session-link", () => {
   it("TC-MCP-071: a lock held for longer than any save takes is replaced, even if its process ID is in use again", async () => {
     const root = makeTempFolder();
     const store = await changeForTask(root, 3);
-    const lock = path.join(root, ".cclinic/workflow/.state.lock");
+    const lock = path.join(root, ".luseen/workflow/.state.lock");
     writeFileSync(lock, JSON.stringify({ pid: process.pid, owner: "long gone" }));
     const old = new Date(Date.now() - STATE_LOCK_STALE_MS - 1_000);
     utimesSync(lock, old, old);
@@ -211,11 +211,11 @@ describe("cclinic session-link", () => {
   it("TC-MCP-071: a lock held by a running process is waited for until the deadline, then given up", async () => {
     const root = makeTempFolder();
     const store = await changeForTask(root, 3);
-    const lock = path.join(root, ".cclinic/workflow/.state.lock");
+    const lock = path.join(root, ".luseen/workflow/.state.lock");
     const holder = JSON.stringify({ pid: process.pid, owner: "someone else" });
     writeFileSync(lock, holder);
     const change = (state: WorkflowState) => linkSession(state, { sessionId: "s1", transcriptPath: "t" }, "now");
-    await expect(store.updateOpen(change, AbortSignal.timeout(50))).rejects.toThrow("Another cclinic process holds");
+    await expect(store.updateOpen(change, AbortSignal.timeout(50))).rejects.toThrow("Another luseen process holds");
     expect((await store.list())[0]?.sessions).toEqual([]);
     expect(readFileSync(lock, "utf8")).toBe(holder);
   });
@@ -245,7 +245,7 @@ describe("cclinic session-link", () => {
     const noChange = makeTempFolder();
     await link(hookInput(noChange, "s1"));
     await link(hookInput(noChange, "s1"), { CLAUDE_PROJECT_DIR: noChange });
-    expect(existsSync(path.join(noChange, ".cclinic"))).toBe(false);
+    expect(existsSync(path.join(noChange, ".luseen"))).toBe(false);
 
     const root = makeTempFolder();
     const store = await changeForTask(root, 3);
@@ -253,7 +253,7 @@ describe("cclinic session-link", () => {
     await link(JSON.stringify({ cwd: root }));
     expect((await store.list())[0]?.sessions).toEqual([]);
 
-    const folder = path.join(root, ".cclinic/workflow");
+    const folder = path.join(root, ".luseen/workflow");
     chmodSync(folder, 0o500);
     try {
       await link(hookInput(root, "s9"));
@@ -267,10 +267,10 @@ describe("cclinic session-link", () => {
   it("TC-MCP-071: a state saved before sessions were recorded is read with none", async () => {
     const root = makeTempFolder();
     const store = await changeForTask(root, 4);
-    const file = path.join(root, ".cclinic/workflow/task-4.json");
+    const file = path.join(root, ".luseen/workflow/task-4.json");
     const older = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
     delete older["sessions"];
-    writeProject(root, { ".cclinic/workflow/task-4.json": JSON.stringify(older) });
+    writeProject(root, { ".luseen/workflow/task-4.json": JSON.stringify(older) });
     expect((await store.list())[0]?.sessions).toEqual([]);
   });
 });

@@ -16,17 +16,17 @@ import { installSkills } from "../../src/adapters/storage/skill-installer.js";
 import { createProjectServer } from "../../src/cli/mcp-command.js";
 import { runClean } from "../../src/cli/other-commands.js";
 import { createReporter } from "../../src/cli/reporter.js";
-import { holdsOnlyCclinicServer, stripCclinicServer } from "../../src/core/mcp-config.js";
+import { holdsOnlyLuseenServer, stripLuseenServer } from "../../src/core/mcp-config.js";
 import { makeTempFolder, writeProject } from "../support/helpers.js";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
 
 const SPEC = "user-login";
 const SPEC_FILES = {
-  [`.cclinic/sdd/specs/${SPEC}/spec.md`]: "# user-login\n\n| FR-AUTH-001 | lock |\n",
-  [`.cclinic/sdd/specs/${SPEC}/validation.md`]: "# validation\n",
-  [`.cclinic/sdd/specs/${SPEC}/verification.md`]: "# verification\n",
-  ".cclinic/sdd/README.md": "# SDD documentation\n\n| [user-login](specs/user-login/spec.md) |\n",
+  [`.luseen/sdd/specs/${SPEC}/spec.md`]: "# user-login\n\n| FR-AUTH-001 | lock |\n",
+  [`.luseen/sdd/specs/${SPEC}/validation.md`]: "# validation\n",
+  [`.luseen/sdd/specs/${SPEC}/verification.md`]: "# verification\n",
+  ".luseen/sdd/README.md": "# SDD documentation\n\n| [user-login](specs/user-login/spec.md) |\n",
 };
 const FINDINGS = { blocking: 0, shouldFix: 1, nit: 0 };
 const context = {
@@ -49,7 +49,7 @@ function makeProject(tasks: readonly (readonly number[])[] = []): string {
   writeProject(root, SPEC_FILES);
   execFileSync("git", ["init", "-q", "-b", "main"], { cwd: root });
   if (tasks.length > 0) {
-    const store = openTaskStore(path.join(root, ".cclinic"), "create");
+    const store = openTaskStore(path.join(root, ".luseen"), "create");
     tasks.forEach((dependsOn, index) =>
       store?.addTask({ title: `T${index + 1}`, spec: SPEC, dependsOn: [...dependsOn] }),
     );
@@ -120,7 +120,7 @@ async function driveTo(call: Awaited<ReturnType<typeof connect>>["call"], step: 
 }
 
 function statusOf(root: string, id: number): string | undefined {
-  const store = openTaskStore(path.join(root, ".cclinic"), "read");
+  const store = openTaskStore(path.join(root, ".luseen"), "read");
   const status = store?.getTask(id)?.status;
   store?.close();
   return status;
@@ -157,18 +157,18 @@ describe("tools and resources", () => {
       ].sort(),
     );
     expect((await client.listResources()).resources.map((resource) => resource.uri).sort()).toEqual([
-      "cclinic://roadmap",
-      "cclinic://specs",
+      "luseen://roadmap",
+      "luseen://specs",
     ]);
     expect((await client.listResourceTemplates()).resourceTemplates.map((item) => item.uriTemplate)).toEqual([
-      "cclinic://specs/{name}",
+      "luseen://specs/{name}",
     ]);
-    const spec = await client.readResource({ uri: `cclinic://specs/${SPEC}` });
+    const spec = await client.readResource({ uri: `luseen://specs/${SPEC}` });
     const text = (spec.contents[0] as { text: string }).text;
     expect(text).toContain("FR-AUTH-001");
     expect(text).toContain("# validation");
     expect(text).toContain("# verification");
-    const roadmap = await client.readResource({ uri: "cclinic://roadmap" });
+    const roadmap = await client.readResource({ uri: "luseen://roadmap" });
     expect((roadmap.contents[0] as { text: string }).text).toBeTypeOf("string");
   });
 
@@ -187,7 +187,7 @@ describe("tools and resources", () => {
 
   it("TC-MCP-015: task tools match the task commands, and task_block records its reason", async () => {
     const root = makeProject([[], [1], [2]]);
-    const store = openTaskStore(path.join(root, ".cclinic"), "update");
+    const store = openTaskStore(path.join(root, ".luseen"), "update");
     store?.setStatus(1, "done");
     store?.close();
     const { call } = await connect(root);
@@ -201,13 +201,13 @@ describe("tools and resources", () => {
     expect(await call("task_block", { id: 3, reason: "waiting on design" })).toMatchObject({
       task: { status: "blocked" },
     });
-    const saved = readFileSync(path.join(root, ".cclinic/workflow/task-2.json"), "utf8");
+    const saved = readFileSync(path.join(root, ".luseen/workflow/task-2.json"), "utf8");
     expect(saved).toContain("waiting on design");
   });
 
   it("TC-MCP-016: task_next returns none when every task is done", async () => {
     const root = makeProject([[]]);
-    const store = openTaskStore(path.join(root, ".cclinic"), "update");
+    const store = openTaskStore(path.join(root, ".luseen"), "update");
     store?.setStatus(1, "done");
     store?.close();
     const { call } = await connect(root);
@@ -217,8 +217,8 @@ describe("tools and resources", () => {
   it("TC-MCP-017: refuses a task a running automated run holds", async () => {
     const root = makeProject([[], []]);
     writeProject(root, {
-      ".cclinic/auto/.lock": JSON.stringify({ pid: process.pid, runId: "R1" }),
-      ".cclinic/auto/R1/run.json": JSON.stringify({ runId: "R1", tasks: [{ taskId: 2, status: "running" }] }),
+      ".luseen/auto/.lock": JSON.stringify({ pid: process.pid, runId: "R1" }),
+      ".luseen/auto/R1/run.json": JSON.stringify({ runId: "R1", tasks: [{ taskId: 2, status: "running" }] }),
     });
     const { call } = await connect(root);
     const reply = await call("task_start", { id: 2 });
@@ -254,14 +254,14 @@ describe("tools and resources", () => {
         tasks: [{ taskId: 1, title: "T1", status: "done", rounds: {}, costUsd: 1, reason: null }],
       });
     writeProject(root, {
-      ".cclinic/auto/20260101-000000/run.json": run("20260101-000000", 1),
-      ".cclinic/auto/20260201-000000/run.json": run("20260201-000000", 2),
+      ".luseen/auto/20260101-000000/run.json": run("20260101-000000", 1),
+      ".luseen/auto/20260201-000000/run.json": run("20260201-000000", 2),
     });
-    const before = readdirSync(path.join(root, ".cclinic/auto"));
+    const before = readdirSync(path.join(root, ".luseen/auto"));
     const { call } = await connect(root);
     expect(await call("auto_status")).toMatchObject({ run: { runId: "20260201-000000", spentUsd: 2 } });
     expect(await call("auto_status", { runId: "20260101-000000" })).toMatchObject({ run: { spentUsd: 1 } });
-    expect(readdirSync(path.join(root, ".cclinic/auto"))).toEqual(before);
+    expect(readdirSync(path.join(root, ".luseen/auto"))).toEqual(before);
   });
 
   it("TC-MCP-021: auto_status says there's no run", async () => {
@@ -315,8 +315,8 @@ describe("steps and gates", () => {
     const { call, asked } = await connect(root, ["approve"]);
     await call("workflow_begin", { changeType: "feature", spec: "new-spec" });
     writeProject(root, {
-      ".cclinic/sdd/specs/new-spec/spec.md": "x",
-      ".cclinic/sdd/specs/new-spec/verification.md": "x",
+      ".luseen/sdd/specs/new-spec/spec.md": "x",
+      ".luseen/sdd/specs/new-spec/verification.md": "x",
     });
     const reply = await call("workflow_advance", { to: "implement" });
     expect(reply).toMatchObject({ isError: true });
@@ -358,7 +358,7 @@ describe("steps and gates", () => {
     await call("task_start", { id: 1 });
     for (let run = 0; run < 3; run += 1) await call("qa_report", { passed: false });
     expect(await call("workflow_resume")).toMatchObject({ isError: false });
-    const ended = JSON.parse(readFileSync(path.join(root, ".cclinic/workflow/task-1.json"), "utf8")) as Record<
+    const ended = JSON.parse(readFileSync(path.join(root, ".luseen/workflow/task-1.json"), "utf8")) as Record<
       string,
       unknown
     >;
@@ -378,7 +378,7 @@ describe("steps and gates", () => {
   it("TC-MCP-032: preview_start runs the start command and records the link", async () => {
     const root = makeProject();
     writeProject(root, {
-      ".cclinic/environment/environment.json": JSON.stringify({
+      ".luseen/environment/environment.json": JSON.stringify({
         version: 1,
         alias: "app",
         parts: [{ name: "cli", type: "cli", start: "node -e \"console.log('built')\"", review: "Run node bin/app.js" }],
@@ -395,7 +395,7 @@ describe("steps and gates", () => {
   it("TC-MCP-033: a failing start command is returned with its output, and approval can still go ahead", async () => {
     const root = makeProject();
     writeProject(root, {
-      ".cclinic/environment/environment.json": JSON.stringify({
+      ".luseen/environment/environment.json": JSON.stringify({
         version: 1,
         alias: "app",
         parts: [
@@ -448,7 +448,7 @@ describe("steps and gates", () => {
     await driveTo(call, "approval");
     await call("workflow_advance", { to: "commit" });
     const done = await call("workflow_advance", { to: "done" });
-    expect(done["message"]).toContain(".cclinic/reviews/");
+    expect(done["message"]).toContain(".luseen/reviews/");
     expect(execFileSync("git", ["rev-list", "--count", "HEAD"], { cwd: root, encoding: "utf8" }).trim()).toBe("1");
   });
 
@@ -490,13 +490,13 @@ describe("approvals", () => {
     expect(await call("workflow_status")).toMatchObject({ change: { step: "spec", decisions: [] } });
   });
 
-  it("TC-MCP-044: without elicitation, the question waits for cclinic approve", async () => {
+  it("TC-MCP-044: without elicitation, the question waits for luseen approve", async () => {
     const root = makeProject();
     const { call } = await connect(root);
     await call("workflow_begin", { changeType: "feature", spec: SPEC });
     const reply = await call("workflow_advance", { to: "implement" });
     expect(reply).toMatchObject({ status: "waiting-for-approval", answers: ["approve", "refine", "review-doc"] });
-    expect(reply["message"]).toContain("cclinic approve");
+    expect(reply["message"]).toContain("luseen approve");
   });
 });
 
@@ -515,7 +515,7 @@ describe("state and safety", () => {
     const { call } = await connect(root, [`refine|use the key ${secret}`]);
     await call("workflow_begin", { changeType: "feature", spec: SPEC });
     await call("workflow_advance", { to: "implement" });
-    const saved = readFileSync(path.join(root, ".cclinic/workflow/branch-main.json"), "utf8");
+    const saved = readFileSync(path.join(root, ".luseen/workflow/branch-main.json"), "utf8");
     expect(saved).toContain("use the key");
     expect(saved).not.toContain(secret);
   });
@@ -529,15 +529,15 @@ describe("state and safety", () => {
     await call("workflow_advance", { to: "done" });
     const after = execFileSync("git", ["status", "--porcelain", "-uall"], { cwd: root, encoding: "utf8" });
     const added = after.split("\n").filter((line) => line !== "" && !before.includes(line));
-    expect(added.every((line) => line.includes(".cclinic/workflow/"))).toBe(true);
+    expect(added.every((line) => line.includes(".luseen/workflow/"))).toBe(true);
   });
 
-  it("TC-MCP-061: cclinic clean keeps the workflow state", async () => {
+  it("TC-MCP-061: luseen clean keeps the workflow state", async () => {
     const root = makeProject();
     const { call } = await connect(root);
     await call("workflow_begin", { changeType: "feature", spec: SPEC });
     await runClean(root, { yes: true }, context);
-    expect(existsSync(path.join(root, ".cclinic/workflow/branch-main.json"))).toBe(true);
+    expect(existsSync(path.join(root, ".luseen/workflow/branch-main.json"))).toBe(true);
   });
 });
 
@@ -565,62 +565,62 @@ describe("gates after rework, QA", () => {
 });
 
 describe(".mcp.json", () => {
-  const ENTRY = { command: "npx", args: ["cclinic", "mcp"] };
+  const ENTRY = { command: "npx", args: ["luseen", "mcp"] };
   const install = (root: string) =>
-    installSkills({ target: root, out: path.join(root, ".cclinic/sdd"), isForced: false });
+    installSkills({ target: root, out: path.join(root, ".luseen/sdd"), isForced: false });
   const config = (root: string) =>
     JSON.parse(readFileSync(path.join(root, ".mcp.json"), "utf8")) as { mcpServers: Record<string, unknown> };
   const statusOfConfig = async (root: string) =>
     (await install(root)).find((entry) => entry.path === ".mcp.json")?.status;
 
-  it("TC-MCP-005: creates .mcp.json with cclinic's server", async () => {
+  it("TC-MCP-005: creates .mcp.json with luseen's server", async () => {
     const root = makeTempFolder();
     expect(await statusOfConfig(root)).toBe("installed");
-    expect(config(root).mcpServers).toEqual({ cclinic: ENTRY });
+    expect(config(root).mcpServers).toEqual({ luseen: ENTRY });
   });
 
   it("TC-MCP-006: keeps every other server", async () => {
     const root = makeTempFolder();
     writeProject(root, { ".mcp.json": JSON.stringify({ mcpServers: { a: { command: "a" }, b: { command: "b" } } }) });
     expect(await statusOfConfig(root)).toBe("updated");
-    expect(config(root).mcpServers).toEqual({ a: { command: "a" }, b: { command: "b" }, cclinic: ENTRY });
+    expect(config(root).mcpServers).toEqual({ a: { command: "a" }, b: { command: "b" }, luseen: ENTRY });
   });
 
-  it("TC-MCP-007: leaves a cclinic entry the user changed, and says so", async () => {
+  it("TC-MCP-007: leaves a luseen entry the user changed, and says so", async () => {
     const root = makeTempFolder();
-    const mine = JSON.stringify({ mcpServers: { cclinic: { command: "node", args: ["my-cclinic"] } } });
+    const mine = JSON.stringify({ mcpServers: { luseen: { command: "node", args: ["my-luseen"] } } });
     writeProject(root, { ".mcp.json": mine });
-    expect(await statusOfConfig(root)).toBe("skipped: not created by cclinic");
+    expect(await statusOfConfig(root)).toBe("skipped: not created by luseen");
     expect(readFileSync(path.join(root, ".mcp.json"), "utf8")).toBe(mine);
   });
 
-  it("TC-MCP-064: the scan leaves out a .mcp.json with only cclinic's entry, and analyses the rest without it", async () => {
+  it("TC-MCP-064: the scan leaves out a .mcp.json with only luseen's entry, and analyses the rest without it", async () => {
     const root = makeTempFolder();
     writeProject(root, { "index.ts": "export const a = 1;\n" });
     await install(root);
     const scan = (target: string) =>
-      scanFolder({ target, outFolder: path.join(target, ".cclinic/sdd"), include: [], exclude: [], maxFileSizeMib: 1 });
+      scanFolder({ target, outFolder: path.join(target, ".luseen/sdd"), include: [], exclude: [], maxFileSizeMib: 1 });
     expect((await scan(root)).included.map((file) => file.path)).not.toContain(".mcp.json");
     const servers = { a: { command: "a" } };
-    writeProject(root, { ".mcp.json": JSON.stringify({ mcpServers: { ...servers, cclinic: ENTRY } }) });
+    writeProject(root, { ".mcp.json": JSON.stringify({ mcpServers: { ...servers, luseen: ENTRY } }) });
     const file = (await scan(root)).included.find((item) => item.path === ".mcp.json");
     if (file === undefined) throw new Error(".mcp.json wasn't scanned");
-    const withCclinic = await createExtractor().extract(file);
+    const withLuseen = await createExtractor().extract(file);
     writeProject(root, { ".mcp.json": JSON.stringify({ mcpServers: servers }) });
     const without = await createExtractor().extract(file);
-    expect(withCclinic.sha256).toBe(without.sha256);
-    expect(JSON.stringify(withCclinic)).not.toContain("cclinic");
+    expect(withLuseen.sha256).toBe(without.sha256);
+    expect(JSON.stringify(withLuseen)).not.toContain("luseen");
   });
 
-  it("TC-MCP-064: analysis leaves out cclinic's own entry", () => {
-    const onlyCclinic = `${JSON.stringify({ mcpServers: { cclinic: ENTRY } }, null, 2)}\n`;
-    expect(holdsOnlyCclinicServer(onlyCclinic)).toBe(true);
-    const withOther = JSON.stringify({ mcpServers: { a: { command: "a" }, cclinic: ENTRY } });
-    expect(holdsOnlyCclinicServer(withOther)).toBe(false);
-    expect(stripCclinicServer(withOther)).toContain('"a"');
-    expect(stripCclinicServer(withOther)).not.toContain("cclinic");
-    expect(stripCclinicServer(withOther)).toBe(
-      stripCclinicServer(JSON.stringify({ mcpServers: { a: { command: "a" } } })),
+  it("TC-MCP-064: analysis leaves out luseen's own entry", () => {
+    const onlyLuseen = `${JSON.stringify({ mcpServers: { luseen: ENTRY } }, null, 2)}\n`;
+    expect(holdsOnlyLuseenServer(onlyLuseen)).toBe(true);
+    const withOther = JSON.stringify({ mcpServers: { a: { command: "a" }, luseen: ENTRY } });
+    expect(holdsOnlyLuseenServer(withOther)).toBe(false);
+    expect(stripLuseenServer(withOther)).toContain('"a"');
+    expect(stripLuseenServer(withOther)).not.toContain("luseen");
+    expect(stripLuseenServer(withOther)).toBe(
+      stripLuseenServer(JSON.stringify({ mcpServers: { a: { command: "a" } } })),
     );
   });
 });
@@ -648,14 +648,14 @@ describe("architecture, QA", () => {
       rmSync(path.join(copy, file));
     }
     expect(check().status).toBe(0);
-    expect(readFileSync(path.join(REPO, ".cclinic/sdd/stack.md"), "utf8")).toMatch(
+    expect(readFileSync(path.join(REPO, ".luseen/sdd/stack.md"), "utf8")).toMatch(
       /@modelcontextprotocol\/sdk \(MIT\).*FR-MCP-006/,
     );
   });
 });
 
 describe("review fixes", () => {
-  it("TC-MCP-038: an answer from cclinic approve is used even when the agent rewords its skip reason", async () => {
+  it("TC-MCP-038: an answer from luseen approve is used even when the agent rewords its skip reason", async () => {
     const root = makeProject();
     const answering = await connect(root, ["approve"]);
     await driveTo(answering.call, "qa");
@@ -679,7 +679,7 @@ describe("review fixes", () => {
     const root = makeProject([[]]);
     const { call } = await connect(root, ["approve", "approve"]);
     await driveTo(call, "approval", 1);
-    const store = openTaskStore(path.join(root, ".cclinic"), "update");
+    const store = openTaskStore(path.join(root, ".luseen"), "update");
     store?.removeTask(1);
     store?.close();
     const reply = await call("workflow_advance", { to: "commit" });
@@ -693,7 +693,7 @@ describe("review fixes", () => {
 
   it("TC-MCP-020: auto_status refuses a damaged run state with a clear message", async () => {
     const root = makeProject();
-    writeProject(root, { ".cclinic/auto/20260101-000000/run.json": "{oops" });
+    writeProject(root, { ".luseen/auto/20260101-000000/run.json": "{oops" });
     const { call } = await connect(root);
     const reply = await call("auto_status");
     expect(reply).toMatchObject({ isError: true });
@@ -734,7 +734,7 @@ describe("approval timeout", () => {
 });
 
 describe("waiting questions", () => {
-  it("TC-MCP-044: an answer given in the host clears the same question waiting for cclinic approve", async () => {
+  it("TC-MCP-044: an answer given in the host clears the same question waiting for luseen approve", async () => {
     const root = makeProject();
     const answering = await connect(root, ["approve"]);
     await driveTo(answering.call, "qa");
@@ -764,17 +764,17 @@ describe("review run 3 fixes", () => {
     const root = makeProject();
     const { call } = await connect(root, ["approve"]);
     await driveTo(call, "qa");
-    expect(readFileSync(path.join(root, ".cclinic/workflow/.gitignore"), "utf8")).toBe("*\n");
+    expect(readFileSync(path.join(root, ".luseen/workflow/.gitignore"), "utf8")).toBe("*\n");
     const status = execFileSync("git", ["status", "--porcelain", "-uall"], { cwd: root, encoding: "utf8" });
-    expect(status).not.toContain(".cclinic/workflow/");
+    expect(status).not.toContain(".luseen/workflow/");
     const handoff = await call("qa_handoff");
-    expect(JSON.stringify(handoff["changedFiles"])).not.toContain(".cclinic/workflow/");
+    expect(JSON.stringify(handoff["changedFiles"])).not.toContain(".luseen/workflow/");
   });
 });
 
 describe("reset and the ignored workflow folder, QA", () => {
   const ENVIRONMENT = {
-    ".cclinic/environment/environment.json": JSON.stringify({
+    ".luseen/environment/environment.json": JSON.stringify({
       version: 1,
       alias: "app",
       parts: [{ name: "cli", type: "cli", start: "node -e \"console.log('built')\"", review: "Run node bin/app.js" }],
@@ -788,8 +788,7 @@ describe("reset and the ignored workflow folder, QA", () => {
       for (const entry of readdirSync(folder, { withFileTypes: true })) {
         const full = path.join(folder, entry.name);
         const relative = path.relative(root, full);
-        if (relative === ".git" || relative === ".cclinic/workflow" || relative.startsWith(".cclinic/tasks.db"))
-          continue;
+        if (relative === ".git" || relative === ".luseen/workflow" || relative.startsWith(".luseen/tasks.db")) continue;
         if (entry.isDirectory()) walk(full);
         else result[relative] = readFileSync(full, "utf8");
       }
@@ -841,23 +840,23 @@ describe("reset and the ignored workflow folder, QA", () => {
 
   it("TC-MCP-067: preview logs and state stay out of git status and qa_handoff, also in an existing folder", async () => {
     const root = makeProject();
-    writeProject(root, { ...ENVIRONMENT, ".cclinic/workflow/notes.txt": "older file\n" });
+    writeProject(root, { ...ENVIRONMENT, ".luseen/workflow/notes.txt": "older file\n" });
     const { call } = await connect(root, ["approve"]);
     await driveTo(call, "preview");
     expect(await call("preview_start")).toMatchObject({ isError: false });
-    expect(readdirSync(path.join(root, ".cclinic/workflow")).some((name) => name.endsWith(".log"))).toBe(true);
-    expect(readFileSync(path.join(root, ".cclinic/workflow/.gitignore"), "utf8")).toBe("*\n");
+    expect(readdirSync(path.join(root, ".luseen/workflow")).some((name) => name.endsWith(".log"))).toBe(true);
+    expect(readFileSync(path.join(root, ".luseen/workflow/.gitignore"), "utf8")).toBe("*\n");
     const status = execFileSync("git", ["status", "--porcelain", "-uall"], { cwd: root, encoding: "utf8" });
-    expect(status).not.toContain(".cclinic/workflow/");
-    expect(JSON.stringify((await call("qa_handoff"))["changedFiles"])).not.toContain(".cclinic/workflow/");
+    expect(status).not.toContain(".luseen/workflow/");
+    expect(JSON.stringify((await call("qa_handoff"))["changedFiles"])).not.toContain(".luseen/workflow/");
   });
 
   it("TC-MCP-067: an existing .gitignore in the workflow folder is left as it is", async () => {
     const root = makeProject();
-    writeProject(root, { ".cclinic/workflow/.gitignore": "*.log\n" });
+    writeProject(root, { ".luseen/workflow/.gitignore": "*.log\n" });
     const { call } = await connect(root);
     await call("workflow_begin", { changeType: "feature", spec: SPEC });
-    expect(readFileSync(path.join(root, ".cclinic/workflow/.gitignore"), "utf8")).toBe("*.log\n");
+    expect(readFileSync(path.join(root, ".luseen/workflow/.gitignore"), "utf8")).toBe("*.log\n");
   });
 
   it("TC-MCP-060: a whole manual change changes no file outside the workflow folder and task database, and runs no git commit or push", async () => {
@@ -910,7 +909,7 @@ describe("preview after a stop", () => {
   it("TC-MCP-068: a stopped change can show a preview, which isn't recorded or counted for G4", async () => {
     const root = makeProject();
     writeProject(root, {
-      ".cclinic/environment/environment.json": JSON.stringify({
+      ".luseen/environment/environment.json": JSON.stringify({
         version: 1,
         alias: "app",
         parts: [{ name: "cli", type: "cli", start: "node -e \"console.log('built')\"", review: "Run node bin/app.js" }],

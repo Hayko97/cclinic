@@ -1,6 +1,7 @@
-/** Names of the files and folders cclinic reads and writes. */
+/** Names of the files and folders luseen reads and writes. */
 
-export const TOOL_FOLDER_NAME = ".cclinic";
+export const PRODUCT_NAME = "luseen";
+export const TOOL_FOLDER_NAME = `.${PRODUCT_NAME}`;
 export const DOCUMENTS_FOLDER_NAME = "sdd";
 export const CACHE_FOLDER_NAME = "cache";
 export const FAILED_FOLDER_NAME = "failed";
@@ -16,20 +17,25 @@ export const REVIEW_CODE_SKILL_NAME = "review-code";
 export const BUILT_IN_REVIEW_SKILL_NAME = "code-review";
 /** Passed explicitly: with no level, the built-in review reuses the last one the user typed, such as max (FR-CREV-008). */
 export const BUILT_IN_REVIEW_LEVEL = "medium";
-export const TEMP_FOLDER_SUFFIX = ".cclinic-tmp-";
-export const BACKUP_FOLDER_SUFFIX = ".cclinic-old-";
+export const TEMP_FOLDER_SUFFIX = ".luseen-tmp-";
+export const BACKUP_FOLDER_SUFFIX = ".luseen-old-";
 
 export const GITIGNORE_FILE = ".gitignore";
-export const CCLINIC_IGNORE_FILE = ".cclinicignore";
+export const LUSEEN_IGNORE_FILE = ".luseenignore";
 export const AGENTS_FILE = "AGENTS.md";
 export const CLAUDE_FILE = "CLAUDE.md";
-/** Root files where cclinic owns a marked section, which is removed before analysis (FR-INSTR-007). */
+/** Root files where luseen owns a marked section, which is removed before analysis (FR-INSTR-007). */
 export const MANAGED_INSTRUCTION_FILES: readonly string[] = [AGENTS_FILE, CLAUDE_FILE];
 export const SKILL_FILE = "SKILL.md";
 export const SKILL_FOLDERS = [".agents/skills", ".claude/skills"] as const;
 
+/** The names Luseen had as cclinic, read only to move a project or a user's settings over (FR-CLI-033 to FR-CLI-037). */
+export const LEGACY_NAME = "cclinic";
+export const LEGACY_TOOL_FOLDER_NAME = `.${LEGACY_NAME}`;
+export const LEGACY_IGNORE_FILE = `.${LEGACY_NAME}ignore`;
+
 export const USER_CONFIG_BASE_FOLDER = ".config";
-export const USER_CONFIG_FOLDER = "cclinic";
+export const USER_CONFIG_FOLDER = PRODUCT_NAME;
 export const USER_CONFIG_FILE = "config.json";
 /** FR-AUTO-041: the newest Claude plan limits, next to the saved model. */
 export const LIMITS_FILE = "limits.json";

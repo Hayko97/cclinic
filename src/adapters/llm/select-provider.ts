@@ -18,7 +18,7 @@ export type ProviderChoice = (typeof PROVIDER_CHOICES)[number];
 export const SETUP_INSTRUCTIONS = `To set up a provider, do one of these:
   - Install Claude Code and log in: claude auth login
   - Set an Anthropic API key: export ANTHROPIC_API_KEY=<your key>
-Run "cclinic doctor" to check your setup.`;
+Run "luseen doctor" to check your setup.`;
 
 function runClaude(
   args: readonly string[],

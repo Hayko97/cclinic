@@ -4,7 +4,7 @@ reports/
 .stryker-tmp/
 test/fixtures/
 package-lock.json
-.cclinic/
+.luseen/
 .agents/
 .claude/
 AGENTS.md

@@ -177,7 +177,7 @@ describe("workflow", () => {
     const atCommit = { ...atReview(), step: "commit" as const };
     const yes = applyAnswer(atCommit, "G6", "yes", NO_NOTES);
     expect(stateOf(yes)).toMatchObject({ status: "done", isCommitted: true });
-    expect("message" in yes && yes.message).toMatch(/\.cclinic\/reviews\//);
+    expect("message" in yes && yes.message).toMatch(/\.luseen\/reviews\//);
     expect(stateOf(applyAnswer(atCommit, "G6", "no", NO_NOTES))).toMatchObject({ status: "done", isCommitted: false });
   });
 

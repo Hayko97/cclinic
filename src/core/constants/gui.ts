@@ -11,9 +11,9 @@ export const GUI_MAX_PORT = 65_535;
 export const HTTP_DEFAULT_PORT = 80;
 /** FR-GUI-003: 32 random bytes, well above the 128 bits required. */
 export const GUI_TOKEN_BYTES = 32;
-export const GUI_TOKEN_HEADER = "x-cclinic-token";
+export const GUI_TOKEN_HEADER = "x-luseen-token";
 export const GUI_TOKEN_QUERY = "token";
-export const GUI_COOKIE_PREFIX = "cclinic_token_";
+export const GUI_COOKIE_PREFIX = "luseen_token_";
 
 /** FR-GUI-083: a plan-limit window at this share or more is marked, so a limit coming up is seen in time. */
 export const LIMIT_HIGH_USE = 0.8;
@@ -80,7 +80,7 @@ export const HTTP_STATUS = {
 
 /** FR-GUI-033, FR-GUI-034: a job's newest output lines kept, and the wait between SIGINT and SIGTERM. */
 export const JOB_OUTPUT_MAX_LINES = 5_000;
-/** Longer than the child's own clean stop, so SIGTERM only ends a job that hangs: to cclinic it's a second signal. */
+/** Longer than the child's own clean stop, so SIGTERM only ends a job that hangs: to luseen it's a second signal. */
 export const JOB_CANCEL_GRACE_MS = SHUTDOWN_TIMEOUT_MS + 1_000;
 /** FR-GUI-004: how long the platform's opener may take before the GUI just prints the link. */
 export const BROWSER_OPEN_TIMEOUT_MS = 10_000;
@@ -100,7 +100,7 @@ export const TRANSCRIPT_FOLD_LINES = 20;
 /** A transcript shows at most its newest entries, and each entry's text is cut to this length. */
 export const TRANSCRIPT_MAX_ENTRIES = 2_000;
 export const TRANSCRIPT_MAX_TEXT_CHARS = 4_000;
-/** Claude Code's own session IDs are UUIDs; this also allows any ID cclinic records, and nothing path-like. */
+/** Claude Code's own session IDs are UUIDs; this also allows any ID luseen records, and nothing path-like. */
 export const SESSION_ID_PATTERN = "[A-Za-z0-9][A-Za-z0-9_-]{0,99}";
 
 /** FR-GUI-073, FR-GUI-074: the saved canvas layout, and the automatic one's sizes in canvas pixels. */
