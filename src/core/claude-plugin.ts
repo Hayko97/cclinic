@@ -21,12 +21,11 @@ import {
   PLUGIN_TOOL_PREFIX,
   PACKAGE_RUNNER,
   PACKAGE_RUNNER_YES_FLAG,
-  PROJECT_DIR_VARIABLE,
   PM_AGENT_NAME,
   PM_AGENT_PLAN_TOOL_NAMES,
 } from "./constants/plugin.js";
 import { JSON_INDENT } from "./constants/terminal.js";
-import { MCP_COMMAND, MCP_SERVER_NAME, PROJECT_DIR_OPTION, SESSION_LINK_COMMAND } from "./constants/workflow.js";
+import { MCP_COMMAND, MCP_SERVER_NAME, SESSION_LINK_COMMAND } from "./constants/workflow.js";
 import { AGENT_SKILLS, renderSkill, type AgentSkill } from "./agent-skills.js";
 
 export const packageInfoSchema = z.object({
@@ -164,7 +163,7 @@ export function renderClaudePlugin(info: PackageInfo, hash: (text: string) => st
       mcpServers: {
         [MCP_SERVER_NAME]: {
           command: runner,
-          args: [...runnerArgs, MCP_COMMAND, PROJECT_DIR_OPTION, PROJECT_DIR_VARIABLE],
+          args: [...runnerArgs, MCP_COMMAND],
         },
       },
     }),
@@ -176,7 +175,7 @@ export function renderClaudePlugin(info: PackageInfo, hash: (text: string) => st
         PostToolUse: [
           {
             matcher: `${PLUGIN_TOOL_PREFIX}.*`,
-            hooks: [{ type: "command", command: [...pinnedRun(info), SESSION_LINK_COMMAND].join(" ") }],
+            hooks: [{ type: "command", command: runner, args: [...runnerArgs, SESSION_LINK_COMMAND] }],
           },
         ],
       },

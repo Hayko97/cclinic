@@ -12,7 +12,7 @@ repository root
 └── plugins/luseen/
     ├── .claude-plugin/plugin.json       name, version = package.json's
     ├── .claude-plugin/icon.png          the logo, from assets/luseen-icon.png
-    ├── .mcp.json                        npx -y luseen@<version> mcp -C ${CLAUDE_PROJECT_DIR}
+    ├── .mcp.json                        npx -y luseen@<version> mcp (runs in the user's project)
     ├── hooks/hooks.json                 PostToolUse → npx -y luseen@<version> session-link
     ├── skills/<9 agent skills>/SKILL.md
     ├── skills/{init,plan,status,gui}/SKILL.md     /luseen:init … /luseen:gui
@@ -37,8 +37,8 @@ Publishing (npm publish, pushing the repository, submitting to Anthropic's direc
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-PLUG-004 | `plugins/luseen/.mcp.json` must declare one server, `luseen`, with command `npx` and arguments `-y`, `luseen@<version>`, `mcp`, `-C`, `${CLAUDE_PROJECT_DIR}`, where `<version>` is `package.json`'s `version`. | confirmed | `src/core/claude-plugin.ts:156-163`, `plugins/luseen/.mcp.json`, `test/integration/claude-plugin.test.ts` TC-PLUG-004 |
-| FR-PLUG-005 | `plugins/luseen/hooks/hooks.json` must hold one `PostToolUse` hook whose matcher is `mcp__plugin_luseen_luseen__.*` and whose command is `npx -y luseen@<version> session-link`. | confirmed | `src/core/claude-plugin.ts:164-177`, `src/core/constants/plugin.ts` `PLUGIN_TOOL_PREFIX`, `test/integration/claude-plugin.test.ts` TC-PLUG-005 |
+| FR-PLUG-004 | `plugins/luseen/.mcp.json` must declare one server, `luseen`, with command `npx` and arguments `-y`, `luseen@<version>` and `mcp`, where `<version>` is `package.json`'s `version`. It must name no variable, because the plugin directory refuses a command whose path it can't follow; Claude Code starts a plugin's server in the user's project folder, which `luseen mcp` serves by default. | confirmed | `src/core/claude-plugin.ts:162-170`, `plugins/luseen/.mcp.json`, claude.ai directory validation 2026-11-16, `test/integration/claude-plugin.test.ts` TC-PLUG-004 |
+| FR-PLUG-005 | `plugins/luseen/hooks/hooks.json` must hold one `PostToolUse` hook whose matcher is `mcp__plugin_luseen_luseen__.*` and whose command is `npx` with the arguments `-y`, `luseen@<version>` and `session-link`, each a plain word, as the plugin directory asks. | confirmed | `src/core/claude-plugin.ts:164-177`, `src/core/constants/plugin.ts` `PLUGIN_TOOL_PREFIX`, `test/integration/claude-plugin.test.ts` TC-PLUG-005 |
 | FR-PLUG-006 | `luseen session-link`, and everything that reads a tool name the hook reports (mcp-server FR-MCP-045, roadmap-planning FR-PLAN-044), must treat `mcp__plugin_luseen_luseen__<tool>` exactly as `mcp__luseen__<tool>`. | confirmed | `src/core/planning.ts:725-742`, `src/cli/mcp-command.ts` `linkFromHook`, `src/core/planning.test.ts` TC-PLUG-007, `test/e2e/plugin.test.ts` TC-PLUG-006 |
 | FR-PLUG-007 | When the project has no `.luseen/sdd`, `luseen mcp` must start anyway and offer only `workflow_status`, which must answer that the project isn't set up and that `/luseen:init` sets it up. This replaces mcp-server FR-MCP-003's exit 2, so the plugin's server starts in every project. | confirmed | `src/cli/mcp-command.ts:136-144`, `src/application/workflow-tools.ts:524`, `test/e2e/plugin.test.ts` TC-PLUG-008, TC-PLUG-009 |
 

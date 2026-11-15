@@ -22,8 +22,6 @@ export const PM_AGENT_NAME = "pm";
 /** The plugin runs the package with npx, without asking to install it (FR-PLUG-004). */
 export const PACKAGE_RUNNER = "npx";
 export const PACKAGE_RUNNER_YES_FLAG = "-y";
-/** Claude Code fills this in with the project folder in a plugin MCP server's arguments. */
-export const PROJECT_DIR_VARIABLE = "${CLAUDE_PROJECT_DIR}";
 /** The plugin serves every project, so its skills name the default documents folder. */
 export const PLUGIN_DOCS_PATH = `${TOOL_FOLDER_NAME}/${DOCUMENTS_FOLDER_NAME}`;
 /** Claude Code names a plugin's MCP tools `mcp__plugin_<plugin>_<server>__<tool>` (FR-PLUG-005, FR-PLUG-006). */

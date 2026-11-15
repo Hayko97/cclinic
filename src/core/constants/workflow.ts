@@ -17,8 +17,6 @@ export const PREVIEW_OUTPUT_MAX_CHARS = 4_000;
 export const MCP_SERVER_NAME = PRODUCT_NAME;
 export const MCP_CONFIG_FILE = ".mcp.json";
 export const MCP_COMMAND = "mcp";
-/** The option that names the project folder, on `luseen mcp` and other commands. */
-export const PROJECT_DIR_OPTION = "-C";
 /** FR-MCP-004: the entry Claude Code reads from `.mcp.json`. */
 export const MCP_SERVER_ENTRY = { command: "npx", args: [PRODUCT_NAME, MCP_COMMAND] } as const;
 /** FR-MCP-044: Claude Code's project settings, where the hook that links sessions to changes goes. */

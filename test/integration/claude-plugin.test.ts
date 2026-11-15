@@ -69,19 +69,19 @@ describe("marketplace and manifest", () => {
 describe("what the plugin runs", () => {
   it("TC-PLUG-004: one MCP server, luseen, runs the pinned package in the project folder", () => {
     expect(JSON.parse(read(".mcp.json"))).toEqual({
-      mcpServers: { luseen: { command: "npx", args: ["-y", PINNED, "mcp", "-C", "${CLAUDE_PROJECT_DIR}"] } },
+      mcpServers: { luseen: { command: "npx", args: ["-y", PINNED, "mcp"] } },
     });
   });
 
   it("TC-PLUG-005: one PostToolUse hook matches only the plugin's luseen tools", () => {
     const hooks = JSON.parse(read("hooks/hooks.json")) as {
-      hooks: Record<string, { matcher: string; hooks: { type: string; command: string }[] }[]>;
+      hooks: Record<string, { matcher: string; hooks: { type: string; command: string; args: string[] }[] }[]>;
     };
     expect(Object.keys(hooks.hooks)).toEqual(["PostToolUse"]);
     const [entry] = hooks.hooks["PostToolUse"] ?? [];
     expect(hooks.hooks["PostToolUse"]).toHaveLength(1);
     expect(entry?.matcher).toBe("mcp__plugin_luseen_luseen__.*");
-    expect(entry?.hooks).toEqual([{ type: "command", command: `npx -y ${PINNED} session-link` }]);
+    expect(entry?.hooks).toEqual([{ type: "command", command: "npx", args: ["-y", PINNED, "session-link"] }]);
     const matcher = new RegExp(`^${entry?.matcher ?? ""}$`);
     expect(matcher.test("mcp__plugin_luseen_luseen__workflow_status")).toBe(true);
     expect(matcher.test("mcp__luseen__workflow_status")).toBe(false);
