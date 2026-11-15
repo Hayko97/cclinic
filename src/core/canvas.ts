@@ -496,9 +496,9 @@ const lineSchema = z.looseObject({
   message: z.looseObject({ content: z.union([z.string(), z.array(blockSchema)]) }).optional(),
 });
 
-function shown(text: string): string {
+function shown(text: string, maxChars: number = TRANSCRIPT_MAX_TEXT_CHARS): string {
   const clean = redact(text).text;
-  return clean.length > TRANSCRIPT_MAX_TEXT_CHARS ? `${clean.slice(0, TRANSCRIPT_MAX_TEXT_CHARS)}…` : clean;
+  return clean.length > maxChars ? `${clean.slice(0, maxChars)}…` : clean;
 }
 
 function resultText(content: unknown): string {
@@ -510,8 +510,14 @@ function resultText(content: unknown): string {
     .join("\n");
 }
 
-/** FR-GUI-040, FR-GUI-043: one transcript line's messages and tool calls, or that it was skipped. */
-export function parseTranscriptLine(line: string): {
+/**
+ * FR-GUI-040, FR-GUI-043: one transcript line's messages and tool calls, or that it was skipped. Each text is cut at
+ * `maxChars`; a planning conversation passes a larger cap, so a whole reply is shown (FR-PLAN-037).
+ */
+export function parseTranscriptLine(
+  line: string,
+  maxChars: number = TRANSCRIPT_MAX_TEXT_CHARS,
+): {
   readonly entries: TranscriptEntry[];
   readonly isSkipped: boolean;
 } {
@@ -528,14 +534,16 @@ export function parseTranscriptLine(line: string): {
   if ((type !== "user" && type !== "assistant") || message === undefined) return { entries: [], isSkipped: true };
   const at = timestamp ?? null;
   if (typeof message.content === "string")
-    return { entries: [{ kind: type, text: shown(message.content), tool: null, at }], isSkipped: false };
+    return { entries: [{ kind: type, text: shown(message.content, maxChars), tool: null, at }], isSkipped: false };
   const entries = message.content.flatMap((block): TranscriptEntry[] => {
     if (block.type === "text" && block.text !== undefined)
-      return [{ kind: type, text: shown(block.text), tool: null, at }];
+      return [{ kind: type, text: shown(block.text, maxChars), tool: null, at }];
     if (block.type === "tool_use")
-      return [{ kind: "tool-call", text: shown(JSON.stringify(block.input ?? {})), tool: block.name ?? null, at }];
+      return [
+        { kind: "tool-call", text: shown(JSON.stringify(block.input ?? {}), maxChars), tool: block.name ?? null, at },
+      ];
     if (block.type === "tool_result")
-      return [{ kind: "tool-result", text: shown(resultText(block.content)), tool: null, at }];
+      return [{ kind: "tool-result", text: shown(resultText(block.content), maxChars), tool: null, at }];
     // Thinking and other blocks aren't part of what the user reads.
     return [];
   });

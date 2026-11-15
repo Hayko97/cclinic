@@ -127,7 +127,7 @@ function statusOf(root: string, id: number): string | undefined {
 }
 
 describe("tools and resources", () => {
-  it("TC-MCP-010: offers exactly the 17 tools and 3 resources, and reads a spec", async () => {
+  it("TC-MCP-010, TC-MCP-073: offers exactly the 22 tools and 3 resources, and reads a spec", async () => {
     const { client } = await connect(makeProject());
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual(
@@ -149,6 +149,11 @@ describe("tools and resources", () => {
         "review_report",
         "preview_start",
         "auto_status",
+        "plan_begin",
+        "plan_resume",
+        "plan_status",
+        "plan_suggest",
+        "plan_propose",
       ].sort(),
     );
     expect((await client.listResources()).resources.map((resource) => resource.uri).sort()).toEqual([

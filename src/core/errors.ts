@@ -20,6 +20,16 @@ export class ValidationFailedError extends CclinicError {
 export class CancelledError extends CclinicError {}
 /** Exits like a Claude failure, but re-running starts this step again rather than continuing it. */
 export class EnvironmentStepError extends CclinicError {}
+/** A planning session approved or cancelled elsewhere, so it takes no more turns (FR-PLAN-032). */
+export class SessionClosedError extends UsageError {
+  constructor(
+    readonly id: string,
+    readonly status: string,
+    readonly outcome: string | null,
+  ) {
+    super(`Planning session ${id} was ${status} elsewhere.${outcome === null ? "" : ` ${outcome}`}`);
+  }
+}
 /** A PM, developer or QA session stopped at a limit or on unusable replies. Re-running starts it again. */
 export class AgentSessionError extends CclinicError {}
 

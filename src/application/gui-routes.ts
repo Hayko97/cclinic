@@ -1,13 +1,16 @@
 /** Answers each request to the local GUI: access first, then the route (spec: gui). */
-import { HTTP_STATUS } from "../core/constants/gui.js";
+import { GUI_MAX_UPLOAD_BODY_BYTES, HTTP_STATUS } from "../core/constants/gui.js";
 import { UsageError } from "../core/errors.js";
 import {
   checkAccess,
   jobRequestSchema,
   matchRoute,
-  planAnswerSchema,
+  planDecisionSchema,
+  planMessageSchema,
+  planOpenSchema,
   planRequestSchema,
-  planReviewSchema,
+  planUploadCheckSchema,
+  planUploadSchema,
   SECURITY_HEADERS,
   tokenCookie,
   type GuiRequest,
@@ -31,6 +34,7 @@ import { PROVIDER_CHOICES } from "../core/constants/llm.js";
 import { ENVIRONMENT_MAX_BUDGET_USD } from "../core/constants/environment.js";
 import type { RunFiles } from "../core/automation.js";
 import { answerChange, type AnswerPorts } from "./gui-answers.js";
+import { attachmentProblem } from "../core/planning.js";
 import type { Planner } from "./gui-planning.js";
 import type { Jobs } from "./gui-jobs.js";
 import { askAuto } from "./gui-auto.js";
@@ -54,7 +58,7 @@ export interface GuiPorts {
   readonly canvas: CanvasPorts;
   /** FR-GUI-038: the changes' saved states, to answer a waiting question. */
   readonly answers: AnswerPorts;
-  /** FR-GUI-023: the one planning session with the PM. */
+  /** FR-GUI-023, FR-PLAN-033: the planning session open in the Plan panel. */
   readonly planner: Planner;
   /** FR-GUI-032: a run's report and logs, or undefined when there's no such run. */
   readonly readRunFiles: (runId: string) => Promise<RunFiles | undefined>;
@@ -109,6 +113,14 @@ async function refusedAsConflict(
     if (error instanceof UsageError) return json(HTTP_STATUS.conflict, { error: error.message });
     throw error;
   }
+}
+
+/** FR-PLAN-033: a change to the Plan panel, answered with the panel as it is then, or what was refused. */
+function planChange(ports: GuiPorts, change: () => void | Promise<void>): Promise<GuiResponse> {
+  return refusedAsConflict(async () => {
+    await change();
+    return { status: HTTP_STATUS.ok, data: { plan: await ports.planner.view() } };
+  });
 }
 
 /**
@@ -280,45 +292,83 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
       case "stop-run":
         return stopRun(ports);
       case "plan":
-        return json(HTTP_STATUS.ok, { plan: ports.planner.current() });
+        return json(HTTP_STATUS.ok, { plan: await ports.planner.view() });
       case "plan-events":
         return {
           kind: "events",
           headers: SECURITY_HEADERS,
-          open: (send) => {
-            send("plan", { plan: ports.planner.current() });
-            return ports.planner.subscribe((plan) => {
-              send("plan", { plan });
-            });
-          },
+          open: (send) => ports.planner.stream(send),
         };
       case "plan-start": {
         // FR-GUI-023: a value `cclinic plan` would refuse is named in its own words.
         const parsed = planRequestSchema.safeParse(await request.readBody());
         if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
         const plan = parsed.data;
+        return refusedAsConflict(async () => {
+          await ports.planner.start(plan);
+          return { status: HTTP_STATUS.created, data: { plan: await ports.planner.view() } };
+        });
+      }
+      case "plan-open": {
+        const parsed = planOpenSchema.safeParse(await request.readBody());
+        if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
+        const { planId, ...options } = parsed.data;
+        return planChange(ports, () => ports.planner.open(planId, options));
+      }
+      case "plan-new":
+        return planChange(ports, () => ports.planner.newSession());
+      case "plan-message": {
+        const parsed = planMessageSchema.safeParse(await request.readBody());
+        if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
+        const message = parsed.data;
+        return planChange(ports, () => ports.planner.send(message));
+      }
+      case "plan-propose":
+        return planChange(ports, () => ports.planner.proposeNow());
+      case "plan-stop":
+        return planChange(ports, () => {
+          ports.planner.stop();
+        });
+      case "plan-retry":
+        return planChange(ports, () => ports.planner.retry());
+      case "plan-approve":
+      case "plan-cancel": {
+        const parsed = planDecisionSchema.safeParse(await request.readBody());
+        if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
+        const { planId } = parsed.data;
+        return refusedAsConflict(async () => {
+          const message =
+            route.name === "plan-approve" ? await ports.planner.approve(planId) : await ports.planner.cancel(planId);
+          return { status: HTTP_STATUS.ok, data: { message, plan: await ports.planner.view() } };
+        });
+      }
+      case "plan-upload": {
+        const parsed = planUploadSchema.safeParse(await request.readBody(GUI_MAX_UPLOAD_BODY_BYTES));
+        if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
+        const { name, contentBase64, pageId } = parsed.data;
         return refusedAsConflict(async () => ({
           status: HTTP_STATUS.created,
-          data: { plan: await ports.planner.start(plan) },
+          data: { upload: await ports.planner.upload(name, contentBase64, pageId) },
         }));
       }
-      case "plan-answer": {
-        const parsed = planAnswerSchema.safeParse(await request.readBody());
+      case "plan-upload-check": {
+        const parsed = planUploadCheckSchema.safeParse(await request.readBody());
         if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
-        const { text } = parsed.data;
-        return refusedAsConflict(() => ({ status: HTTP_STATUS.ok, data: { plan: ports.planner.answer(text) } }));
+        return json(HTTP_STATUS.ok, { problem: attachmentProblem(parsed.data) ?? null });
       }
-      case "plan-review": {
-        const parsed = planReviewSchema.safeParse(await request.readBody());
-        if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
-        const { choice, feedback } = parsed.data;
-        return refusedAsConflict(() => ({
+      case "plan-attachment": {
+        const found = await ports.planner.attachment(route.planId, route.file);
+        if (found === undefined) return json(HTTP_STATUS.notFound, NOT_FOUND);
+        return {
+          kind: "body",
           status: HTTP_STATUS.ok,
-          data: { plan: ports.planner.review(choice, feedback) },
-        }));
+          headers: { ...SECURITY_HEADERS, "content-type": found.contentType },
+          body: found.bytes,
+        };
       }
-      case "plan-cancel":
-        return refusedAsConflict(() => ({ status: HTTP_STATUS.ok, data: { plan: ports.planner.cancel() } }));
+      case "plan-remove-upload":
+        await ports.planner.removeUpload(route.id);
+        return json(HTTP_STATUS.ok, { removed: route.id });
       case "cancel-job": {
         const outcome = ports.jobs.cancel(route.id);
         if (outcome === "unknown") return json(HTTP_STATUS.notFound, NOT_FOUND);

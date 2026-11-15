@@ -20,7 +20,7 @@ import {
 import { runEnvironmentCommand, type EnvironmentCommandOptions } from "./environment-command.js";
 import { runGenerate, type CommandContext, type GenerateOptions } from "./generate-command.js";
 import { commandHelp, GUIDE_TEXT, HELP_HOW_IT_WORKS } from "./guide.js";
-import { collect, integerInRange, oneOf, positiveId, positiveNumber } from "./options.js";
+import { collect, integerInRange, oneOf, planId, positiveId, positiveNumber } from "./options.js";
 import {
   runClean,
   runDoctor,
@@ -205,10 +205,24 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .option("-C, --dir <path>", "project folder (default: the current folder)")
     .option("--roadmap <id>", "extend this roadmap, or with --task, add the task to it", positiveId)
     .option("--task", "plan one concrete task instead of a roadmap")
+    .addOption(
+      new Option("--attach <path>", "attach an image or document to your first message. Repeatable")
+        .argParser(collect)
+        .default([], "none"),
+    )
+    .option("--resume [id]", "continue a planning session. With no ID, lists them", planId)
     .option("-m, --model [value]", "model to use. With no value, opens a menu")
     .option("--effort [value]", "reasoning level. With no value, opens a menu")
     .option(...limitOption("--timeout-minutes <n>", "time limit for each PM turn", LIMITS.timeoutMinutes))
-    .addHelpText("after", commandHelp("cclinic plan", "cclinic plan --task --roadmap 1"))
+    .addHelpText(
+      "after",
+      commandHelp(
+        "cclinic plan",
+        "cclinic plan --task --roadmap 1",
+        "cclinic plan --attach brief.pdf",
+        "cclinic plan --resume plan-3",
+      ),
+    )
     .action(async (options: PlanOptions) => {
       await runPlanCommand(options, context);
     });
@@ -239,6 +253,7 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     )
     .option("--run <id>", "with --approver pm-agent: the automated run")
     .option("--task <id>", "with --approver pm-agent: the task", positiveId)
+    .option("--plan <id>", "serve only the planning tools of this planning session, for a PM turn cclinic runs", planId)
     .addHelpText("after", commandHelp("cclinic mcp", "cclinic mcp -C ./my-project"))
     .action(async (options: McpOptions) => {
       await runMcpCommand(options, context);

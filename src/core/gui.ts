@@ -6,6 +6,7 @@ import {
   GUI_COOKIE_PREFIX,
   GUI_HOST_NAMES,
   GUI_MAX_DEPENDENCIES,
+  GUI_MAX_UPLOAD_NAME_CHARS,
   GUI_MAX_PATTERN_LENGTH,
   GUI_MAX_PATTERNS,
   GUI_TOKEN_HEADER,
@@ -15,7 +16,14 @@ import {
   SESSION_ID_PATTERN,
   TRANSCRIPT_MAX_TEXT_CHARS,
 } from "./constants/gui.js";
-import { AUTO_LIMITS, RUN_ID_SOURCE } from "./constants/agents.js";
+import {
+  ATTACHMENT_LIMITS,
+  AUTO_LIMITS,
+  PLAN_ID_PATTERN,
+  PLAN_ID_SOURCE,
+  PLAN_LIMITS,
+  RUN_ID_SOURCE,
+} from "./constants/agents.js";
 import { LIMITS } from "./constants/limits.js";
 import { PROVIDER_CHOICES } from "./constants/llm.js";
 import { parseEffort, parseModel } from "./models.js";
@@ -28,6 +36,17 @@ import {
   wholeNumberRule,
 } from "./option-rules.js";
 import { EXIT_CODES } from "./errors.js";
+import type { TranscriptEntry } from "./canvas.js";
+import {
+  activityOf,
+  ANSWER_LAST_MESSAGE,
+  repeatedMessageOf,
+  isPlanningNote,
+  sourceSchema,
+  sourcesSchema,
+  suggestionsSchema,
+  userPartOf,
+} from "./planning.js";
 import { idSchema, specNameSchema, TASK_LIMITS, textSchema, titleSchema } from "./tasks.js";
 
 export interface GuiRequest {
@@ -36,7 +55,7 @@ export interface GuiRequest {
   readonly query: Readonly<Record<string, string>>;
   readonly headers: Readonly<Record<string, string | undefined>>;
   /** Read only once access is allowed and the route needs it, so a refused request costs nothing (FR-GUI-008). */
-  readonly readBody: () => Promise<unknown>;
+  readonly readBody: (maxBytes?: number) => Promise<unknown>;
 }
 
 /** Sends one Server-Sent Event. */
@@ -47,7 +66,8 @@ export type GuiResponse =
       readonly kind: "body";
       readonly status: number;
       readonly headers: Readonly<Record<string, string>>;
-      readonly body: string;
+      /** Text, or a file's bytes, such as an attached image (FR-PLAN-037). */
+      readonly body: string | Uint8Array;
     }
   | {
       readonly kind: "events";
@@ -148,11 +168,39 @@ export type Route =
   | { readonly name: "plan" }
   | { readonly name: "plan-events" }
   | { readonly name: "plan-start" }
-  | { readonly name: "plan-answer" }
-  | { readonly name: "plan-review" }
-  | { readonly name: "plan-cancel" };
+  | { readonly name: "plan-open" }
+  | { readonly name: "plan-new" }
+  | { readonly name: "plan-message" }
+  | { readonly name: "plan-propose" }
+  | { readonly name: "plan-stop" }
+  | { readonly name: "plan-retry" }
+  | { readonly name: "plan-approve" }
+  | { readonly name: "plan-cancel" }
+  | { readonly name: "plan-upload" }
+  | { readonly name: "plan-upload-check" }
+  | { readonly name: "plan-remove-upload"; readonly id: string }
+  | { readonly name: "plan-attachment"; readonly planId: string; readonly file: string };
 
 const ASSET_FILES: ReadonlySet<string> = new Set(GUI_ASSETS.files);
+/** A file's name with nothing that could leave its folder: no separators, and not "." or "..". */
+export function isPlainFileName(name: string): boolean {
+  return name !== "" && name !== "." && name !== ".." && !/[/\\\0]/.test(name);
+}
+
+/** FR-PLAN-037: the type an attached image is served with, by its extension. */
+export const IMAGE_CONTENT_TYPES: Readonly<Record<string, string>> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+};
+
+/** A file uploaded for the next planning message (FR-PLAN-033): its prefix, then random bytes as hex. */
+export const UPLOAD_ID_PREFIX = "upload-";
+export const UPLOAD_ID_BYTES = 8;
+const HEX_DIGITS_PER_BYTE = 2;
+export const UPLOAD_ID_SOURCE = `${UPLOAD_ID_PREFIX}[0-9a-f]{${UPLOAD_ID_BYTES * HEX_DIGITS_PER_BYTE}}`;
 const JOB_PATH = "/api/jobs/(job-[1-9][0-9]{0,5})";
 const SESSION_PATH = `/api/sessions/(${SESSION_ID_PATTERN})`;
 /** A change's key (FR-MCP-038). It's only looked up among the saved states, never used as a path. */
@@ -190,9 +238,38 @@ const ROUTES: readonly {
   { method: "GET", pattern: /^\/api\/plan$/, route: () => ({ name: "plan" }) },
   { method: "GET", pattern: /^\/api\/plan\/events$/, route: () => ({ name: "plan-events" }) },
   { method: "POST", pattern: /^\/api\/plan$/, route: () => ({ name: "plan-start" }) },
-  { method: "POST", pattern: /^\/api\/plan\/answer$/, route: () => ({ name: "plan-answer" }) },
-  { method: "POST", pattern: /^\/api\/plan\/review$/, route: () => ({ name: "plan-review" }) },
+  { method: "POST", pattern: /^\/api\/plan\/open$/, route: () => ({ name: "plan-open" }) },
+  { method: "POST", pattern: /^\/api\/plan\/new$/, route: () => ({ name: "plan-new" }) },
+  { method: "POST", pattern: /^\/api\/plan\/message$/, route: () => ({ name: "plan-message" }) },
+  { method: "POST", pattern: /^\/api\/plan\/propose$/, route: () => ({ name: "plan-propose" }) },
+  { method: "POST", pattern: /^\/api\/plan\/stop$/, route: () => ({ name: "plan-stop" }) },
+  { method: "POST", pattern: /^\/api\/plan\/retry$/, route: () => ({ name: "plan-retry" }) },
+  { method: "POST", pattern: /^\/api\/plan\/approve$/, route: () => ({ name: "plan-approve" }) },
   { method: "POST", pattern: /^\/api\/plan\/cancel$/, route: () => ({ name: "plan-cancel" }) },
+  // FR-PLAN-037: an image a session's message has, by its stored file name, for its thumbnail.
+  {
+    method: "GET",
+    pattern: new RegExp(`^/api/plan/sessions/(${PLAN_ID_SOURCE}/attachments/[^/]{1,255})$`),
+    route: (parameter) => {
+      const [planId = "", , encoded = ""] = parameter.split("/");
+      let file: string;
+      try {
+        file = decodeURIComponent(encoded);
+      } catch {
+        return undefined;
+      }
+      return isPlainFileName(file) ? { name: "plan-attachment", planId, file } : undefined;
+    },
+  },
+  // FR-PLAN-033: one file at a time, checked with the limits of FR-PLAN-022.
+  { method: "POST", pattern: /^\/api\/plan\/uploads$/, route: () => ({ name: "plan-upload" }) },
+  // FR-PLAN-022: a file's name and size, checked before it's sent, so one too large to send is refused by name.
+  { method: "POST", pattern: /^\/api\/plan\/uploads\/check$/, route: () => ({ name: "plan-upload-check" }) },
+  {
+    method: "POST",
+    pattern: new RegExp(`^/api/plan/uploads/(${UPLOAD_ID_SOURCE})/remove$`),
+    route: (id) => ({ name: "plan-remove-upload", id }),
+  },
   // FR-GUI-031: stops the run the GUI started.
   { method: "POST", pattern: /^\/api\/run\/stop$/, route: () => ({ name: "stop-run" }) },
 ];
@@ -282,34 +359,70 @@ export const environmentOptionsSchema = z.strictObject({
   allowBroadTarget: z.boolean().default(false),
 });
 
-/** FR-GUI-023: what `cclinic plan` plans, and its options, checked with the CLI's own limits. */
+/** FR-GUI-023, FR-PLAN-035: the model, reasoning and time limit a session's PM turns use, as `cclinic plan` takes them. */
+const planOptionsShape = {
+  model: modelValueSchema.optional(),
+  effort: effortValueSchema.optional(),
+  timeoutMinutes: limit("--timeout-minutes <n>", LIMITS.timeoutMinutes),
+};
+export const planOptionsSchema = z.strictObject(planOptionsShape);
+export type PlanOptionsRequest = z.output<typeof planOptionsSchema>;
+
+const uploadIdsSchema = z
+  .array(z.string().regex(new RegExp(`^${UPLOAD_ID_SOURCE}$`)))
+  .max(ATTACHMENT_LIMITS.perMessage, {
+    message: `A message can have at most ${ATTACHMENT_LIMITS.perMessage} files.`,
+  });
+const messageTextSchema = z
+  .string()
+  .max(PLAN_LIMITS.maxUserMessageChars, `A message can be at most ${PLAN_LIMITS.maxUserMessageChars} characters.`);
+
+/** FR-PLAN-021, FR-PLAN-036: a message to the PM, with the files uploaded for it. */
+export const planMessageSchema = z.strictObject({ text: messageTextSchema, uploads: uploadIdsSchema.default([]) });
+export type PlanMessage = z.output<typeof planMessageSchema>;
+
+/** FR-GUI-023, FR-PLAN-021: what a new session plans, its options, and the user's first message. */
 export const planRequestSchema = z.strictObject({
   target: z.discriminatedUnion("kind", [
     z.strictObject({ kind: z.literal("new-roadmap") }),
     z.strictObject({ kind: z.literal("extend-roadmap"), roadmapId: idSchema }),
     z.strictObject({ kind: z.literal("task"), roadmapId: idSchema.nullable() }),
   ]),
-  model: modelValueSchema.optional(),
-  effort: effortValueSchema.optional(),
-  timeoutMinutes: limit("--timeout-minutes <n>", LIMITS.timeoutMinutes),
+  ...planOptionsShape,
+  text: messageTextSchema,
+  uploads: uploadIdsSchema.default([]),
 });
 export type PlanRequest = z.output<typeof planRequestSchema>;
 
-/** FR-GUI-024: an answer to the PM's question. */
-export const planAnswerSchema = z.strictObject({
-  text: z.string().trim().min(1, "Type an answer for the PM.").max(TASK_LIMITS.text),
+const planIdBodySchema = z.string().regex(PLAN_ID_PATTERN, "That isn't a planning session's ID.");
+
+/** FR-PLAN-034: a saved session to open, with the options its turns use. */
+export const planOpenSchema = z.strictObject({ planId: planIdBodySchema, ...planOptionsShape });
+/** FR-PLAN-039, FR-PLAN-045: a session whose proposal is approved or cancelled, from the panel or Needs you. */
+export const planDecisionSchema = z.strictObject({ planId: planIdBodySchema });
+
+/** FR-PLAN-033: one uploaded file, as base64. Its type and size are checked once decoded (FR-PLAN-022). */
+export const planUploadSchema = z.strictObject({
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(GUI_MAX_UPLOAD_NAME_CHARS)
+
+    .refine((name) => !/[\u0000-\u001f\u007f]/.test(name), "A file's name can't have control characters."),
+  contentBase64: z.string().regex(/^[A-Za-z0-9+/]*={0,2}$/, "The file's content isn't base64."),
+  /** The page that holds it (FR-PLAN-022); a request with none counts as one page of its own. */
+  pageId: z
+    .string()
+    .regex(/^[A-Za-z0-9-]{1,64}$/, "That isn't a page's ID.")
+    .default("api"),
 });
 
-/** FR-GUI-024: the user's choice on a proposal; refine carries feedback for the PM. */
-export const planReviewSchema = z
-  .strictObject({
-    choice: z.enum(["approve", "refine", "cancel"]),
-    feedback: z.string().trim().max(TASK_LIMITS.text).default(""),
-  })
-  .refine((review) => review.choice !== "refine" || review.feedback !== "", {
-    message: "Type your feedback for the PM.",
-    path: ["feedback"],
-  });
+/** FR-PLAN-022: a file the page is about to send, checked with the rules the upload is checked with. */
+export const planUploadCheckSchema = z.strictObject({
+  name: z.string().trim().min(1).max(GUI_MAX_UPLOAD_NAME_CHARS),
+  sizeBytes: z.number().int().nonnegative(),
+});
 
 /** FR-GUI-027: `cclinic auto`'s options, checked with the CLI's own limits. */
 export const autoOptionsSchema = z.strictObject({
@@ -531,4 +644,166 @@ const EXIT_MEANINGS: Readonly<Record<number, string>> = {
 /** FR-GUI-033: what an exit code means, as the CLI uses it. */
 export function exitMeaning(code: number): string {
   return EXIT_MEANINGS[code] ?? `Exited with code ${code}`;
+}
+
+/** FR-PLAN-042: one entry of the Plan panel's conversation, from the session's Claude transcript. */
+export interface PlanChatItem {
+  readonly kind: "user" | "pm" | "note" | "activity" | "result";
+  readonly text: string;
+  /** For an activity: the tool, so a `plan_propose` call can be shown as a proposal. */
+  readonly tool: string | null;
+  /** For a user message: the files it listed, each with its stored file name in the session (FR-PLAN-037). */
+  readonly attachments: readonly { readonly name: string; readonly kind: string; readonly file: string }[];
+  /** For a `plan_suggest` call: the web sources it gave, shown under that turn's message (FR-PLAN-037). */
+  readonly sources: readonly { readonly title: string; readonly url: string }[];
+  /** For a `plan_suggest` call: the answers it offered, shown as buttons while its turn is the newest. */
+  readonly suggestions: readonly string[];
+  /** For a tool call, its ID; for a tool result, the call it answers, so a refused call can be left out. */
+  readonly toolUseId: string | null;
+  /** For a tool result, or a call with input the tool refuses: the call was refused (FR-PLAN-007). */
+  readonly isError: boolean;
+  /** For cclinic's request to answer a message again: that message, as the conversation shows it (FR-PLAN-014). */
+  readonly repeats?: PlanChatItem | null;
+  readonly at: string | null;
+}
+
+/** What the panel shows for cclinic's request to answer the last message again. */
+export const ANSWER_LAST_NOTE = "Asked the PM to answer your last message.";
+
+/** How `buildUserMessage` lists a message's files (FR-PLAN-006). */
+const ATTACHED_HEADING = /(?:^|\n\n)Attached \(new in this message\):\n/;
+const ATTACHED_LINE = /^- (.+) \((image|document)\): (.+)$/;
+
+function parsedInput(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    // A long input is cut short in the transcript view, so only the tool's name is shown.
+    return {};
+  }
+}
+
+/** The sources a `plan_suggest` call gave, as far as they're well formed. */
+function sourcesOf(input: unknown): PlanChatItem["sources"] {
+  const parsed = z.object({ sources: z.array(z.unknown()) }).safeParse(input);
+  if (!parsed.success) return [];
+  return parsed.data.sources.flatMap((source) => {
+    const checked = sourceSchema.safeParse(source);
+    return checked.success ? [checked.data] : [];
+  });
+}
+
+/** What `plan_suggest` accepts besides its session, as the tool checks it (FR-PLAN-007). */
+const suggestInputSchema = z.object({ suggestions: suggestionsSchema, sources: sourcesSchema.default([]) });
+
+/** The suggested answers a `plan_suggest` call gave, as far as they're well formed. */
+function suggestionsOf(input: unknown): readonly string[] {
+  const parsed = z.object({ suggestions: z.array(z.unknown()) }).safeParse(input);
+  if (!parsed.success) return [];
+  return parsed.data.suggestions.filter((item): item is string => typeof item === "string" && item.trim() !== "");
+}
+
+/** A tool call's ID, or the call a tool result answers, and whether the tool refused it. */
+export interface ToolLink {
+  readonly toolUseId: string | null;
+  readonly isError: boolean;
+}
+
+const toolBlockSchema = z.looseObject({
+  type: z.string(),
+  id: z.string().optional(),
+  tool_use_id: z.string().optional(),
+  is_error: z.boolean().optional(),
+});
+const toolLineSchema = z.looseObject({ message: z.looseObject({ content: z.array(z.unknown()) }) });
+
+/** The tool calls and results of one transcript line, in order, as `parseTranscriptLine` lists them. */
+export function toolLinksOf(line: string): ToolLink[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    // An unreadable line has no entries either.
+    return [];
+  }
+  const content = toolLineSchema.safeParse(parsed);
+  if (!content.success) return [];
+  return content.data.message.content.flatMap((block): ToolLink[] => {
+    const checked = toolBlockSchema.safeParse(block);
+    if (!checked.success) return [];
+    if (checked.data.type === "tool_use") return [{ toolUseId: checked.data.id ?? null, isError: false }];
+    if (checked.data.type === "tool_result")
+      return [{ toolUseId: checked.data.tool_use_id ?? null, isError: checked.data.is_error === true }];
+    return [];
+  });
+}
+
+/** FR-PLAN-037, FR-PLAN-042: transcript entries as the Plan panel shows them, with their tool links in order. */
+export function toPlanChatItems(entries: readonly TranscriptEntry[], links: readonly ToolLink[] = []): PlanChatItem[] {
+  let nextLink = 0;
+  return entries.flatMap((entry): PlanChatItem[] => {
+    const isTool = entry.kind === "tool-call" || entry.kind === "tool-result";
+    const link = isTool ? links[nextLink++] : undefined;
+    const base = {
+      tool: null,
+      attachments: [],
+      sources: [],
+      suggestions: [],
+      toolUseId: link?.toolUseId ?? null,
+      isError: link?.isError ?? false,
+      at: entry.at,
+    };
+    switch (entry.kind) {
+      case "assistant":
+        return entry.text.trim() === "" ? [] : [{ ...base, kind: "pm", text: entry.text }];
+      case "tool-call": {
+        const input = parsedInput(entry.text);
+        const isSuggest = /plan_suggest$/.test(entry.tool ?? "");
+        // FR-PLAN-007: input the tool would refuse is marked refused here too, before its result is written.
+        const isRefused = isSuggest && !suggestInputSchema.safeParse(input).success;
+        return [
+          {
+            ...base,
+            kind: "activity",
+            tool: entry.tool,
+            text: activityOf(entry.tool ?? "tool", input),
+            sources: isSuggest && !isRefused ? sourcesOf(input) : [],
+            suggestions: isSuggest && !isRefused ? suggestionsOf(input) : [],
+            isError: isRefused,
+          },
+        ];
+      }
+      case "tool-result":
+        return [{ ...base, kind: "result", text: entry.text }];
+      case "user": {
+        const own = userPartOf(entry.text);
+        if (isPlanningNote(own)) {
+          // FR-PLAN-014: asked to answer a message again, the PM is sent it after a blank line.
+          const repeated = repeatedMessageOf(own);
+          const repeats =
+            repeated === null ? [] : toPlanChatItems([{ kind: "user", text: repeated, tool: null, at: entry.at }]);
+          // Shown short: the message it repeats is the user's, shown as theirs (FR-PLAN-038).
+          const text = own.startsWith(ANSWER_LAST_MESSAGE) ? ANSWER_LAST_NOTE : own;
+          return [{ ...base, kind: "note", text, repeats: repeats[0] ?? null }];
+        }
+        const heading = ATTACHED_HEADING.exec(own);
+        const text = heading === null ? own : own.slice(0, heading.index);
+        const attachments =
+          heading === null
+            ? []
+            : own
+                .slice(heading.index + heading[0].length)
+                .split("\n")
+                .flatMap((line) => {
+                  const match = ATTACHED_LINE.exec(line);
+                  return match?.[1] === undefined || match[2] === undefined || match[3] === undefined
+                    ? []
+                    : [{ name: match[1], kind: match[2], file: match[3].split("/").at(-1) ?? "" }];
+                });
+        return text.trim() === "" && attachments.length === 0
+          ? []
+          : [{ ...base, kind: "user", text: text.trim(), attachments }];
+      }
+    }
+  });
 }

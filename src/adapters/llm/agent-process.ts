@@ -31,8 +31,14 @@ export interface AgentRequest extends AgentToolSettings {
   readonly environment: NodeJS.ProcessEnv;
   readonly signal: AbortSignal;
   readonly timeoutMs: number;
-  /** FR-AUTO-016: keeps the session under this ID. Without it, no session is saved (FR-PLAN-005). */
+  /** FR-AUTO-016, FR-PLAN-005: keeps the session under this ID. Without it or `resumeSessionId`, none is saved. */
   readonly sessionId?: string;
+  /** FR-PLAN-005: continues this saved session instead of starting one. */
+  readonly resumeSessionId?: string;
+  /** FR-PLAN-005: the only MCP servers the agent may use, as Claude Code's `--mcp-config` JSON. */
+  readonly mcpConfig?: Record<string, unknown>;
+  /** Called with each stream event, such as a tool call, as it arrives. */
+  readonly onEvent?: (event: unknown) => void;
   /** FR-AUTO-041: called with each plan-limits report Claude Code makes during the call. */
   readonly onLimits?: (limits: PlanLimits) => void;
 }
@@ -51,8 +57,16 @@ export function buildAgentArgs(
     effort: string;
     jsonSchema?: Record<string, unknown>;
     sessionId?: string;
+    resumeSessionId?: string;
+    mcpConfig?: Record<string, unknown>;
   },
 ): string[] {
+  const session =
+    input.resumeSessionId !== undefined
+      ? ["--resume", input.resumeSessionId]
+      : input.sessionId !== undefined
+        ? ["--session-id", input.sessionId]
+        : ["--no-session-persistence"];
   return [
     "-p",
     "--model",
@@ -71,7 +85,8 @@ export function buildAgentArgs(
     ...input.deniedTools,
     "--permission-mode",
     "dontAsk",
-    ...(input.sessionId === undefined ? ["--no-session-persistence"] : ["--session-id", input.sessionId]),
+    ...session,
+    ...(input.mcpConfig === undefined ? [] : ["--mcp-config", JSON.stringify(input.mcpConfig), "--strict-mcp-config"]),
     // Keeps the login, and stops the project's own hooks and settings from running. No dollar limit is passed: the
     // plan's own usage limits stop the work (FR-AUTO-025).
     "--safe-mode",
@@ -86,6 +101,7 @@ export async function runAgent(request: AgentRequest): Promise<AgentResult> {
     timeoutMs: request.timeoutMs,
     signal: request.signal,
     onEvent: (event) => {
+      request.onEvent?.(event);
       const reported = limitsFromEvent(event, new Date());
       if (reported === undefined) return;
       limits = reported;

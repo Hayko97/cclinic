@@ -175,6 +175,9 @@ export const hookInputSchema = z.object({
   session_id: z.string().min(1),
   transcript_path: z.string().min(1),
   cwd: z.string().min(1),
+  tool_name: z.string().optional(),
+  tool_input: z.unknown().optional(),
+  tool_response: z.unknown().optional(),
 });
 
 /** FR-MCP-045: adds a session once, and after that only moves its last-seen time. */

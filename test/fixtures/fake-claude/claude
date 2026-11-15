@@ -6,6 +6,11 @@
 // set `output` (structured output), `message`, `cost`, `exitCode`, `delayMs`, `hang`, `silent` (exit with no
 // result line), `events` (stream events written before the result, such as a `rate_limit_event`) and `write`
 // (files to write, relative to the working folder).
+// Planning turns (roadmap-planning): with --session-id or --resume, the call is written to a Claude Code-style
+// transcript under CLAUDE_CONFIG_DIR (or HOME/.claude). A rule can also set `toolUses` (tool calls written to the
+// stream and the transcript, such as Read) and `tools` (MCP tool calls made through the server in --mcp-config;
+// `planId` is filled in from its --plan argument). Their results go to FAKE_CLAUDE_RECORD + ".tools.jsonl".
+// The user's message is written when the turn starts, unless `beforeTranscript` is set.
 const fs = require("node:fs");
 
 const args = process.argv.slice(2);
@@ -73,11 +78,66 @@ if (scriptFile) {
     process.exit(1);
   }
   if (process.env.FAKE_CLAUDE_PIDS) fs.appendFileSync(process.env.FAKE_CLAUDE_PIDS, `${process.pid}\n`);
+  const nodePath = require("node:path");
+  const sessionId = args.includes("--resume") ? args[args.indexOf("--resume") + 1] : args.includes("--session-id") ? args[args.indexOf("--session-id") + 1] : null;
+  // Like Claude Code, the user's message is in the transcript as soon as the turn starts; the replies follow.
+  const line = (type, content) => {
+    if (sessionId === null || args.includes("--no-session-persistence")) return;
+    const config = process.env.CLAUDE_CONFIG_DIR || nodePath.join(process.env.HOME, ".claude");
+    const folder = nodePath.join(config, "projects", fs.realpathSync(process.cwd()).replace(/[^a-zA-Z0-9]/g, "-"));
+    fs.mkdirSync(folder, { recursive: true });
+    const file = nodePath.join(folder, `${sessionId}.jsonl`);
+    fs.appendFileSync(file, `${JSON.stringify({ type, timestamp: new Date().toISOString(), sessionId, message: { role: type, content } })}\n`);
+  };
+  // `beforeTranscript`: the turn is stopped before Claude Code wrote anything, such as while it starts up.
+  if (!rule.beforeTranscript) line("user", prompt);
   if (rule.hang) {
     setInterval(() => {}, 1000);
     return;
   }
-  const respond = () => {
+  const transcript = () => {
+    for (const use of rule.toolUses ?? []) line("assistant", [{ type: "tool_use", id: "t", name: use.name, input: use.input ?? {} }]);
+    for (const call of rule.tools ?? []) line("assistant", [{ type: "tool_use", id: "m", name: `mcp__cclinic__${call.name}`, input: call.input ?? {} }]);
+    if (rule.message !== undefined && rule.message !== "") line("assistant", [{ type: "text", text: rule.message }]);
+  };
+  /** Calls the scripted MCP tools through the server in --mcp-config, over newline-delimited JSON-RPC. */
+  const callTools = async () => {
+    if (!rule.tools || !args.includes("--mcp-config")) return;
+    const config = JSON.parse(args[args.indexOf("--mcp-config") + 1]);
+    const server = Object.values(config.mcpServers)[0];
+    const planId = server.args[server.args.indexOf("--plan") + 1];
+    const child = require("node:child_process").spawn(server.command, server.args, { stdio: ["pipe", "pipe", "inherit"] });
+    let buffer = "";
+    const waiting = new Map();
+    child.stdout.on("data", (chunk) => {
+      buffer += chunk;
+      for (let at = buffer.indexOf("\n"); at !== -1; at = buffer.indexOf("\n")) {
+        const message = JSON.parse(buffer.slice(0, at));
+        buffer = buffer.slice(at + 1);
+        waiting.get(message.id)?.(message);
+      }
+    });
+    let id = 0;
+    const request = (method, params) =>
+      new Promise((resolve) => {
+        id += 1;
+        waiting.set(id, resolve);
+        child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
+      });
+    await request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "fake-claude", version: "1" } });
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
+    for (const call of rule.tools) {
+      emit({ type: "assistant", message: { content: [{ type: "tool_use", name: `mcp__cclinic__${call.name}`, input: call.input ?? {} }] } });
+      const answer = await request("tools/call", { name: call.name, arguments: { planId, ...(call.input ?? {}) } });
+      if (record) fs.appendFileSync(`${record}.tools.jsonl`, `${JSON.stringify({ name: call.name, result: answer.result ?? answer.error })}\n`);
+    }
+    child.stdin.end();
+    child.kill();
+  };
+  const respond = async () => {
+    for (const use of rule.toolUses ?? []) emit({ type: "assistant", message: { content: [{ type: "tool_use", name: use.name, input: use.input ?? {} }] } });
+    await callTools();
+    transcript();
     for (const [file, content] of Object.entries(rule.write ?? {})) {
       fs.mkdirSync(require("node:path").dirname(file), { recursive: true });
       fs.writeFileSync(file, content);
@@ -96,8 +156,8 @@ if (scriptFile) {
     });
     process.exit(rule.exitCode ?? 0);
   };
-  if (rule.delayMs) setTimeout(respond, rule.delayMs);
-  else respond();
+  if (rule.delayMs) setTimeout(() => void respond(), rule.delayMs);
+  else void respond();
   return;
 }
 const fail = (fields, code = 1) => {

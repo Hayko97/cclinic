@@ -1,7 +1,7 @@
 /** Shared test helpers: temp projects, sample documents and a fake LLM provider. */
 import type { CanvasPorts } from "../../src/application/gui-canvas.js";
 import type { AnswerPorts } from "../../src/application/gui-answers.js";
-import { createPlanner, type Planner } from "../../src/application/gui-planning.js";
+import type { Planner } from "../../src/application/gui-planning.js";
 import { UsageError } from "../../src/core/errors.js";
 import {
   chmodSync,
@@ -259,6 +259,12 @@ export interface FakeClaudeRule {
   /** The result's `api_error_status`, such as 429. */
   readonly apiErrorStatus?: number;
   readonly write?: Readonly<Record<string, string>>;
+  /** Tool calls written to the stream and the transcript, such as Read or WebSearch. */
+  readonly toolUses?: readonly { readonly name: string; readonly input?: unknown }[];
+  /** The turn is stopped before Claude Code writes anything to the transcript. */
+  readonly beforeTranscript?: boolean;
+  /** Planning tool calls made through the `--mcp-config` server, such as plan_propose. */
+  readonly tools?: readonly { readonly name: string; readonly input?: Readonly<Record<string, unknown>> }[];
 }
 
 export interface FakeClaudeCall {
@@ -310,7 +316,7 @@ export function agentHarness(
           .filter(Boolean)
           .map((line) => JSON.parse(line) as FakeClaudeCall)
       : [];
-  return { context, controller, environment, output, calls, bin };
+  return { context, controller, environment, output, calls, bin, recordFile: record };
 }
 
 /** A canvas for GUI tests that don't use it: empty, and never asked to save or read a transcript. */
@@ -335,7 +341,27 @@ export const NO_ANSWERS: AnswerPorts = {
   now: () => new Date(0),
 };
 
-/** A planner for GUI tests that don't plan: every start is refused. */
-export const NO_PLANNER: Planner = createPlanner({
-  prepare: () => Promise.reject(new UsageError("Planning isn't part of this test.")),
-});
+const NOT_PLANNING = (): Promise<never> => Promise.reject(new UsageError("Planning isn't part of this test."));
+
+/** A planner for GUI tests that don't plan: an empty panel, and every change refused. */
+export const NO_PLANNER: Planner = {
+  view: () => Promise.resolve({ open: null, sessions: [], turn: null, notice: null, version: 0 }),
+  subscribe: () => () => undefined,
+  start: NOT_PLANNING,
+  open: NOT_PLANNING,
+  newSession: NOT_PLANNING,
+  send: NOT_PLANNING,
+  proposeNow: NOT_PLANNING,
+  stop: () => {
+    throw new UsageError("Planning isn't part of this test.");
+  },
+  retry: NOT_PLANNING,
+  approve: NOT_PLANNING,
+  cancel: NOT_PLANNING,
+  upload: NOT_PLANNING,
+  removeUpload: NOT_PLANNING,
+  attachment: () => Promise.resolve(undefined),
+  openId: () => null,
+  stream: () => () => undefined,
+  shutdown: () => Promise.resolve(),
+};

@@ -14,7 +14,14 @@ export const vitestConfig = defineConfig({
     },
     projects: [
       { test: { name: "unit", include: ["src/**/*.test.ts"] } },
-      { test: { name: "integration", include: ["test/integration/**/*.test.ts"], testTimeout: 30_000 } },
+      {
+        test: {
+          name: "integration",
+          include: ["test/integration/**/*.test.ts"],
+          testTimeout: 30_000,
+          globalSetup: ["test/support/build.ts"],
+        },
+      },
       { test: { name: "e2e", include: ["test/e2e/**/*.test.ts"], testTimeout: 60_000 } },
     ],
   },

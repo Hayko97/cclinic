@@ -3076,13 +3076,13 @@ describe("canvas: sessions, search, keyboard and what needs you (C2b)", () => {
     expect(await banner(page).textContent()).toContain("There's no roadmap yet.");
     // D5: the banner's action is the GUI's own Plan, for a new roadmap.
     await banner(page).locator("button", { hasText: "Plan a roadmap" }).click();
-    expect(await page.locator("#plan-target").textContent()).toBe("A new roadmap.");
-    await page.locator("#plan-dialog [data-plan-close]").click();
+    expect(await page.locator("#plan-subtitle").textContent()).toBe("New roadmap");
+    await page.locator("#plan-close").click();
     expect(await page.locator("#canvas-empty").isVisible()).toBe(true);
     expect(await page.locator("#canvas-empty").textContent()).toContain("There are no roadmaps or tasks yet.");
     // FR-GUI-053: the empty canvas offers the one action that fills it.
     await page.locator("#canvas-empty button", { hasText: "New roadmap" }).click();
-    expect(await page.locator("#plan-target").textContent()).toBe("A new roadmap.");
+    expect(await page.locator("#plan-subtitle").textContent()).toBe("New roadmap");
   });
 
   it("TC-GUI-020 (QA D1): the generate banner shows its text and the Open Setup button, and nothing else", async () => {

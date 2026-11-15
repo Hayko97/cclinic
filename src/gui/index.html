@@ -325,36 +325,133 @@
       </form>
     </dialog>
 
-    <dialog id="plan-dialog" aria-labelledby="plan-title">
-      <h2 id="plan-title">Plan with the PM</h2>
-      <p id="plan-target" class="muted"></p>
-      <form id="plan-form" novalidate>
-        <div>
-          <label id="plan-what"
-            >What to plan
-            <select name="what">
-              <option value="new-roadmap">A new roadmap</option>
-              <option value="task">One standalone task, in no roadmap</option>
-            </select></label
+    <aside id="plan-panel" class="side-panel plan-panel" aria-labelledby="plan-title" hidden>
+      <div class="plan-head">
+        <h1 id="plan-title">Plan with the PM</h1>
+        <span id="plan-subtitle" class="plan-subtitle"></span>
+        <div class="plan-menu-wrap">
+          <button
+            id="plan-sessions-button"
+            type="button"
+            class="plan-icon"
+            aria-label="Planning sessions"
+            aria-haspopup="menu"
+            aria-expanded="false"
           >
-          <label
-            >Model
-            <select name="model" data-models data-optional></select
-          ></label>
-          <label
-            >Reasoning
-            <select name="effort" data-efforts></select
-          ></label>
-          <label>Time limit per PM turn, minutes <input name="timeoutMinutes" inputmode="numeric" /></label>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2.5 4h11M2.5 8h11M2.5 12h7" />
+            </svg>
+          </button>
+          <div
+            id="plan-sessions-menu"
+            class="plan-menu plan-menu-right"
+            role="menu"
+            aria-label="Planning sessions"
+            hidden
+          ></div>
         </div>
-        <div class="actions">
-          <button type="button" data-plan-close>Close</button>
-          <button id="plan-start" type="submit" class="primary">Start planning</button>
+        <div class="plan-menu-wrap">
+          <button
+            id="plan-more"
+            type="button"
+            class="plan-icon"
+            aria-label="More"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="3.5" cy="8" r="1.2" />
+              <circle cx="8" cy="8" r="1.2" />
+              <circle cx="12.5" cy="8" r="1.2" />
+            </svg>
+          </button>
+          <div id="plan-more-menu" class="plan-menu plan-menu-right" role="menu" aria-label="More" hidden>
+            <button id="plan-cancel-session" type="button" class="plan-menu-item is-danger" role="menuitem" hidden>
+              Cancel session
+            </button>
+            <div id="plan-resume" class="plan-resume"></div>
+          </div>
+        </div>
+        <button id="plan-close" type="button" class="plan-icon" aria-label="Close planning">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+        </button>
+      </div>
+      <div id="plan-banner" class="plan-banner" role="status" hidden></div>
+      <div id="plan-log" class="plan-log" role="log" aria-live="polite" aria-label="Conversation with the PM"></div>
+      <div id="plan-suggestions" class="plan-suggestions" hidden></div>
+      <form id="plan-composer" class="plan-composer" novalidate>
+        <div id="plan-chips" class="plan-chips"></div>
+        <label class="visually-hidden" for="plan-text">Message to the PM</label>
+        <textarea id="plan-text" rows="1" placeholder="Describe your idea…"></textarea>
+        <div class="plan-toolbar">
+          <button id="plan-attach" type="button" class="plan-icon" aria-label="Attach files" title="Attach files">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+          </button>
+          <input id="plan-files" type="file" multiple hidden />
+          <div class="plan-menu-wrap">
+            <button
+              id="plan-target"
+              type="button"
+              class="plan-pill"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-label="What to plan"
+            >
+              <span id="plan-target-label">New roadmap</span>
+              <svg class="plan-caret" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" /></svg>
+            </button>
+            <div
+              id="plan-target-menu"
+              class="plan-menu plan-menu-up"
+              role="menu"
+              aria-label="What to plan"
+              hidden
+            ></div>
+          </div>
+          <div class="plan-menu-wrap">
+            <button
+              id="plan-model"
+              type="button"
+              class="plan-pill"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              aria-label="Model and reasoning"
+            >
+              <span id="plan-model-label">Default</span>
+              <svg class="plan-caret" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" /></svg>
+            </button>
+            <div
+              id="plan-model-menu"
+              class="plan-menu plan-menu-up plan-model-menu"
+              role="dialog"
+              aria-label="Model and reasoning"
+              hidden
+            >
+              <div id="plan-options" class="plan-options">
+                <label
+                  >Model
+                  <select name="model" data-models data-optional></select
+                ></label>
+                <label
+                  >Reasoning
+                  <select name="effort" data-efforts></select
+                ></label>
+                <label>Time limit per turn, minutes <input name="timeoutMinutes" inputmode="numeric" /></label>
+              </div>
+            </div>
+          </div>
+          <button id="plan-propose" type="button" class="plan-pill" hidden>Propose now</button>
+          <span class="plan-spacer"></span>
+          <button id="plan-send" type="submit" class="plan-send" aria-label="Send" title="Send (Enter)">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5L8 3l4.5 4.5" /></svg>
+          </button>
+          <button id="plan-stop" type="button" class="plan-send is-stop" aria-label="Stop" title="Stop" hidden>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" rx="1.5" /></svg>
+          </button>
         </div>
       </form>
-      <div id="plan-session" hidden></div>
-      <p id="plan-error" class="error" role="alert"></p>
-    </dialog>
+      <div id="plan-drop" class="plan-drop" hidden>Drop files to attach</div>
+    </aside>
 
     <dialog id="add-task" aria-labelledby="add-task-title">
       <form id="add-task-form">

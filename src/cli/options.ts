@@ -1,5 +1,6 @@
 /** Option parsing rules that don't depend on the terminal. */
 import { InvalidArgumentError } from "commander";
+import { PLAN_ID_PATTERN } from "../core/constants/agents.js";
 import { COMMANDS, MAX_TYPO_DISTANCE } from "../core/constants/terminal.js";
 import { UsageError } from "../core/errors.js";
 import { parseEffort, parseModel, type Effort, type ModelChoice } from "../core/models.js";
@@ -71,4 +72,10 @@ export function editDistance(left: string, right: string): number {
 
 export function closestCommand(value: string): string | undefined {
   return COMMANDS.find((command) => editDistance(value, command) <= MAX_TYPO_DISTANCE);
+}
+
+/** FR-PLAN-001, FR-MCP-046: a planning session's ID, such as plan-3. */
+export function planId(value: string): string {
+  if (!PLAN_ID_PATTERN.test(value)) throw new InvalidArgumentError("must be a planning session ID, such as plan-3.");
+  return value;
 }

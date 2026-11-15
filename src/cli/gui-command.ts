@@ -1,14 +1,17 @@
 /** `cclinic gui`: the local web GUI for a project (spec: gui). */
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { openInBrowser } from "../adapters/browser/open-browser.js";
-import { claudeConfigFolder } from "../adapters/llm/agent-process.js";
+import { claudeConfigFolder, claudeTranscriptPath } from "../adapters/llm/agent-process.js";
+import { isProcessRunning } from "../adapters/storage/file-lock.js";
 import { createAssetReader, startGuiServer } from "../adapters/http/gui-server.js";
 import { startProcess } from "../adapters/process/job-process.js";
 import { projectPaths } from "../adapters/storage/document-store.js";
 import { readPlanLimits } from "../adapters/config/limits-store.js";
+import { plansFolder } from "../adapters/storage/plan-store.js";
 import { acquireGuiLock, readLayout, readMcpConfig, saveLayout } from "../adapters/storage/gui-store.js";
 import { createRunLister, readRunFiles } from "../adapters/storage/run-store.js";
 import { openTaskStore } from "../adapters/storage/task-store.js";
@@ -20,16 +23,16 @@ import {
 } from "../adapters/transcripts/transcript-reader.js";
 import { problemOf, type CanvasPorts } from "../application/gui-canvas.js";
 import { createJobs, type JobProcess } from "../application/gui-jobs.js";
-import { createPlanner } from "../application/gui-planning.js";
-import type { PreparedSession } from "../application/planning-session.js";
+import { createPlanner, type PlannerPorts } from "../application/gui-planning.js";
 import { createGuiHandler } from "../application/gui-routes.js";
 import { GUI_DEFAULT_PORT, GUI_HOST, GUI_TOKEN_BYTES, GUI_TOKEN_QUERY } from "../core/constants/gui.js";
+import { PLAN_ATTACHMENTS_FOLDER } from "../core/constants/agents.js";
 import { UsageError } from "../core/errors.js";
-import type { PlanRequest } from "../core/gui.js";
-import type { PlanTarget } from "../core/planning.js";
 import { LIMITS } from "../core/constants/limits.js";
+import { cclinicBin } from "./cclinic-bin.js";
 import { resolveModelAndEffort } from "./generate-command.js";
-import { checkPlanning, preparePlanning } from "./plan-command.js";
+import { checkPlanning, pmSkill } from "./plan-command.js";
+import { decisionPorts, documentPaths, planStoreFor, transcriptChecks, turnPorts } from "./planning-ports.js";
 import type { CommandContext } from "./command-context.js";
 import { projectFolder, readOverview } from "./tasks-command.js";
 
@@ -47,16 +50,6 @@ export interface GuiDependencies {
   readonly isTerminal?: boolean;
   /** How the canvas and transcripts are checked for changes; replaced in tests, so no real clock is used. */
   readonly every?: (ms: number, run: () => Promise<void>) => () => void;
-}
-
-/** The `cclinic` entry point that started this process: `bin/cclinic.js`, from `dist` or from `src/cli`. */
-function cclinicBin(): string {
-  const candidates = ["../bin/cclinic.js", "../../bin/cclinic.js"].map((relative) =>
-    fileURLToPath(new URL(relative, import.meta.url)),
-  );
-  const found = candidates.find((candidate) => existsSync(candidate));
-  if (found === undefined) throw new UsageError("cclinic's own program file is missing. Reinstall cclinic.");
-  return found;
 }
 
 function every(ms: number, run: () => Promise<void>): () => void {
@@ -138,29 +131,77 @@ function waitForStop(signal: AbortSignal): Promise<void> {
 }
 
 /**
- * FR-GUI-023: the same checks, options and defaults as `cclinic plan`, with the session's PM calls stopped by
- * `signal` (a cancel) as well as by the GUI stopping.
+ * FR-GUI-023, FR-PLAN-033: the Plan panel's planner, with the same checks, options, defaults and PM as
+ * `cclinic plan`. A turn's PM is stopped by its own signal (Stop) as well as by the GUI stopping.
  */
-async function preparePlan(
+function plannerPorts(
   target: string,
-  options: PlanRequest,
-  signal: AbortSignal,
   context: CommandContext,
-): Promise<{ readonly target: PlanTarget } & PreparedSession> {
-  const session: CommandContext = { ...context, signal: AbortSignal.any([context.signal, signal]) };
-  await checkPlanning(target, session);
-  const { model, effort } = await resolveModelAndEffort({ model: options.model, effort: options.effort }, session);
-  const prepared = preparePlanning(
-    {
-      target,
-      planTarget: options.target,
-      model,
-      effort,
-      timeoutMinutes: options.timeoutMinutes ?? LIMITS.timeoutMinutes.default,
+  repeat: (ms: number, run: () => Promise<void>) => () => void,
+): PlannerPorts {
+  const records = planStoreFor(target);
+  const checks = transcriptChecks();
+  // Made once, private to this user (mkdtemp gives 0700), on the first upload, and removed when the GUI stops.
+  let uploadFolder: Promise<string> | undefined;
+  const folder = (): Promise<string> => (uploadFolder ??= mkdtemp(path.join(os.tmpdir(), "cclinic-plan-uploads-")));
+  return {
+    prepare: async (options) => {
+      await checkPlanning(target, context);
+      const { model, effort } = await resolveModelAndEffort({ model: options.model, effort: options.effort }, context);
+      const settings = {
+        target,
+        model,
+        effort,
+        timeoutMinutes: options.timeoutMinutes ?? LIMITS.timeoutMinutes.default,
+      };
+      return (signal) =>
+        turnPorts(settings, records, { ...context, signal: AbortSignal.any([context.signal, signal]) });
     },
-    session,
-  );
-  return { target: options.target, ...prepared };
+    records,
+    decisions: decisionPorts(target, records),
+    pmContext: () => ({ skill: pmSkill(target), ...documentPaths(target) }),
+    newClaudeSession: () => {
+      const claudeSessionId = randomUUID();
+      return { claudeSessionId, transcriptPath: claudeTranscriptPath(context.environment, target, claudeSessionId) };
+    },
+    isRunning: isProcessRunning,
+    pid: process.pid,
+    now: () => new Date().toISOString(),
+    transcriptExists: (transcriptPath) => existsSync(transcriptPath),
+    isAnswered: checks.isAnswered,
+    isWritten: checks.isWritten,
+    readAttachment: async (planId, file) => {
+      const folder = path.resolve(plansFolder(target), planId, PLAN_ATTACHMENTS_FOLDER);
+      const resolved = path.resolve(folder, file);
+      // Only a file directly in the session's attachments folder is ever read.
+      if (path.dirname(resolved) !== folder) throw new UsageError("That isn't one of the session's files.");
+      return readFile(resolved);
+    },
+    // Uploaded files wait outside the project until their message is sent, and are removed then (FR-PLAN-033).
+    uploads: {
+      save: async (bytes) => {
+        const file = path.join(await folder(), randomUUID());
+        await writeFile(file, bytes, { mode: 0o600 });
+        return file;
+      },
+      remove: (file) => rm(file, { force: true }),
+      clear: async () => {
+        if (uploadFolder === undefined) return;
+        await rm(await uploadFolder, { recursive: true, force: true });
+        uploadFolder = undefined;
+      },
+    },
+    transcripts: {
+      locate: (transcriptPath, claudeSessionId) =>
+        locateTranscript(
+          transcriptPath,
+          claudeSessionId,
+          path.join(claudeConfigFolder(context.environment), "projects"),
+        ),
+      read: readTranscriptLines,
+    },
+    every: repeat,
+  };
 }
 
 /** FR-GUI-001 to FR-GUI-007: serves the GUI on this machine until Ctrl+C or SIGTERM. */
@@ -196,7 +237,7 @@ export async function runGuiCommand(
     // FR-GUI-003: a new token each time the GUI starts, never saved anywhere.
     const token = randomBytes(GUI_TOKEN_BYTES).toString("base64url");
     let port = 0;
-    const planner = createPlanner({ prepare: (request, signal) => preparePlan(target, request, signal, context) });
+    const planner = createPlanner(plannerPorts(target, context, dependencies.every ?? every));
     const handle = createGuiHandler({
       get port() {
         return port;
@@ -237,7 +278,7 @@ export async function runGuiCommand(
     } finally {
       // FR-GUI-005: the jobs are stopped first, so none is left running without the GUI. A planning session
       // still going saves nothing (FR-GUI-025).
-      await Promise.all([jobs.stopAll(), planner.stop()]);
+      await Promise.all([jobs.stopAll(), planner.shutdown()]);
       await server.close();
     }
   } finally {

@@ -11,6 +11,8 @@ import { findRunHoldingTask, readRunState } from "../adapters/storage/run-store.
 import { readEnvironmentFile } from "../adapters/storage/environment-store.js";
 import { openTaskStore, type OpenMode, type TaskStore } from "../adapters/storage/task-store.js";
 import { openWorkflowStore } from "../adapters/storage/workflow-store.js";
+import { createPlanTools } from "../application/plan-tools.js";
+import { approveProposal, cancelSession, releaseSessionHold } from "../application/planning-session.js";
 import { createWorkflowTools, type RunSummary } from "../application/workflow-tools.js";
 import { TOOL_FOLDER_NAME } from "../core/constants/paths.js";
 import { MCP_SERVER_NAME, SESSION_LINK_LOCK_WAIT_MS, SESSION_LINK_TIMEOUT_MS } from "../core/constants/workflow.js";
@@ -27,8 +29,18 @@ import {
   type Approver,
   type WorkflowState,
 } from "../core/workflow.js";
+import {
+  isPlanToolCall,
+  linkClaudeSession,
+  planIdOfToolCall,
+  PROPOSAL_ANSWERS,
+  renderWaitingProposal,
+  type PlanSession,
+} from "../core/planning.js";
 import type { CommandContext } from "./command-context.js";
 import { askText, chooseFrom, isInteractive } from "./menus.js";
+import { decisionPorts, documentPaths, planStoreFor } from "./planning-ports.js";
+import { isProcessRunning } from "../adapters/storage/file-lock.js";
 import { projectFolder, readOverview } from "./tasks-command.js";
 
 export interface McpOptions {
@@ -36,6 +48,8 @@ export interface McpOptions {
   readonly approver: string;
   readonly run?: string;
   readonly task?: number;
+  /** FR-MCP-046: serve only this planning session's tools, for a PM turn cclinic drives. */
+  readonly plan?: string;
 }
 
 /** FR-MCP-002: pm-agent needs to know its run and its task; it has no dollar budget (FR-MCP-036). */
@@ -85,6 +99,36 @@ function summarizeRun(target: string) {
   };
 }
 
+/** This server, as the holder of the planning sessions Claude Code begins or resumes (FR-PLAN-032). */
+const HOST_HOLDER = { place: "claude-code", pid: process.pid } as const;
+
+/** FR-PLAN-044, FR-MCP-046: the planning tools, for Claude Code itself or for one session cclinic drives. */
+function planTools(target: string, connection: McpConnection, planId: string | undefined) {
+  const ports = decisionPorts(target);
+  return createPlanTools({
+    ...ports,
+    mode: planId === undefined ? { kind: "host" } : { kind: "driven", planId },
+    holder: HOST_HOLDER,
+    ...documentPaths(target),
+    isRunning: isProcessRunning,
+    askUser: (question) => connection.askUser({ ...question, isNotesAsked: false }),
+  });
+}
+
+/** FR-MCP-046: a driven server serves one open session only. */
+async function requireOpenPlan(target: string, planId: string): Promise<void> {
+  const session = await planStoreFor(target).read(planId);
+  if (session?.status !== "open") throw new UsageError(`There's no open planning session ${planId}.`);
+}
+
+/** FR-PLAN-032: the sessions this server held are let go when Claude Code ends it. */
+async function releaseHeldPlans(target: string): Promise<void> {
+  const ports = decisionPorts(target);
+  for (const session of (await ports.records.list()).sessions) {
+    if (session.holder?.pid === process.pid) await releaseSessionHold(ports, session.id, HOST_HOLDER);
+  }
+}
+
 /** The server for a project, with every tool and resource, not yet connected. */
 export async function createProjectServer(options: McpOptions, context: CommandContext): Promise<McpConnection> {
   const target = await projectFolder(options.dir);
@@ -92,9 +136,14 @@ export async function createProjectServer(options: McpOptions, context: CommandC
   const paths = projectPaths(target, undefined);
   if (!existsSync(paths.out))
     throw new UsageError(`There are no project documents in ${paths.out}. Run "cclinic" in the project first.`);
+  const connection = createMcpServer({ name: MCP_SERVER_NAME, version: context.version });
+  if (options.plan !== undefined) {
+    await requireOpenPlan(target, options.plan);
+    for (const tool of planTools(target, connection, options.plan)) connection.addTool(tool);
+    return connection;
+  }
   const git = { environment: context.environment };
   const useTasks = useTasksIn(paths.tool);
-  const connection = createMcpServer({ name: MCP_SERVER_NAME, version: context.version });
   const { tools, resources } = createWorkflowTools({
     approverMode,
     states: openWorkflowStore(target),
@@ -119,7 +168,7 @@ export async function createProjectServer(options: McpOptions, context: CommandC
     readDocument: (relative) => readFile(path.join(paths.out, relative), "utf8").catch(() => undefined),
     now: () => new Date().toISOString(),
   });
-  for (const tool of tools) connection.addTool(tool);
+  for (const tool of [...tools, ...planTools(target, connection, undefined)]) connection.addTool(tool);
   for (const resource of resources) connection.addResource(resource);
   return connection;
 }
@@ -129,6 +178,26 @@ export async function runMcpCommand(options: McpOptions, context: CommandContext
   await connection.connect();
   context.reporter.debug("The cclinic MCP server is running.");
   await connection.waitUntilClosed();
+  if (options.plan === undefined) await releaseHeldPlans(await projectFolder(options.dir));
+}
+
+/** FR-PLAN-045: a proposal a Claude Code session couldn't ask about, approved or cancelled here. */
+async function answerProposal(target: string, session: PlanSession, context: CommandContext): Promise<void> {
+  if (session.proposal === null) return;
+  const answer = await chooseFrom(
+    `${renderWaitingProposal(session.proposal, session.target)}\n\nApprove this proposal?`,
+    PROPOSAL_ANSWERS.map((value) => ({ value, name: value })),
+  );
+  if (answer === "keep chatting") {
+    context.reporter.result("The proposal stays waiting. Tell the PM what to change.");
+    return;
+  }
+  const ports = decisionPorts(target);
+  const decided =
+    answer === "approve"
+      ? await approveProposal(ports, session.id)
+      : await cancelSession(ports, session.id, { pid: process.pid, isRunning: isProcessRunning });
+  context.reporter.result(decided.message);
 }
 
 /** FR-MCP-029, FR-CLI-029: only a person at a terminal can answer, so an agent's shell can't. */
@@ -138,17 +207,29 @@ export async function runApproveCommand(given: string | undefined, context: Comm
   const target = await projectFolder(given);
   const store = openWorkflowStore(target);
   const waiting = (await store.list()).filter((state) => state.pending !== null && state.pending.answer === null);
-  if (waiting.length === 0) {
+  const proposals = (await planStoreFor(target).list()).sessions.filter(
+    (session) => session.status === "open" && session.proposal !== null,
+  );
+  if (waiting.length === 0 && proposals.length === 0) {
     context.reporter.result("No question is waiting for your answer.");
     return;
   }
-  const state: WorkflowState =
-    waiting.length === 1 && waiting[0] !== undefined
-      ? waiting[0]
-      : await chooseFrom(
-          "Which question do you want to answer?",
-          waiting.map((item) => ({ value: item, name: item.pending?.question ?? item.key })),
-        );
+  const choices: { value: WorkflowState | PlanSession; name: string }[] = [
+    ...waiting.map((item) => ({ value: item, name: item.pending?.question ?? item.key })),
+    ...proposals.map((session) => ({
+      value: session,
+      name: `Approve the proposal of planning session ${session.id}?`,
+    })),
+  ];
+  const chosen =
+    choices.length === 1 && choices[0] !== undefined
+      ? choices[0].value
+      : await chooseFrom("Which question do you want to answer?", choices);
+  if ("target" in chosen) {
+    await answerProposal(target, chosen, context);
+    return;
+  }
+  const state: WorkflowState = chosen;
   const pending = state.pending;
   if (pending === null) return;
   const answer = await chooseFrom(
@@ -186,6 +267,16 @@ async function linkFromHook(stdin: Readable, environment: NodeJS.ProcessEnv, sig
   if (!input.success) return;
   const project = hookProject(input.data.cwd, environment);
   if (project === undefined) return;
+  if (isPlanToolCall(input.data.tool_name)) {
+    const planId = planIdOfToolCall(input.data.tool_name, input.data.tool_response);
+    if (planId === undefined) return;
+    const claude = { sessionId: input.data.session_id, transcriptPath: input.data.transcript_path };
+    await planStoreFor(project).update(planId, (session) => {
+      const linked = linkClaudeSession(session, claude, new Date().toISOString());
+      return linked === session ? { value: undefined } : { save: linked, value: undefined };
+    });
+    return;
+  }
   const store = openWorkflowStore(project);
   const session = { sessionId: input.data.session_id, transcriptPath: input.data.transcript_path };
   await store.updateOpen((open) => linkSession(open, session, new Date().toISOString()), signal);

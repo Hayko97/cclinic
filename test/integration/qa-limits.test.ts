@@ -410,8 +410,6 @@ describe("QA: auto at a plan usage limit", () => {
 });
 
 describe("QA: plan at a plan usage limit", () => {
-  const questions = (text: string) => ({ questions: [text], proposal: null });
-
   function project(): string {
     const root = makeTempFolder();
     writeProject(root, { ".cclinic/sdd/overview.md": "# Overview\n", ".cclinic/sdd/README.md": "# Specs\n" });
@@ -424,20 +422,22 @@ describe("QA: plan at a plan usage limit", () => {
     const root = project();
     const harness = agentHarness({
       rules: [
-        { output: questions("Who pays?"), events: [REAL_EVENT] },
+        { message: "Who pays?", events: [REAL_EVENT] },
         { events: [rejectedEvent], exitCode: 1, message: "API Error: 429 rate_limit_error" },
       ],
     });
     selectMock.mockResolvedValueOnce("new");
-    inputMock.mockResolvedValueOnce("Shoppers");
+    inputMock.mockResolvedValueOnce("A shop").mockResolvedValueOnce("Shoppers");
     const error = await runPlanCommand(
       { dir: root, timeoutMinutes: 30, model: "haiku", effort: "low" },
       harness.context,
     ).catch((caught: unknown) => caught);
     expect(exitCodeFor(error)).toBe(4);
     expect(existsSync(limitsFile(harness.environment))).toBe(true);
-    expect((error as Error).message).toBe(
-      `The PM stopped: Claude's usage limit is reached. It resets ${RESETS_ISO}. Nothing was saved. Plan again once it resets.`,
+    expect((error as Error).message).toMatch(
+      new RegExp(
+        `^The PM stopped: Claude's usage limit is reached\\. It resets ${RESETS_ISO.replaceAll(".", "\\.")}\\. Nothing was saved to the roadmap\\. Continue later with: cclinic plan --resume plan-1 {2}or {2}claude --resume [0-9a-f-]{36}$`,
+      ),
     );
   });
 });

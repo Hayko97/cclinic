@@ -50,21 +50,35 @@ function closeList() {
   document.getElementById("needs-you").setAttribute("aria-expanded", "false");
 }
 
-/** FR-GUI-052: the PM's question or proposal, while it waits for the user. */
-function planItem(plan) {
-  if (plan === null || (plan.step !== "question" && plan.step !== "review")) return [];
-  return [
-    {
-      title: "The PM",
-      detail: plan.step === "question" ? plan.question : "A proposal is waiting for your review.",
-      target: { kind: "plan" },
-    },
-  ];
+/**
+ * FR-GUI-052, FR-PLAN-045: each planning session with a proposal waiting, wherever it's driven, and the session this
+ * GUI drives while the PM waits for the user's reply.
+ */
+function planItems(plan) {
+  if (plan === null) return [];
+  const items = plan.sessions
+    .filter((session) => session.hasProposal)
+    .map((session) => ({
+      title: `Planning session ${session.id}`,
+      detail: "A proposal is waiting for your approval.",
+      target: { kind: "plan", id: session.id },
+    }));
+  const open = plan.open;
+  const isWaitingForReply =
+    open !== null &&
+    open.status === "open" &&
+    open.isHeldHere &&
+    plan.turn === null &&
+    !open.isAwaitingReply &&
+    !open.hasProposal;
+  if (isWaitingForReply)
+    items.push({ title: "The PM", detail: "The PM is waiting for your reply.", target: { kind: "plan", id: open.id } });
+  return items;
 }
 
 function drawNeeds(canvas) {
   state.canvas = canvas;
-  const items = [...planItem(state.plan), ...itemsOf(canvas)];
+  const items = [...planItems(state.plan), ...itemsOf(canvas)];
   const text = JSON.stringify(items);
   if (text === state.items) return;
   state.items = text;
@@ -96,7 +110,7 @@ function drawNeeds(canvas) {
                   className: "small",
                   onClick: () => {
                     closeList();
-                    if (item.target.kind === "plan") void state.openPlan();
+                    if (item.target.kind === "plan") void state.openPlan(item.target.id);
                     else state.open(item.target);
                   },
                 },
@@ -157,7 +171,7 @@ function drawBanner(step, canvas) {
   );
 }
 
-/** Called with each planning session update (FR-GUI-052), and once with what opens the Plan dialog. */
+/** Called with each update of the Plan panel (FR-GUI-052), and once with what opens it. */
 export function setPlan(plan) {
   state.plan = plan;
   if (state.canvas !== undefined) drawNeeds(state.canvas);

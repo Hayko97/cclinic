@@ -1,6 +1,16 @@
 /** Planning a roadmap or a single task with the PM agent (spec: roadmap-planning). */
 import { z } from "zod";
-import { PLAN_LIMITS } from "./constants/agents.js";
+import { TOOL_INPUT_SHORT_CHARS } from "./constants/gui.js";
+import {
+  ATTACHMENT_LIMITS,
+  BYTES_PER_MEGABYTE,
+  DOCUMENT_EXTENSIONS,
+  IMAGE_EXTENSIONS,
+  PLAN_ID_PATTERN,
+  PLAN_ID_PREFIX,
+  PLAN_ID_SOURCE,
+  PLAN_LIMITS,
+} from "./constants/agents.js";
 import {
   dependencyEdges,
   findCycle,
@@ -47,58 +57,26 @@ const taskProposalSchema = z.object({
 });
 export type TaskProposal = z.infer<typeof taskProposalSchema>;
 
-/** One JSON shape per reply, so the CLI can ask Claude for it. Exactly one of the two is filled (FR-PLAN-007). */
-export const roadmapReplySchema = z.object({
-  questions: z.array(z.string()),
-  proposal: roadmapProposalSchema.nullable(),
-});
-export const taskReplySchema = z.object({
-  questions: z.array(z.string()),
-  proposal: taskProposalSchema.nullable(),
-});
-
-export function replySchemaFor(target: PlanTarget): typeof roadmapReplySchema | typeof taskReplySchema {
-  return target.kind === "task" ? taskReplySchema : roadmapReplySchema;
-}
-
-export type PmReply<P> =
-  | { readonly kind: "questions"; readonly questions: readonly string[] }
-  | { readonly kind: "proposal"; readonly proposal: P };
-
 function describeIssue(error: z.ZodError): string {
   const issue = error.issues[0];
-  return `${issue?.path.join(".") || "reply"}: ${issue?.message ?? "not accepted"}`;
+  return `${issue?.path.join(".") || "proposal"}: ${issue?.message ?? "not accepted"}`;
 }
 
-function parseReply<P>(
-  schema: z.ZodType<{ questions: string[]; proposal: P | null }>,
-  value: unknown,
-): PmReply<P> | string {
-  const parsed = schema.safeParse(value);
-  if (!parsed.success) return `The reply doesn't match the required JSON shape (${describeIssue(parsed.error)}).`;
-  const { questions, proposal } = parsed.data;
-  if (proposal !== null) {
-    return questions.length === 0 ? { kind: "proposal", proposal } : "Send either questions or a proposal, not both.";
-  }
-  if (questions.length === 0) return "Send 1 or more questions, or a proposal.";
-  if (questions.length > PLAN_LIMITS.maxQuestions) {
-    return `Ask at most ${PLAN_LIMITS.maxQuestions} questions at a time.`;
-  }
-  return { kind: "questions", questions };
-}
+export type PlannedProposal =
+  | { readonly kind: "roadmap"; readonly proposal: RoadmapProposal }
+  | { readonly kind: "task"; readonly proposal: TaskProposal };
 
-/** Returns the reply, or why it isn't valid (FR-PLAN-010). */
-export function parseRoadmapReply(value: unknown, target: PlanTarget): PmReply<RoadmapProposal> | string {
-  const reply = parseReply(roadmapReplySchema, value);
-  if (typeof reply === "string" || reply.kind === "questions") return reply;
-  if (target.kind === "new-roadmap" && reply.proposal.roadmap === null) {
-    return "A new roadmap needs a roadmap title and goal.";
+/** FR-PLAN-007, FR-PLAN-018: the proposal in the target's shape, or which field is wrong. */
+export function parseProposal(value: unknown, target: PlanTarget): PlannedProposal | string {
+  if (target.kind === "task") {
+    const parsed = taskProposalSchema.safeParse(value);
+    return parsed.success ? { kind: "task", proposal: parsed.data } : describeIssue(parsed.error);
   }
-  return reply;
-}
-
-export function parseTaskReply(value: unknown): PmReply<TaskProposal> | string {
-  return parseReply(taskReplySchema, value);
+  const parsed = roadmapProposalSchema.safeParse(value);
+  if (!parsed.success) return describeIssue(parsed.error);
+  if (target.kind === "new-roadmap" && parsed.data.roadmap === null)
+    return "roadmap: a new roadmap needs a title and goal";
+  return { kind: "roadmap", proposal: parsed.data };
 }
 
 function fieldProblems(label: string, fields: { title: string; text: string; spec: string | null }): string[] {
@@ -201,22 +179,10 @@ export function toRoadmapPlan(proposal: RoadmapProposal, target: PlanTarget): Ro
   };
 }
 
-export interface ConversationTurn {
-  readonly from: "pm" | "user" | "cclinic";
-  readonly text: string;
-}
-
-export interface PmPromptInput {
-  readonly skill: string;
-  readonly target: PlanTarget;
-  readonly overview: RoadmapOverview;
-  readonly conversation: readonly ConversationTurn[];
-}
-
 function targetInstruction(target: PlanTarget): string {
   switch (target.kind) {
     case "new-roadmap":
-      return "Plan a NEW roadmap. The proposal must have `roadmap` with a title and goal.";
+      return "Plan a NEW roadmap. Your proposal must have `roadmap` with a title and goal.";
     case "extend-roadmap":
       return `EXTEND roadmap ${target.roadmapId}. Set \`roadmap\` to null, and propose only new milestones, which go after its existing ones.`;
     case "task":
@@ -226,42 +192,376 @@ function targetInstruction(target: PlanTarget): string {
   }
 }
 
-function replyFormat(target: PlanTarget): string {
-  const proposal =
-    target.kind === "task"
-      ? '{ "task": { "title", "description", "spec": name or null, "dependsOn": [existing task IDs] }, "milestoneId": number or null, "openQuestions": [] }'
-      : '{ "roadmap": { "title", "goal" } or null, "milestones": [{ "title", "goal", "tasks": [{ "key", "title", "description", "spec": name or null, "dependsOn": [keys of new tasks, or existing task IDs] }] }], "openQuestions": [] }';
-  return [
-    `Reply with JSON only: either { "questions": [1 to ${PLAN_LIMITS.maxQuestions} questions], "proposal": null }`,
-    `or { "questions": [], "proposal": ${proposal} }.`,
-    'An answer of "unknown" means the user doesn\'t know: list it in openQuestions rather than guessing.',
-  ].join("\n");
+function proposalShape(target: PlanTarget): string {
+  return target.kind === "task"
+    ? '{ "task": { "title", "description", "spec": name or null, "dependsOn": [existing task IDs] }, "milestoneId": number or null, "openQuestions": [] }'
+    : '{ "roadmap": { "title", "goal" } or null, "milestones": [{ "title", "goal", "tasks": [{ "key", "title", "description", "spec": name or null, "dependsOn": [keys of new tasks, or existing task IDs] }] }], "openQuestions": [] }';
 }
 
-/** FR-PLAN-006 */
-export function buildPmPrompt(input: PmPromptInput): string {
-  const conversation =
-    input.conversation.length === 0
-      ? "(none yet)"
-      : input.conversation.map((turn) => `[${turn.from}]\n${turn.text}`).join("\n\n");
+export interface PlanContextInput {
+  readonly planId: string;
+  readonly target: PlanTarget;
+  readonly overview: RoadmapOverview;
+  /** The project overview and the specs list, relative to the project folder. */
+  readonly overviewPath: string;
+  readonly specsListPath: string;
+}
+
+/** FR-PLAN-006, FR-PLAN-044: what the PM is planning and what exists, for its first turn or `plan_begin`. */
+export function renderPlanContext(input: PlanContextInput): string {
   return [
-    "You are the PM agent run by `cclinic plan`. Follow these instructions:",
-    "<instructions>",
-    input.skill.trim(),
-    "</instructions>",
+    `Planning session: ${input.planId}. Pass it as \`planId\` to every plan_* tool.`,
     "",
     `## Task\n\n${targetInstruction(input.target)}`,
+    "",
+    `Read the project overview at ${input.overviewPath} and the specs list at ${input.specsListPath}.`,
     "",
     "## Existing roadmaps and tasks (JSON)\n",
     JSON.stringify(input.overview),
     "",
-    `## Conversation so far\n\n${conversation}`,
+    "## Tools",
     "",
-    `## Reply format\n\n${replyFormat(input.target)}`,
+    "- `plan_suggest`: up to 4 short answers the user can pick, and the web pages you used as sources. Call it in any turn where an answer is a choice, and write the choices in your text too.",
+    `- \`plan_propose\`: your proposal, as ${proposalShape(input.target)}. If it returns problems, fix them and call it again in the same turn.`,
+    "",
+    "Reply to the user in plain Markdown text. Never invent an answer: list what the user couldn't answer in openQuestions.",
   ].join("\n");
 }
 
-function dependencyLabel(dependency: string | number): string {
+/**
+ * Marks the user's own first message, which comes first in the first turn's prompt, so it can be shown alone later,
+ * even from a transcript that keeps only the start of a long entry.
+ */
+export const FIRST_MESSAGE_MARKER = "## The user's first message";
+const INSTRUCTIONS_MARKER = "## Your instructions as the PM";
+
+/** FR-PLAN-006: the first turn carries the skill and the context; later turns carry only the user's message. */
+export function buildFirstTurnPrompt(
+  input: PlanContextInput & { readonly skill: string; readonly message: string },
+): string {
+  return [
+    FIRST_MESSAGE_MARKER,
+    "",
+    input.message,
+    "",
+    INSTRUCTIONS_MARKER,
+    "",
+    "You are the PM agent in a cclinic planning session. Follow these instructions:",
+    "<instructions>",
+    input.skill.trim(),
+    "</instructions>",
+    "",
+    renderPlanContext(input),
+  ].join("\n");
+}
+
+/** How the PM reads each stored attachment: the copy, or a DOCX's extracted text (FR-PLAN-006). */
+export function notesOf(stored: readonly StoredAttachment[]): AttachmentNote[] {
+  return stored.map((item) => ({ name: item.name, kind: item.kind, readPath: item.textPath ?? item.path }));
+}
+
+/** What a user message shows of an attachment (FR-PLAN-006). */
+export interface AttachmentNote {
+  readonly name: string;
+  readonly kind: AttachmentKind;
+  /** Where the PM reads it, relative to the project folder: the copy, or a DOCX's extracted text. */
+  readonly readPath: string;
+}
+
+/** FR-PLAN-006: a user message with its attachments listed for the PM to read. */
+export function buildUserMessage(text: string, attachments: readonly AttachmentNote[]): string {
+  if (attachments.length === 0) return text;
+  const listed = attachments.map((item) => `- ${item.name} (${item.kind}): ${item.readPath}`);
+  return [text, "", "Attached (new in this message):", ...listed].join("\n").trim();
+}
+
+/** FR-PLAN-010 */
+export const NUDGE_MESSAGE = "Your last turn ended without a reply to the user. Reply to the user now, in plain text.";
+/** FR-PLAN-031: what a resumed session tells the PM about a waiting proposal that no longer fits. */
+export const PROPOSAL_NO_LONGER_FITS =
+  "Your waiting proposal no longer fits what exists now. Fix these problems and propose again:";
+/** FR-PLAN-024 */
+export const PROPOSE_NOW_MESSAGE =
+  "Propose now from what you know: call plan_propose, and list everything still unclear as open questions.";
+/** FR-PLAN-014: a turn that was stopped is asked for again. */
+export const ANSWER_LAST_MESSAGE = "Your last turn was stopped. Answer my last message.";
+
+/**
+ * FR-PLAN-014: asks for the stopped turn's answer, repeating its message only when Claude Code hadn't written it, so
+ * a repeated message is always one the conversation doesn't show yet.
+ */
+export function answerLastMessage(unanswered: string | null): string {
+  return unanswered === null
+    ? ANSWER_LAST_MESSAGE
+    : `${ANSWER_LAST_MESSAGE} In case you didn't get it, it was:\n\n${unanswered}`;
+}
+
+/** FR-PLAN-014: the user's message a Retry request repeats, or null when it repeats none. */
+export function repeatedMessageOf(text: string): string | null {
+  if (!text.startsWith(ANSWER_LAST_MESSAGE)) return null;
+  const repeated = text.split("\n\n").slice(1).join("\n\n");
+  return repeated === "" ? null : repeated;
+}
+
+/** Whether a message is one cclinic wrote to the PM, such as Retry's request or a nudge, not the user's own. */
+export function isPlanningNote(text: string): boolean {
+  return (
+    text.startsWith(NUDGE_MESSAGE) ||
+    text === PROPOSE_NOW_MESSAGE ||
+    text.startsWith(ANSWER_LAST_MESSAGE) ||
+    text.startsWith(PROPOSAL_NO_LONGER_FITS)
+  );
+}
+
+/** The part of a first-turn prompt the user wrote, or the whole message for any other. */
+export function userPartOf(message: string): string {
+  if (!message.startsWith(FIRST_MESSAGE_MARKER)) return message;
+  const end = message.indexOf(INSTRUCTIONS_MARKER);
+  return message.slice(FIRST_MESSAGE_MARKER.length, end === -1 ? undefined : end).trim();
+}
+
+/**
+ * FR-PLAN-031, FR-PLAN-038: what a message in the transcript shows as the user's: their own words, or the message a
+ * Retry request repeated; null for cclinic's other notes. The terminal, the GUI and the waiting-message rule all read
+ * messages this way.
+ */
+export function shownUserMessage(text: string): string | null {
+  const own = userPartOf(text);
+  return isPlanningNote(own) ? repeatedMessageOf(own) : own;
+}
+
+/** FR-PLAN-007: suggested answers and sources, as `plan_suggest` takes them. */
+export const sourceSchema = z.strictObject({
+  title: z.string().trim().min(1),
+  url: z.string().regex(/^https?:\/\/\S+$/, "must be an http or https URL"),
+});
+export type Source = z.infer<typeof sourceSchema>;
+
+export const suggestionsSchema = z
+  .array(z.string().trim().min(1).max(PLAN_LIMITS.maxSuggestionChars))
+  .max(PLAN_LIMITS.maxSuggestions);
+export const sourcesSchema = z.array(sourceSchema).max(PLAN_LIMITS.maxSources);
+
+export const planIdSchema = z.string().regex(PLAN_ID_PATTERN, "must be a planning session ID, such as plan-1");
+
+export const planTargetSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("new-roadmap") }),
+  z.strictObject({ kind: z.literal("extend-roadmap"), roadmapId: z.number().int().positive() }),
+  z.strictObject({ kind: z.literal("task"), roadmapId: z.number().int().positive().nullable() }),
+]);
+
+export type AttachmentKind = "image" | "document";
+
+/** FR-PLAN-022: an image or a document, by its extension. */
+export function attachmentKind(name: string): AttachmentKind | undefined {
+  if (!name.includes(".")) return undefined;
+  const extension = name.slice(name.lastIndexOf(".")).toLowerCase();
+  if (IMAGE_EXTENSIONS.includes(extension)) return "image";
+  if (DOCUMENT_EXTENSIONS.includes(extension)) return "document";
+  return undefined;
+}
+
+/** FR-PLAN-022: why a file can't be attached, or undefined when it can. */
+export function attachmentProblem(file: { readonly name: string; readonly sizeBytes: number }): string | undefined {
+  const kind = attachmentKind(file.name);
+  if (kind === undefined) {
+    return `${file.name} can't be attached: only images (${IMAGE_EXTENSIONS.join(", ")}) and documents (${DOCUMENT_EXTENSIONS.join(", ")}) can.`;
+  }
+  const maxBytes = kind === "image" ? ATTACHMENT_LIMITS.imageMaxBytes : ATTACHMENT_LIMITS.documentMaxBytes;
+  if (file.sizeBytes > maxBytes) {
+    return `${file.name} is too large: ${kind}s can be at most ${maxBytes / BYTES_PER_MEGABYTE} MB.`;
+  }
+  return undefined;
+}
+
+/** FR-PLAN-022: why this many files can't be sent, or undefined when they can. */
+export function attachmentCountProblem(inMessage: number, alreadyInSession: number): string | undefined {
+  if (inMessage > ATTACHMENT_LIMITS.perMessage) {
+    return `A message can have at most ${ATTACHMENT_LIMITS.perMessage} files.`;
+  }
+  if (inMessage + alreadyInSession > ATTACHMENT_LIMITS.perSession) {
+    return `A planning session can have at most ${ATTACHMENT_LIMITS.perSession} files; it has ${alreadyInSession}.`;
+  }
+  return undefined;
+}
+
+/** FR-PLAN-008 */
+export function messageProblem(text: string, fileCount: number): string | undefined {
+  if (text.trim() === "" && fileCount === 0) return "Write a message or attach a file.";
+  if (text.length > PLAN_LIMITS.maxUserMessageChars) {
+    return `A message can be at most ${PLAN_LIMITS.maxUserMessageChars} characters.`;
+  }
+  return undefined;
+}
+
+/** What the user typed in the terminal (FR-PLAN-024). */
+export type ChatInput =
+  | { readonly kind: "approve" }
+  | { readonly kind: "cancel" }
+  | { readonly kind: "propose" }
+  | { readonly kind: "suggestion"; readonly index: number }
+  | { readonly kind: "message"; readonly text: string; readonly files: readonly string[] };
+
+const ATTACH_COMMAND = "/attach ";
+/** `@"path with spaces"` or `@path`, at the start of a word, so an email address isn't one. */
+const FILE_REFERENCE = /[ \t]*(?<!\S)@(?:"([^"]+)"|(\S+))/g;
+
+/** FR-PLAN-024: a terminal message: a command, a suggestion's number, or text with `@file` references. */
+export function parseChatInput(typed: string): ChatInput {
+  const trimmed = typed.trim();
+  if (trimmed === "/approve") return { kind: "approve" };
+  if (trimmed === "/cancel") return { kind: "cancel" };
+  if (trimmed === "/propose") return { kind: "propose" };
+  if (/^[1-9]\d*$/.test(trimmed)) return { kind: "suggestion", index: Number(trimmed) };
+  if (trimmed.startsWith(ATTACH_COMMAND)) {
+    return {
+      kind: "message",
+      text: "",
+      files: [
+        trimmed
+          .slice(ATTACH_COMMAND.length)
+          .trim()
+          .replace(/^"(.*)"$/, "$1"),
+      ],
+    };
+  }
+  const files: string[] = [];
+  // The reference and the spaces before it are left out; the rest of the message is kept as typed.
+  const text = typed.replace(FILE_REFERENCE, (_match, quoted: string | undefined, bare: string | undefined) => {
+    files.push(quoted ?? bare ?? "");
+    return "";
+  });
+  return { kind: "message", text: text.trim(), files };
+}
+
+/** FR-PLAN-030: who drives a session now. */
+export const holderSchema = z.strictObject({
+  place: z.enum(["terminal", "gui", "claude-code"]),
+  pid: z.number().int().positive(),
+});
+export type Holder = z.infer<typeof holderSchema>;
+export type HolderPlace = Holder["place"];
+
+export const storedAttachmentSchema = z.strictObject({
+  name: z.string().min(1),
+  kind: z.enum(["image", "document"]),
+  /** The copy, relative to the project folder. */
+  path: z.string().min(1),
+  /** A DOCX's extracted text, relative to the project folder. */
+  textPath: z.string().nullable(),
+  sizeBytes: z.number().int().nonnegative(),
+});
+export type StoredAttachment = z.infer<typeof storedAttachmentSchema>;
+
+const waitingProposalSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("roadmap"), proposal: roadmapProposalSchema, proposedAt: z.string() }),
+  z.strictObject({ kind: z.literal("task"), proposal: taskProposalSchema, proposedAt: z.string() }),
+]);
+export type WaitingProposal = z.infer<typeof waitingProposalSchema>;
+
+/** FR-PLAN-030: a planning session's record. The conversation itself is the Claude session's transcript. */
+export const planSessionSchema = z.strictObject({
+  version: z.literal(1),
+  id: planIdSchema,
+  target: planTargetSchema,
+  status: z.enum(["open", "approved", "cancelled"]),
+  claudeSessionId: z.string().nullable(),
+  transcriptPath: z.string().nullable(),
+  /** The start of the first message, for lists. */
+  summary: z.string(),
+  attachments: z.array(storedAttachmentSchema),
+  suggestions: suggestionsSchema,
+  sources: sourcesSchema,
+  proposal: waitingProposalSchema.nullable(),
+  /** The user's last message has no complete reply yet (FR-PLAN-014). */
+  isAwaitingReply: z.boolean(),
+  /**
+   * The user's first message, kept only until the Claude session exists, so a session stopped before its first
+   * turn reached Claude can still start (FR-PLAN-014).
+   */
+  pendingFirstMessage: z.string().nullable().default(null),
+  /**
+   * The newest message sent after the first, kept until it's answered, so a turn stopped before Claude Code wrote
+   * it can send it again (FR-PLAN-014).
+   */
+  unansweredMessage: z.string().nullable().default(null),
+  /** When the turn still waiting for a reply started, to find its reply in the transcript (FR-PLAN-014). */
+  turnStartedAt: z.string().nullable().default(null),
+  holder: holderSchema.nullable(),
+  lastPlace: z.enum(["terminal", "gui", "claude-code"]).nullable(),
+  /** What happened at the end: the saved IDs, or that it was cancelled. */
+  outcome: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type PlanSession = z.infer<typeof planSessionSchema>;
+
+export function summaryOf(message: string): string {
+  const flat = message.replace(/\s+/g, " ").trim();
+  return flat.length > PLAN_LIMITS.summaryChars ? `${flat.slice(0, PLAN_LIMITS.summaryChars - 1)}…` : flat;
+}
+
+export function newPlanSession(fields: {
+  readonly id: string;
+  readonly target: PlanTarget;
+  readonly summary: string;
+  readonly holder: Holder;
+  readonly claudeSessionId: string | null;
+  readonly transcriptPath: string | null;
+  readonly now: string;
+}): PlanSession {
+  return {
+    version: 1,
+    id: fields.id,
+    target: fields.target,
+    status: "open",
+    claudeSessionId: fields.claudeSessionId,
+    transcriptPath: fields.transcriptPath,
+    summary: summaryOf(fields.summary),
+    attachments: [],
+    suggestions: [],
+    sources: [],
+    proposal: null,
+    isAwaitingReply: false,
+    pendingFirstMessage: null,
+    unansweredMessage: null,
+    turnStartedAt: null,
+    holder: fields.holder,
+    lastPlace: fields.holder.place,
+    outcome: null,
+    createdAt: fields.now,
+    updatedAt: fields.now,
+  };
+}
+
+/** The next free ID, after the highest one used in the project (FR-PLAN-030). */
+export function nextPlanId(existing: readonly string[]): string {
+  const numbers = existing
+    .filter((id) => PLAN_ID_PATTERN.test(id))
+    .map((id) => Number(id.slice(PLAN_ID_PREFIX.length)));
+  return `${PLAN_ID_PREFIX}${Math.max(0, ...numbers) + 1}`;
+}
+
+const PLACE_NAMES: Readonly<Record<HolderPlace, string>> = {
+  terminal: "a terminal (cclinic plan)",
+  gui: "the GUI",
+  "claude-code": "Claude Code",
+};
+
+export function placeName(place: HolderPlace): string {
+  return PLACE_NAMES[place];
+}
+
+/** FR-PLAN-043: both ways to continue a session. */
+export function resumeCommands(session: Pick<PlanSession, "id" | "claudeSessionId">): string[] {
+  return [
+    `cclinic plan --resume ${session.id}`,
+    ...(session.claudeSessionId === null ? [] : [`claude --resume ${session.claudeSessionId}`]),
+  ];
+}
+
+/** A dependency as shown: an existing task's ID as `#3`, a new task's key as it is. */
+export function dependencyLabel(dependency: string | number): string {
   return typeof dependency === "number" ? `#${dependency}` : dependency;
 }
 
@@ -304,4 +604,196 @@ export function renderTaskProposal(proposal: TaskProposal, target: PlanTarget): 
     proposal.task.description,
     ...openQuestionLines(proposal.openQuestions),
   ].join("\n");
+}
+
+/**
+ * FR-PLAN-032: takes the session for `holder`, or says where it's held. A hold whose process no longer runs is
+ * taken over. A closed session can't be driven.
+ */
+export function takeHold(
+  session: PlanSession,
+  holder: Holder,
+  isRunning: (pid: number) => boolean,
+  now: string,
+): PlanSession | string {
+  if (session.status !== "open") return `Planning session ${session.id} is ${session.status}, so it can't continue.`;
+  const current = session.holder;
+  const isOwn = current !== null && current.pid === holder.pid && current.place === holder.place;
+  if (current !== null && !isOwn && isRunning(current.pid)) {
+    return `Planning session ${session.id} is open in ${placeName(current.place)}. Close it there to continue here.`;
+  }
+  return { ...session, holder, lastPlace: holder.place, updatedAt: now };
+}
+
+/** Lets go of the session, unless another process holds it now. */
+export function releaseHold(session: PlanSession, holder: Holder, now: string): PlanSession {
+  const isOwn = session.holder?.pid === holder.pid && session.holder.place === holder.place;
+  return isOwn ? { ...session, holder: null, updatedAt: now } : session;
+}
+
+/** Problems with the target a resumed session plans for, from what exists now (FR-PLAN-031). */
+export function missingTarget(target: PlanTarget, overview: RoadmapOverview): string | undefined {
+  const roadmapId = target.kind === "new-roadmap" ? null : target.roadmapId;
+  if (roadmapId === null || overview.roadmaps.some((roadmap) => roadmap.id === roadmapId)) return undefined;
+  return `Roadmap ${roadmapId}, which this session plans for, doesn't exist any more.`;
+}
+
+/** FR-PLAN-011, FR-PLAN-020: the waiting proposal as text. */
+export function renderWaitingProposal(proposal: WaitingProposal, target: PlanTarget): string {
+  return proposal.kind === "task"
+    ? renderTaskProposal(proposal.proposal, target)
+    : renderRoadmapProposal(proposal.proposal, target);
+}
+
+/** FR-PLAN-009, FR-PLAN-019: the problems with a proposal against what exists now. */
+export function checkProposal(
+  proposal: PlannedProposal,
+  context: { readonly tasks: readonly Task[]; readonly target: PlanTarget; readonly overview: RoadmapOverview },
+): string[] {
+  if (proposal.kind === "roadmap") return checkRoadmapProposal(proposal.proposal, context.tasks);
+  const roadmapId = context.target.kind === "task" ? context.target.roadmapId : null;
+  const milestones = context.overview.roadmaps.find((roadmap) => roadmap.id === roadmapId)?.milestones;
+  return checkTaskProposal(proposal.proposal, {
+    existing: context.tasks,
+    roadmapMilestoneIds: roadmapId === null ? undefined : (milestones ?? []).map((milestone) => milestone.id),
+  });
+}
+
+/** FR-PLAN-044: the target and the user's request in their words, for the session list. */
+export const planBeginInputSchema = z.strictObject({
+  target: planTargetSchema,
+  request: z.string().trim().min(1),
+});
+export const planIdInputSchema = z.strictObject({ planId: planIdSchema });
+/** FR-PLAN-007 */
+export const planSuggestInputSchema = z.strictObject({
+  planId: planIdSchema,
+  suggestions: suggestionsSchema,
+  sources: sourcesSchema.default([]),
+});
+/** FR-PLAN-007: the proposal's own shape is checked against the session's target when it runs. */
+export const planProposeInputSchema = z.strictObject({
+  planId: planIdSchema,
+  proposal: z.record(z.string(), z.unknown()),
+});
+
+/** FR-PLAN-045: what the user may answer to a proposal asked about in Claude Code. */
+export const PROPOSAL_ANSWERS = ["approve", "keep chatting", "cancel"] as const;
+
+function shortened(text: string): string {
+  return text.length > TOOL_INPUT_SHORT_CHARS ? `${text.slice(0, TOOL_INPUT_SHORT_CHARS - 1)}…` : text;
+}
+
+function field(input: unknown, name: string): string {
+  if (typeof input !== "object" || input === null || !(name in input)) return "";
+  const value = (input as Record<string, unknown>)[name];
+  return typeof value === "string" ? value : "";
+}
+
+/** FR-PLAN-038, FR-PLAN-042: one tool call as a short line, such as "Read brief.pdf" or "Searched the web: …". */
+export function activityOf(tool: string, input: unknown): string {
+  const planTool = /^mcp__\w+__(plan_\w+)$/.exec(tool)?.[1];
+  if (planTool !== undefined) return planTool;
+  switch (tool) {
+    case "Read":
+      return `Read ${shortened(field(input, "file_path").split("/").at(-1) ?? "")}`;
+    case "Glob":
+    case "Grep":
+      return `Searched the project: ${shortened(field(input, "pattern"))}`;
+    case "WebSearch":
+      return `Searched the web: ${shortened(field(input, "query"))}`;
+    case "WebFetch":
+      return `Read ${shortened(field(input, "url"))}`;
+    default:
+      return tool;
+  }
+}
+
+/** The tool calls in one `stream-json` event from Claude Code, as activity lines. */
+export function activitiesOfEvent(event: unknown): string[] {
+  if (typeof event !== "object" || event === null) return [];
+  const message = (event as { type?: unknown; message?: { content?: unknown } }).message;
+  if ((event as { type?: unknown }).type !== "assistant" || !Array.isArray(message?.content)) return [];
+  return message.content.flatMap((block: unknown) => {
+    if (typeof block !== "object" || block === null) return [];
+    const { type, name, input } = block as { type?: unknown; name?: unknown; input?: unknown };
+    return type === "tool_use" && typeof name === "string" ? [activityOf(name, input)] : [];
+  });
+}
+
+/** Only the calls that take a session link a Claude session to it, so a look from elsewhere never moves it. */
+const LINKING_TOOL_PATTERN = /^mcp__\w+__plan_(begin|resume)$/;
+const PLAN_TOOL_PATTERN = /^mcp__\w+__plan_\w+$/;
+/** `"planId":"plan-3"` in a reply, however many times the reply was quoted as JSON. */
+const TAKEN_PLAN_ID = new RegExp(`\\\\*"planId\\\\*"\\s*:\\s*\\\\*"(${PLAN_ID_SOURCE})\\\\*"`);
+
+/** Whether a tool call is one of cclinic's planning tools, which never link to a change (FR-MCP-045). */
+export function isPlanToolCall(toolName: string | undefined): boolean {
+  return toolName !== undefined && PLAN_TOOL_PATTERN.test(toolName);
+}
+
+/**
+ * FR-MCP-045: the planning session a `plan_begin` or `plan_resume` call took, from its input or its reply.
+ * Undefined for any other tool.
+ */
+export function planIdOfToolCall(toolName: string | undefined, response: unknown): string | undefined {
+  if (toolName === undefined || !LINKING_TOOL_PATTERN.test(toolName)) return undefined;
+  // Only a reply that took the session names it as `planId`; a refusal never does.
+  return TAKEN_PLAN_ID.exec(JSON.stringify(response ?? ""))?.[1];
+}
+
+/** FR-PLAN-044, FR-MCP-045: the Claude Code session that used a planning tool is the session's conversation. */
+export function linkClaudeSession(
+  session: PlanSession,
+  claude: { readonly sessionId: string; readonly transcriptPath: string },
+  now: string,
+): PlanSession {
+  if (session.claudeSessionId === claude.sessionId && session.transcriptPath === claude.transcriptPath) return session;
+  return {
+    ...session,
+    claudeSessionId: claude.sessionId,
+    transcriptPath: claude.transcriptPath,
+    lastPlace: "claude-code",
+    updatedAt: now,
+  };
+}
+
+/**
+ * FR-PLAN-014, FR-PLAN-038: whether the transcript already shows the user's waiting message, so it's shown and sent
+ * once: one of their own messages, or a Retry request repeating it, was written after the turn started. With no turn
+ * time, the newest of those must be it, with no finished reply after it.
+ */
+export function isWaitingMessageWritten(
+  entries: readonly { readonly kind: string; readonly text: string; readonly at: string | null }[],
+  turnStartedAt: string | null,
+  waiting: string,
+): boolean {
+  const own = entries.flatMap((entry) => {
+    const shown = entry.kind === "user" ? shownUserMessage(entry.text) : null;
+    return shown === null ? [] : [{ ...entry, text: shown }];
+  });
+  const start = turnStartedAt === null ? Number.NaN : Date.parse(turnStartedAt);
+  if (Number.isNaN(start)) {
+    const newest = own.at(-1);
+    return newest !== undefined && newest.text === waiting && entries.at(-1)?.kind !== "assistant";
+  }
+  return own.some((entry) => entry.at !== null && Date.parse(entry.at) >= start);
+}
+
+/**
+ * FR-PLAN-014: whether the waiting turn has a complete reply in the transcript, here or in Claude Code after this turn
+ * was stopped. Only what was written after the turn started counts: the conversation moved on (the user wrote another
+ * message of their own), or the PM's newest entry is text, so a lead-in followed by a tool call isn't a reply. An
+ * entry with no time can't be placed, so it never counts as a reply.
+ */
+export function isTurnAnswered(
+  entries: readonly { readonly kind: string; readonly text: string; readonly at: string | null }[],
+  turnStartedAt: string | null,
+): boolean {
+  const start = turnStartedAt === null ? Number.NaN : Date.parse(turnStartedAt);
+  if (Number.isNaN(start)) return false;
+  const since = entries.filter((entry) => entry.at !== null && Date.parse(entry.at) >= start);
+  const ownMessages = since.filter((entry) => entry.kind === "user" && !isPlanningNote(userPartOf(entry.text)));
+  if (ownMessages.length > 1) return true;
+  return since.at(-1)?.kind === "assistant";
 }

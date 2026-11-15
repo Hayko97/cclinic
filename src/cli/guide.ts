@@ -127,11 +127,12 @@ STEP 5: WORK WITH YOUR CODING AGENT
     implement-spec   "Use implement-spec to build the user-login spec."
     test-spec        "Use test-spec to test the user-login spec."
     local-env        "Use local-env to set up the local environment."
-    product-engineer "Help me plan what to build next." (then: cclinic plan)
+    product-engineer "Plan a roadmap for password reset."
     review-doc       "Use review-doc to show how the user-login change will look."
     review-code      "Use review-code to review my uncommitted changes."
 
-  Roadmaps are created only by the PM agent, with "cclinic plan". Tasks are kept
+  Roadmaps are created only by the PM agent: "cclinic plan", the GUI, or your
+  agent with cclinic's MCP server, after you approve. Tasks are kept
   in .cclinic/tasks.db. On each prompt, your agent checks for open tasks, and
   asks whether to work on one, remove it, or keep it.
 
@@ -160,7 +161,7 @@ COMMANDS
   cclinic model --reset   go back to ${DEFAULT_CLAUDE_MODEL.label} at ${DEFAULT_CLAUDE_EFFORT.label.toLowerCase()}
   cclinic skills [path]   install the skills only, with no Claude usage
   cclinic environment [path]  set up a local environment for previews
-  cclinic plan            plan a roadmap with the PM agent. --task for one task
+  cclinic plan            chat with the PM agent to plan a roadmap. --task, --resume
   cclinic auto            run a whole roadmap with agents, with no human
   cclinic tasks roadmaps  list roadmaps with their status, with no Claude usage
   cclinic tasks list      list open tasks. Also: roadmap, add, depend, show, start, done, remove

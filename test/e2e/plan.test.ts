@@ -34,15 +34,21 @@ function project(): string {
 describe("cclinic plan", () => {
   it("TC-PLAN-001: invalid options exit 2 and call no Claude", () => {
     const root = project();
-    for (const args of [
-      ["--roadmap", "abc"],
+    writeProject(root, { "song.mp3": "x", "notes.md": "n" });
+    for (const [args, named] of [
+      [["--roadmap", "abc"], "--roadmap"],
       // Removed: a plan is limited by the Claude plan's own usage limits (FR-PLAN-015).
-      ["--max-budget-usd", "1"],
-      ["--timeout-minutes", "0"],
-    ]) {
+      [["--max-budget-usd", "1"], "--max-budget-usd"],
+      [["--timeout-minutes", "0"], "--timeout-minutes"],
+      [["--attach", "missing.pdf"], "missing.pdf"],
+      [["--attach", "song.mp3"], "song.mp3"],
+      [["--resume", "--task"], "--resume"],
+      [["--resume", "plan-1", "--attach", "notes.md"], "--resume"],
+      [["--resume", "seven"], "--resume"],
+    ] as const) {
       const result = cclinic(["plan", "-C", root, ...args]);
       expect(result.code, args.join(" ")).toBe(2);
-      expect(result.stderr).toContain(args[0]);
+      expect(result.stderr, args.join(" ")).toContain(named);
       expect(result.called).toBe(false);
     }
   });

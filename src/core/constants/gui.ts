@@ -42,12 +42,25 @@ export const GUI_ASSETS = {
     "follow.js",
     "auto.js",
     "plan.js",
+    "markdown.js",
     "router.js",
     "limits.js",
     "styles.css",
   ],
 } as const;
+/** The largest request body. */
 export const GUI_MAX_BODY_BYTES = 1_048_576;
+/**
+ * FR-PLAN-033: the largest body of a planning upload, the one route that takes more: a 20 MB document, sent as
+ * base64, which is a third larger, with room for the JSON around it.
+ */
+export const GUI_MAX_UPLOAD_BODY_BYTES = 28 * GUI_MAX_BODY_BYTES;
+/** FR-PLAN-033: the longest name of an uploaded file. */
+export const GUI_MAX_UPLOAD_NAME_CHARS = 255;
+/** FR-PLAN-022: a waiting upload from another page is dropped after this long, as left behind by it. */
+export const UPLOAD_ORPHAN_MS = 600_000;
+/** FR-PLAN-042: how often the Plan panel's session is checked for changes made elsewhere. */
+export const PLAN_VIEW_POLL_MS = 1_000;
 /** The longest include or exclude pattern, and the most of each, the GUI passes on. */
 export const GUI_MAX_PATTERN_LENGTH = 500;
 export const GUI_MAX_PATTERNS = 100;

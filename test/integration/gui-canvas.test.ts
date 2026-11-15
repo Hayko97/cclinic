@@ -246,7 +246,9 @@ describe("canvas data", () => {
       expect((await sendTo(gui, "POST", route, { title: "x" })).status).toBe(404);
     // Plan creates a roadmap only from a proposal the user approves, so a roadmap's fields start nothing.
     expect((await sendTo(gui, "POST", "/api/plan", { title: "x" })).status).toBe(400);
-    expect(JSON.parse((await sendTo(gui, "GET", "/api/plan")).body)).toEqual({ plan: null });
+    expect(JSON.parse((await sendTo(gui, "GET", "/api/plan")).body)).toMatchObject({
+      plan: { open: null, sessions: [], turn: null, notice: null },
+    });
     for (const command of ["roadmap-add", "milestone-add"])
       expect((await sendTo(gui, "POST", "/api/jobs", { command, title: "x" })).status).toBe(400);
   });

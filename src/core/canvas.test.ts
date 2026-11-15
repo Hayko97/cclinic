@@ -305,7 +305,7 @@ describe("transcript lines", () => {
       JSON.stringify({ type: "something-new", data: 1 }),
       JSON.stringify({ type: "user", message: { content: "key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789" } }),
     ];
-    const parsed = lines.map(parseTranscriptLine);
+    const parsed = lines.map((line) => parseTranscriptLine(line));
     expect(parsed.filter((item) => item.isSkipped)).toHaveLength(2);
     expect(parsed.flatMap((item) => item.entries).map((entry) => [entry.kind, entry.tool, entry.text])).toEqual([
       ["user", null, "Run the tests"],

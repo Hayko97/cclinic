@@ -5,7 +5,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { GUI_ASSETS, GUI_MAX_BODY_BYTES, HTTP_STATUS } from "../../core/constants/gui.js";
+import { GUI_ASSETS, GUI_MAX_BODY_BYTES, GUI_MAX_UPLOAD_BODY_BYTES, HTTP_STATUS } from "../../core/constants/gui.js";
 import { CclinicError, UsageError } from "../../core/errors.js";
 import { SECURITY_HEADERS, type GuiRequest, type GuiResponse } from "../../core/gui.js";
 
@@ -25,25 +25,48 @@ export interface GuiServerOptions {
 
 class BodyTooLarge extends CclinicError {}
 
-async function readBody(request: IncomingMessage): Promise<unknown> {
-  let size = 0;
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) {
-    const buffer = chunk as Buffer;
-    size += buffer.length;
-    if (size > GUI_MAX_BODY_BYTES) throw new BodyTooLarge("The request is too large.");
-    chunks.push(buffer);
-  }
-  if (size === 0) return undefined;
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
-  } catch {
-    // Not JSON: the route's own check refuses it.
-    return null;
-  }
+/**
+ * The JSON body, up to `maxBytes`, which only the route reading it chooses (FR-PLAN-033). The rest of a larger body
+ * is read and dropped, up to the largest any route takes, so the refusal reaches the browser; beyond that, the
+ * connection is cut.
+ */
+function readBody(request: IncomingMessage, maxBytes: number): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > GUI_MAX_UPLOAD_BODY_BYTES) {
+        request.destroy();
+        reject(new BodyTooLarge("The request is too large."));
+      } else if (size <= maxBytes) chunks.push(chunk);
+    });
+    request.on("end", () => {
+      if (size > maxBytes) {
+        reject(new BodyTooLarge("The request is too large."));
+        return;
+      }
+      if (size === 0) {
+        resolve(undefined);
+        return;
+      }
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown);
+      } catch {
+        // Not JSON: the route's own check refuses it.
+        resolve(null);
+      }
+    });
+    request.once("error", reject);
+  });
 }
 
-function writeBody(response: ServerResponse, status: number, headers: Readonly<Record<string, string>>, body: string) {
+function writeBody(
+  response: ServerResponse,
+  status: number,
+  headers: Readonly<Record<string, string>>,
+  body: string | Uint8Array,
+) {
   response.writeHead(status, { ...headers, "content-length": Buffer.byteLength(body) });
   response.end(body);
 }
@@ -74,7 +97,7 @@ async function serve(
     path: url.pathname,
     query: Object.fromEntries(url.searchParams),
     headers,
-    readBody: () => (body ??= readBody(request)),
+    readBody: (maxBytes = GUI_MAX_BODY_BYTES) => (body ??= readBody(request, maxBytes)),
   });
   // A body nobody read is drained, not kept.
   if (body === undefined) request.resume();

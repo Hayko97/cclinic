@@ -3,7 +3,7 @@ import { api, element, notify, remember, remembered, startClock } from "./api.js
 import { drawLimits } from "./limits.js";
 import { addIcons } from "./icons.js";
 import { startAuto } from "./auto.js";
-import { openPlan, startPlan } from "./plan.js";
+import { openPlan, openPlanSession, startPlan } from "./plan.js";
 import { onOpenPlan, setTitleBase, showAttention, startAttention } from "./attention.js";
 import {
   currentCanvas,
@@ -129,7 +129,8 @@ onCanvasChange((canvas, payload) => {
 startPanel();
 startAuto();
 startPlan();
-onOpenPlan((target) => openPlan(target));
+// A Needs you item opens its planning session; the banner opens a new one.
+onOpenPlan((target) => (typeof target === "string" ? openPlanSession(target) : openPlan(target)));
 onPlan((target) => void openPlan(target));
 startClock();
 startAddTask();

@@ -3,6 +3,8 @@ import { BUILD_COMMANDS, SECRET_FILES } from "./environment.js";
 import { TOOL_FOLDER_NAME } from "./paths.js";
 
 export const READ_ONLY_TOOLS: readonly string[] = ["Read", "Glob", "Grep"];
+/** FR-PLAN-005: the PM also researches the web. */
+export const PM_TOOLS: readonly string[] = [...READ_ONLY_TOOLS, "WebSearch", "WebFetch"];
 export const WRITING_TOOLS: readonly string[] = [...READ_ONLY_TOOLS, "Write", "Edit", "Bash"];
 
 /** Claude Code runs read-only commands such as `git status` without an allow rule, so these need explicit denial. */
@@ -21,12 +23,43 @@ export const WORKTREE_AGENT_ALLOWED_TOOLS: readonly string[] = [
   ...BUILD_COMMANDS.map((command) => `Bash(${command} *)`),
 ];
 
-/** FR-PLAN-015. The limits are estimates, recorded as an open question. */
+/** FR-PLAN-007, FR-PLAN-008, FR-PLAN-010, FR-PLAN-015. The limits are estimates, recorded as open questions. */
 export const PLAN_LIMITS = {
-  maxTurns: 20,
-  maxQuestions: 5,
-  invalidRepliesInARow: 2,
+  maxTurns: 40,
+  emptyRepliesInARow: 2,
+  maxReplyChars: 8_000,
+  maxUserMessageChars: 20_000,
+  maxSuggestions: 4,
+  maxSuggestionChars: 200,
+  maxSources: 10,
+  /** The start of the first message, shown in session lists (FR-PLAN-031). */
+  summaryChars: 80,
+  /** A planning transcript entry is shown whole up to here: a 20,000-character message with its file list. */
+  transcriptEntryChars: 40_000,
 } as const;
+
+export const BYTES_PER_MEGABYTE = 1024 * 1024;
+
+/** FR-PLAN-022: what may be attached, and how much. */
+export const ATTACHMENT_LIMITS = {
+  imageMaxBytes: 5 * BYTES_PER_MEGABYTE,
+  documentMaxBytes: 20 * BYTES_PER_MEGABYTE,
+  perMessage: 10,
+  perSession: 30,
+} as const;
+export const IMAGE_EXTENSIONS: readonly string[] = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+export const DOCUMENT_EXTENSIONS: readonly string[] = [".pdf", ".docx", ".md", ".txt", ".csv"];
+
+/** FR-PLAN-030: one folder per planning session. */
+export const PLANS_FOLDER = `${TOOL_FOLDER_NAME}/plans`;
+export const PLAN_SESSION_FILE = "session.json";
+export const PLAN_ATTACHMENTS_FOLDER = "attachments";
+export const PLAN_ID_PREFIX = "plan-";
+/** A planning session ID, such as `plan-3` (FR-PLAN-030). */
+export const PLAN_ID_SOURCE = "plan-[1-9]\\d{0,8}";
+export const PLAN_ID_PATTERN = new RegExp(`^${PLAN_ID_SOURCE}$`);
+/** FR-PLAN-005, FR-MCP-046: the planning tools a PM turn cclinic drives may call. */
+export const PLAN_DRIVEN_TOOL_NAMES = ["plan_status", "plan_suggest", "plan_propose"] as const;
 
 export const AUTO_LIMITS = {
   developers: { minimum: 1, maximum: 8, default: 2 },

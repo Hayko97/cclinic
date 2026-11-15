@@ -125,12 +125,13 @@ Answer a waiting question in the agent's chat, with `cclinic approve`, or in the
 ## 6. Plan work
 
 ```bash
-cclinic plan                 # plan a roadmap with the PM agent
+cclinic plan                 # plan a roadmap with the PM agent, as a chat
 cclinic plan --task          # plan one task
+cclinic plan --resume        # continue a planning session
 cclinic tasks list           # see open tasks
 ```
 
-The PM asks questions, then proposes milestones and tasks. Nothing is saved until you approve. More in [PLANNING_FLOW.md](PLANNING_FLOW.md).
+The PM is a Claude session you chat with in the terminal, the GUI or Claude Code. Attach briefs or screenshots if you like. It researches, asks a few questions at a time, recommends options, then proposes milestones and tasks. Nothing is saved until you approve. More in [PLANNING_FLOW.md](PLANNING_FLOW.md).
 
 ## 7. Run a roadmap with AI
 
