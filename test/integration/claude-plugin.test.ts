@@ -1,5 +1,5 @@
 /** The Claude Code plugin and its marketplace, as committed in the repository (spec: claude-plugin). */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -67,25 +67,20 @@ describe("marketplace and manifest", () => {
 });
 
 describe("what the plugin runs", () => {
-  it("TC-PLUG-004: one MCP server, luseen, runs the pinned package in the project folder", () => {
-    expect(JSON.parse(read(".mcp.json"))).toEqual({
-      mcpServers: { luseen: { command: "npx", args: ["-y", PINNED, "mcp"] } },
-    });
+  const manifest = () => readJson(path.join(PLUGIN, ".claude-plugin/plugin.json"));
+
+  it("TC-PLUG-004: the plugin declares no MCP server", async () => {
+    const files = await buildPluginFiles(REPO);
+    expect([...files.keys()].filter((file) => file.endsWith(".mcp.json"))).toEqual([]);
+    expect(existsSync(path.join(PLUGIN, ".mcp.json"))).toBe(false);
+    expect(manifest()).not.toHaveProperty("mcpServers");
   });
 
-  it("TC-PLUG-005: one PostToolUse hook matches only the plugin's luseen tools", () => {
-    const hooks = JSON.parse(read("hooks/hooks.json")) as {
-      hooks: Record<string, { matcher: string; hooks: { type: string; command: string; args: string[] }[] }[]>;
-    };
-    expect(Object.keys(hooks.hooks)).toEqual(["PostToolUse"]);
-    const [entry] = hooks.hooks["PostToolUse"] ?? [];
-    expect(hooks.hooks["PostToolUse"]).toHaveLength(1);
-    expect(entry?.matcher).toBe("mcp__plugin_luseen_luseen__.*");
-    expect(entry?.hooks).toEqual([{ type: "command", command: "npx", args: ["-y", PINNED, "session-link"] }]);
-    const matcher = new RegExp(`^${entry?.matcher ?? ""}$`);
-    expect(matcher.test("mcp__plugin_luseen_luseen__workflow_status")).toBe(true);
-    expect(matcher.test("mcp__luseen__workflow_status")).toBe(false);
-    expect(matcher.test("mcp__plugin_other_x__y")).toBe(false);
+  it("TC-PLUG-005: the plugin ships no hooks", async () => {
+    const files = await buildPluginFiles(REPO);
+    expect([...files.keys()].filter((file) => file.includes("/hooks/") || file.endsWith("hooks.json"))).toEqual([]);
+    expect(existsSync(path.join(PLUGIN, "hooks"))).toBe(false);
+    expect(manifest()).not.toHaveProperty("hooks");
   });
 });
 
@@ -108,13 +103,20 @@ describe("skills, commands and agents", () => {
       expect(frontmatter(text)["name"]).toBe(name);
       expect(frontmatter(text)["description"]).toMatch(/^".+"$/);
     }
-    expect(skills["init"]).toContain(`npx -y ${PINNED} --yes --plugin`);
-    expect(skills["init"]).toContain("already set up");
-    expect(skills["init"]).toMatch(/Ask whether to start, and wait for their answer/);
-    expect(skills["init"]).toMatch(/If they say no,\*\* do nothing more/);
+    const init = skills["init"] ?? "";
+    expect(init).toContain(`npx -y ${PINNED} --yes --plugin`);
+    expect(init).toContain(`npx -y ${PINNED} skills --plugin`);
+    expect(init).toContain("already set up");
+    expect(init).toMatch(/Ask whether to start, and wait for their answer/);
+    expect(init).toMatch(/If they say no,\*\* do nothing more/);
+    expect(init.match(/`\.mcp\.json`[^\n]*`\.claude\/settings\.json`[^\n]*Ask/g)).toHaveLength(2);
+    expect(init).toContain("/mcp");
     expect(skills["plan"]).toMatch(/Before any other tool call, call .*`plan_begin`/);
+    expect(skills["plan"]).toContain("/luseen:init");
     expect(skills["status"]).toContain("`workflow_status`");
     expect(skills["status"]).toContain("`tasks_list`");
+    expect(skills["status"]).toContain(`npx -y ${PINNED} tasks list --json`);
+    expect(skills["status"]).toContain("/luseen:init");
     expect(skills["gui"]).toContain(`npx -y ${PINNED} gui --no-open --json`);
   });
 
@@ -122,6 +124,7 @@ describe("skills, commands and agents", () => {
     const text = read("agents/pm.md");
     const meta = frontmatter(text);
     expect(meta["name"]).toBe("pm");
+    expect(meta["tools"]).not.toContain("mcp__plugin_");
     expect(new Set(meta["tools"]?.split(", "))).toEqual(
       new Set([
         "Read",
@@ -129,7 +132,7 @@ describe("skills, commands and agents", () => {
         "Glob",
         "WebSearch",
         "WebFetch",
-        ...["begin", "resume", "status", "suggest", "propose"].map((tool) => `mcp__plugin_luseen_luseen__plan_${tool}`),
+        ...["begin", "resume", "status", "suggest", "propose"].map((tool) => `mcp__luseen__plan_${tool}`),
       ]),
     );
     const productEngineer = AGENT_SKILLS.find((skill) => skill.name === "product-engineer");
@@ -149,10 +152,9 @@ describe("generation", () => {
     const bumped = await buildPluginFiles(REPO, { ...info, version: "99.0.0" });
     expect(await findPluginDrift(copy, bumped)).toEqual([
       "plugins/luseen/.claude-plugin/plugin.json",
-      "plugins/luseen/.mcp.json",
-      "plugins/luseen/hooks/hooks.json",
       "plugins/luseen/skills/gui/SKILL.md",
       "plugins/luseen/skills/init/SKILL.md",
+      "plugins/luseen/skills/status/SKILL.md",
     ]);
   });
 
@@ -174,6 +176,8 @@ describe("README", () => {
     expect(readme).toContain(`/plugin marketplace add ${slug}`);
     expect(readme).toContain("/plugin install luseen@luseen");
     expect(readme).toContain("/luseen:init");
+    const pluginSection = readme.slice(readme.indexOf("### Or install the Claude Code plugin"));
+    expect(pluginSection).toMatch(/`\/luseen:init` adds[\s\S]*`\.mcp\.json`[\s\S]*`\.claude\/settings\.json`/);
   });
 });
 

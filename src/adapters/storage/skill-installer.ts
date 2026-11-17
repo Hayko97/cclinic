@@ -106,7 +106,7 @@ export interface InstallOptions {
   readonly isForced: boolean;
   /** Install only into these files, relative to the target (FR-CLI-038). */
   readonly only?: ReadonlySet<string>;
-  /** With the plugin, it brings the skills, server and hook, so only the instruction sections go in (FR-PLUG-013). */
+  /** With the plugin, it brings the skills, so no skill folders go in; the sections, server and hook do (FR-PLUG-013). */
   readonly skillSource?: SkillSource;
 }
 
@@ -152,12 +152,7 @@ export async function installSkills(options: InstallOptions): Promise<readonly S
     [CLAUDE_FILE, renderClaudeBlock()],
   ] as const;
   const entries: SkillInstallEntry[] = [];
-  if (skillSource === "plugin") {
-    for (const [relative, section] of instructions)
-      entries.push({ path: relative, status: await installInstructionFile(path.join(target, relative), section) });
-    return entries;
-  }
-  for (const folder of SKILL_FOLDERS) {
+  for (const folder of skillSource === "plugin" ? [] : SKILL_FOLDERS) {
     for (const skill of AGENT_SKILLS) {
       const relative = `${folder}/${skill.name}/${SKILL_FILE}`;
       if (!isIncluded(relative)) continue;
@@ -192,7 +187,7 @@ export function summarizeInstall(entries: readonly SkillInstallEntry[], skillSou
     .map((label) => `${counts.get(label) ?? 0} ${label}`)
     .join(", ");
   if (skillSource === "plugin")
-    return `Agent instructions: ${summary}. Locations: ${AGENTS_FILE}, ${CLAUDE_FILE}. The skills, MCP server and hook come from the luseen Claude Code plugin.`;
+    return `Agent instructions: ${summary}. Locations: ${AGENTS_FILE}, ${CLAUDE_FILE}, ${MCP_CONFIG_FILE}, ${CLAUDE_SETTINGS_FILE}. The skills come from the luseen Claude Code plugin.`;
   return `Agent skills: ${summary}. Locations: ${SKILL_FOLDERS.join(", ")}, ${AGENTS_FILE}, ${CLAUDE_FILE}, ${MCP_CONFIG_FILE}, ${CLAUDE_SETTINGS_FILE}
 For Codex, add the luseen MCP server to ~/.codex/config.toml:
 ${CODEX_MCP_CONFIG}`;

@@ -14,18 +14,14 @@ export const PLUGIN_MANIFEST_FILE = ".claude-plugin/plugin.json";
 /** FR-PLUG-015: the listing icon, copied from the repository's own logo. */
 export const PLUGIN_ICON_FILE = ".claude-plugin/icon.png";
 export const LOGO_FILE = "assets/luseen-icon.png";
-export const PLUGIN_MCP_FILE = ".mcp.json";
-export const PLUGIN_HOOKS_FILE = "hooks/hooks.json";
 export const PLUGIN_SKILLS_FOLDER = "skills";
 export const PLUGIN_AGENTS_FOLDER = "agents";
 export const PM_AGENT_NAME = "pm";
-/** The plugin runs the package with npx, without asking to install it (FR-PLUG-004). */
+/** The plugin's skills run the package with npx, without asking to install it (FR-PLUG-009, FR-PLUG-010). */
 export const PACKAGE_RUNNER = "npx";
 export const PACKAGE_RUNNER_YES_FLAG = "-y";
 /** The plugin serves every project, so its skills name the default documents folder. */
 export const PLUGIN_DOCS_PATH = `${TOOL_FOLDER_NAME}/${DOCUMENTS_FOLDER_NAME}`;
-/** Claude Code names a plugin's MCP tools `mcp__plugin_<plugin>_<server>__<tool>` (FR-PLUG-005, FR-PLUG-006). */
-export const PLUGIN_TOOL_PREFIX = `mcp__plugin_${PLUGIN_NAME}_${MCP_SERVER_NAME}__`;
 /** FR-PLUG-011: the planning tools the plugin's PM agent may call. */
 export const PM_AGENT_PLAN_TOOL_NAMES = ["plan_begin", "plan_resume", ...PLAN_DRIVEN_TOOL_NAMES] as const;
 /** FR-PLUG-007: what the server's only tool answers in a project that isn't set up. */

@@ -121,7 +121,10 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .option("-y, --yes", "skip the confirmation prompt")
     .option("--no-cache", "re-analyse everything, ignoring cached results")
     .option("--no-skills", "don't install the agent skills")
-    .option("--plugin", "only add the AGENTS.md and CLAUDE.md sections, for the luseen Claude Code plugin")
+    .option(
+      "--plugin",
+      "add the AGENTS.md and CLAUDE.md sections, MCP server and hook, without skill folders, for the luseen Claude Code plugin",
+    )
     .option("--environment", "set up the local environment without asking")
     .option("--no-environment", "don't offer to set up the local environment")
     .option("--no-git", "don't create a repository, use Git history, or alert about a remote")
@@ -194,7 +197,10 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .argument("[path]", "project folder (default: the current folder)")
     .option("-o, --out <dir>", "where the project documents are (default: <path>/.luseen/sdd)")
     .option("-f, --force", "replace luseen skills that were edited")
-    .option("--plugin", "only add the AGENTS.md and CLAUDE.md sections, for the luseen Claude Code plugin")
+    .option(
+      "--plugin",
+      "add the AGENTS.md and CLAUDE.md sections, MCP server and hook, without skill folders, for the luseen Claude Code plugin",
+    )
     .option("--json", "print JSON")
     .addHelpText("after", commandHelp("luseen skills", "luseen skills ./my-project --out docs/sdd --json"))
     .action(async (given: string | undefined, options: SkillsCommandOptions) => {

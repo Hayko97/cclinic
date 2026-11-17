@@ -183,6 +183,19 @@ describe("luseen mcp in a project that isn't set up", () => {
   });
 });
 
+const readJson = (file: string) => JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+
+function expectServerAndHook(root: string): void {
+  expect(readJson(path.join(root, ".mcp.json"))).toEqual({
+    mcpServers: { luseen: { command: "npx", args: ["luseen", "mcp"] } },
+  });
+  expect(readJson(path.join(root, ".claude/settings.json"))).toEqual({
+    hooks: {
+      PostToolUse: [{ matcher: "mcp__luseen__.*", hooks: [{ type: "command", command: "npx luseen session-link" }] }],
+    },
+  });
+}
+
 function expectPluginSections(root: string): void {
   const agents = readFileSync(path.join(root, "AGENTS.md"), "utf8");
   expect(agents).toContain("<!-- luseen:start -->");
@@ -190,20 +203,32 @@ function expectPluginSections(root: string): void {
   expect(agents).toContain("`/luseen:product-engineer`");
   expect(agents).not.toContain(".agents/skills");
   expect(readFileSync(path.join(root, "CLAUDE.md"), "utf8")).toContain("@AGENTS.md");
-  for (const absent of [".agents", ".claude", ".mcp.json"]) expect(existsSync(path.join(root, absent))).toBe(false);
+  expectServerAndHook(root);
+  for (const absent of [".agents", ".claude/skills"]) expect(existsSync(path.join(root, absent))).toBe(false);
 }
 
 describe("--plugin", () => {
-  it("TC-PLUG-014: luseen skills --plugin installs only the AGENTS.md and CLAUDE.md sections", () => {
+  it("TC-PLUG-014: luseen skills --plugin installs the sections, the MCP server and the hook, and no skill folders", () => {
     const root = makeTempFolder();
     const result = luseen(["skills", root, "--plugin"]);
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("Agent instructions: 2 installed");
+    expect(result.stdout).toContain("Agent instructions: 4 installed");
     expect(result.stdout).not.toContain("codex");
     expectPluginSections(root);
   });
 
-  it("TC-PLUG-015: luseen --yes --plugin generates the documents and installs only the sections", () => {
+  it("TC-PLUG-019: luseen skills without --plugin installs everything, as before", () => {
+    const root = makeTempFolder();
+    const result = luseen(["skills", root]);
+    expect(result.code).toBe(0);
+    for (const folder of [".agents/skills", ".claude/skills"])
+      expect(readdirSync(path.join(root, folder)).sort()).toHaveLength(9);
+    expect(readFileSync(path.join(root, "AGENTS.md"), "utf8")).toContain(".agents/skills/");
+    expect(readFileSync(path.join(root, "CLAUDE.md"), "utf8")).toContain("@AGENTS.md");
+    expectServerAndHook(root);
+  });
+
+  it("TC-PLUG-015: luseen --yes --plugin generates the documents and installs the sections, server and hook", () => {
     const root = makeTempFolder();
     writeProject(root, { "src/a.ts": "export const a = 1;\n" });
     const result = luseen([root, "--yes", "--plugin"]);

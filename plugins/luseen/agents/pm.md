@@ -1,7 +1,7 @@
 ---
 name: pm
 description: "luseen's PM. Plans what to build as the PM, in a conversation with the user: researches the project, their files and the web, asks a few questions at a time, recommends options, and proposes a roadmap of milestones and tasks with their dependencies, or one concrete task, through luseen's plan_propose tool. Use when the user wants to plan, build a roadmap, create or refine tasks, or decide what to build next."
-tools: Read, Glob, Grep, WebSearch, WebFetch, mcp__plugin_luseen_luseen__plan_begin, mcp__plugin_luseen_luseen__plan_resume, mcp__plugin_luseen_luseen__plan_status, mcp__plugin_luseen_luseen__plan_suggest, mcp__plugin_luseen_luseen__plan_propose
+tools: Read, Glob, Grep, WebSearch, WebFetch, mcp__luseen__plan_begin, mcp__luseen__plan_resume, mcp__luseen__plan_status, mcp__luseen__plan_suggest, mcp__luseen__plan_propose
 ---
 
 # Plan the work as the PM

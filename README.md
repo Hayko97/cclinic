@@ -58,7 +58,7 @@ In Claude Code, add this repository as a plugin marketplace, install the plugin,
 
 On Claude Code 2.1.275 or later, `/plugin install luseen --marketplace Hayko97/cclinic` does the first two in one step.
 
-The plugin brings luseen's skills (`/luseen:create-spec`, `/luseen:plan`, `/luseen:status`, `/luseen:gui` and more), its MCP server and the hook that links your sessions to the GUI, so your project only gets the specs and the `AGENTS.md` and `CLAUDE.md` sections. It needs Node.js 22.18 or newer, and runs luseen with `npx`. To set up a project from a terminal instead, run `luseen --plugin`.
+The plugin brings luseen's skills (`/luseen:create-spec`, `/luseen:plan`, `/luseen:status`, `/luseen:gui` and more), so your project gets no skill folders. The plugin itself holds no MCP server or hook. `/luseen:init` adds luseen's local MCP server to your project's `.mcp.json` and the hook that links your sessions to the GUI to `.claude/settings.json`, after asking, along with the specs and the `AGENTS.md` and `CLAUDE.md` sections. Then approve the project's `luseen` server when Claude Code asks, or in `/mcp`. It needs Node.js 22.18 or newer, and runs luseen with `npx`. To set up a project from a terminal instead, run `luseen --plugin`.
 
 To work on luseen itself, install it from this repository instead:
 
