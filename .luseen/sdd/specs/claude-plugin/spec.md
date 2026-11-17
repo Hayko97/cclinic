@@ -14,9 +14,10 @@ repository root
 └── plugins/luseen/
     ├── .claude-plugin/plugin.json       name, version = package.json's
     ├── .claude-plugin/icon.png          the logo, from assets/luseen-icon.png
-    ├── skills/<9 agent skills>/SKILL.md
+    ├── skills/<10 agent skills>/SKILL.md
     ├── skills/{init,plan,status,gui}/SKILL.md     /luseen:init … /luseen:gui
-    └── agents/pm.md                     read-only PM agent
+    ├── agents/pm.md                     read-only PM agent
+    └── agents/designer.md               UI/UX designer and UI developer (ui-design FR-DSGN-038)
 
 user's project, after /luseen:init or `luseen`
 ├── .mcp.json                            luseen → npx luseen mcp
@@ -50,7 +51,7 @@ Publishing (npm publish, pushing the repository, submitting to Anthropic's direc
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-PLUG-008 | `plugins/luseen/skills/` must hold the nine agent skills, each identical to what `luseen skills` writes for the documents folder `.luseen/sdd`. | confirmed | `src/core/claude-plugin.ts:178-179`, `test/integration/claude-plugin.test.ts` TC-PLUG-010 |
+| FR-PLUG-008 | `plugins/luseen/skills/` must hold the ten agent skills, each identical to what `luseen skills` writes for the documents folder `.luseen/sdd`. | confirmed | `src/core/claude-plugin.ts:178-179`, `test/integration/claude-plugin.test.ts` TC-PLUG-010 |
 | FR-PLUG-009 | The skill `init` (`/luseen:init`) must tell Claude to: (1) when the project has `.luseen/sdd` and `.mcp.json` has a `luseen` server, say it's already set up and stop; (2) when it has `.luseen/sdd` but no `luseen` server in `.mcp.json`, tell the user it will add luseen's local MCP server to `.mcp.json` and its hook to `.claude/settings.json`, without using Claude usage, ask, and on yes run `npx -y luseen@<version> skills --plugin` in the project root; (3) otherwise tell the user that setup analyses the project with their Claude usage, writes the specs and the `AGENTS.md` and `CLAUDE.md` sections, and adds luseen's local MCP server to `.mcp.json` and its hook to `.claude/settings.json`, ask before starting, and on yes run `npx -y luseen@<version> --yes --plugin` in the project root. After a command succeeds, it must tell the user to restart Claude Code or run `/mcp`, and approve the project's `luseen` server. On no, it must do nothing. | confirmed | `src/core/claude-plugin.ts:58-71`, `plugins/luseen/skills/init/SKILL.md`, `test/integration/claude-plugin.test.ts` TC-PLUG-011, `user request 2026-11-17` |
 | FR-PLUG-010 | The skill `plan` (`/luseen:plan`) must start planning as the `product-engineer` skill does from Claude Code (roadmap-planning FR-PLAN-044), with `plan_begin` first; when luseen's MCP tools aren't available, it must tell the user to run `/luseen:init` and stop. The skill `status` (`/luseen:status`) must call `workflow_status` and `tasks_list` and summarise the current change, its waiting gate and the open tasks; when luseen's MCP tools aren't available, it must run `npx -y luseen@<version> tasks list --json`, summarise the open tasks, and say that the change's status needs luseen's MCP server, which `/luseen:init` adds. The skill `gui` (`/luseen:gui`) must start `npx -y luseen@<version> gui --no-open --json` in the background in the project root and give the user the link it prints. | confirmed | `src/core/claude-plugin.ts:72-108`, `test/integration/claude-plugin.test.ts` TC-PLUG-011, `user request 2026-11-17` |
 | FR-PLUG-011 | `plugins/luseen/agents/pm.md` must define the agent `pm` with the `product-engineer` skill's instructions, and `tools` limited to `Read`, `Grep`, `Glob`, `WebSearch`, `WebFetch` and the project server's planning tools `mcp__luseen__plan_begin`, `mcp__luseen__plan_resume`, `mcp__luseen__plan_status`, `mcp__luseen__plan_suggest` and `mcp__luseen__plan_propose`, so it can't edit files or run commands. | confirmed | `src/core/claude-plugin.ts:118-130`, `plugins/luseen/agents/pm.md`, `test/integration/claude-plugin.test.ts` TC-PLUG-012, `user request 2026-11-17` |

@@ -85,10 +85,11 @@ describe("what the plugin runs", () => {
 });
 
 describe("skills, commands and agents", () => {
-  it("TC-PLUG-010: the nine agent skills are byte-identical to what luseen skills writes", async () => {
+  it("TC-PLUG-010, TC-DSGN-003: the ten agent skills are byte-identical to what luseen skills writes", async () => {
     const root = makeTempFolder();
     await installSkills({ target: root, out: path.join(root, ".luseen/sdd"), isForced: false });
-    expect(AGENT_SKILLS).toHaveLength(9);
+    expect(AGENT_SKILLS).toHaveLength(10);
+    expect(read("skills/ui-design/SKILL.md")).toContain("# Design the user interface");
     for (const skill of AGENT_SKILLS)
       expect(read(`skills/${skill.name}/SKILL.md`)).toBe(
         readFileSync(path.join(root, ".agents/skills", skill.name, "SKILL.md"), "utf8"),
@@ -137,6 +138,29 @@ describe("skills, commands and agents", () => {
     );
     const productEngineer = AGENT_SKILLS.find((skill) => skill.name === "product-engineer");
     expect(text).toContain(productEngineer?.body.replaceAll("{{DOCS}}", ".luseen/sdd"));
+  });
+
+  it("TC-DSGN-050: the designer agent has the ui-design instructions, its 8 tools and the lifecycle line", async () => {
+    const text = read("agents/designer.md");
+    const meta = frontmatter(text);
+    expect(meta["name"]).toBe("designer");
+    expect(meta["description"]).toContain("design systems, UI/UX design and building UI");
+    expect(meta["tools"]?.split(", ")).toEqual([
+      "Read",
+      "Glob",
+      "Grep",
+      "Write",
+      "Edit",
+      "Bash",
+      "WebSearch",
+      "WebFetch",
+    ]);
+    expect(text).toContain("Follow the project's `AGENTS.md` lifecycle for every code change");
+    const uiDesign = AGENT_SKILLS.find((skill) => skill.name === "ui-design");
+    expect(text).toContain(uiDesign?.body.replaceAll("{{DOCS}}", ".luseen/sdd"));
+    const root = makeTempFolder();
+    await installSkills({ target: root, out: path.join(root, ".luseen/sdd"), isForced: false });
+    expect(readFileSync(path.join(root, ".claude/agents/designer.md"), "utf8")).toBe(text);
   });
 });
 

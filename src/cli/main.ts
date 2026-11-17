@@ -17,6 +17,7 @@ import {
   UsageError,
   ValidationFailedError,
 } from "../core/errors.js";
+import { runDesignCommand, type DesignCommandOptions } from "./design-command.js";
 import { runEnvironmentCommand, type EnvironmentCommandOptions } from "./environment-command.js";
 import { runGenerate, type CommandContext, type GenerateOptions } from "./generate-command.js";
 import { commandHelp, GUIDE_TEXT, HELP_HOW_IT_WORKS } from "./guide.js";
@@ -127,6 +128,8 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     )
     .option("--environment", "set up the local environment without asking")
     .option("--no-environment", "don't offer to set up the local environment")
+    .option("--design", "create the design system without asking")
+    .option("--no-design", "don't offer to create the design system")
     .option("--no-git", "don't create a repository, use Git history, or alert about a remote")
     .option("--allow-broad-target", "allow running on a home folder or filesystem root")
     .optionsGroup("Limits:")
@@ -158,6 +161,11 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
         (process.argv.includes("--no-environment") || process.argv.includes("--no-skills"))
       )
         throw new UsageError("--environment can't be used with --no-environment or --no-skills.");
+      if (
+        process.argv.includes("--design") &&
+        (process.argv.includes("--no-design") || process.argv.includes("--no-skills"))
+      )
+        throw new UsageError("--design can't be used with --no-design or --no-skills.");
       await runGenerate(given, options, context);
     });
 
@@ -315,6 +323,23 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
     .addHelpText("after", commandHelp("luseen environment", "luseen environment ./my-project --yes --json"))
     .action(async (given: string | undefined, options: EnvironmentCommandOptions) => {
       await runEnvironmentCommand(given, options, context);
+    });
+
+  program
+    .command("design")
+    .description("Create a design system for the project's user interface, using Claude")
+    .argument("[path]", "project folder (default: the current folder)")
+    .option("-o, --out <dir>", "where the project documents are (default: <path>/.luseen/sdd)")
+    .option("-m, --model [value]", "model to use. With no value, opens a menu")
+    .option("--effort [value]", "reasoning level. With no value, opens a menu")
+    .option("--max-budget-usd <n>", "stop at this estimated spend (default: 2)", positiveNumber)
+    .option("-y, --yes", "skip the confirmation prompt")
+    .option("-f, --force", "create the design system again")
+    .option("--allow-broad-target", "allow running on a home folder or filesystem root")
+    .option("--json", "print JSON")
+    .addHelpText("after", commandHelp("luseen design", "luseen design ./my-project --yes --json"))
+    .action(async (given: string | undefined, options: DesignCommandOptions) => {
+      await runDesignCommand(given, options, context);
     });
 
   program

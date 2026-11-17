@@ -10,6 +10,22 @@ import { BUDGET_DECIMAL_PLACES } from "../../core/constants/llm.js";
 import type { Effort, ModelChoice } from "../../core/models.js";
 import { claudeEnvironment, requireSuccessfulResult, resultMessage, runProcess } from "./claude-cli.js";
 
+/** The tools a step's agent may use: the local environment by default, or the design system (FR-DSGN-028). */
+export interface AgentToolSet {
+  readonly tools: readonly string[];
+  readonly allowed: readonly string[];
+  readonly denied: readonly string[];
+  /** What the step does, as in "Setting up the environment stopped at its limit". */
+  readonly activity: string;
+}
+
+export const ENVIRONMENT_TOOL_SET: AgentToolSet = {
+  tools: ENVIRONMENT_AGENT_TOOLS,
+  allowed: ENVIRONMENT_AGENT_ALLOWED_TOOLS,
+  denied: ENVIRONMENT_AGENT_DENIED_TOOLS,
+  activity: "Setting up the environment",
+};
+
 export interface EnvironmentAgentRequest {
   readonly target: string;
   readonly prompt: string;
@@ -19,6 +35,7 @@ export interface EnvironmentAgentRequest {
   readonly environment: NodeJS.ProcessEnv;
   readonly signal: AbortSignal;
   readonly timeoutMs?: number;
+  readonly toolSet?: AgentToolSet;
 }
 
 export interface EnvironmentAgentResult {
@@ -26,7 +43,13 @@ export interface EnvironmentAgentResult {
   readonly finalMessage: string;
 }
 
-export function buildEnvironmentAgentArgs(input: { model: string; effort: string; maxBudgetUsd: number }): string[] {
+export function buildEnvironmentAgentArgs(input: {
+  model: string;
+  effort: string;
+  maxBudgetUsd: number;
+  toolSet?: AgentToolSet;
+}): string[] {
+  const toolSet = input.toolSet ?? ENVIRONMENT_TOOL_SET;
   return [
     "-p",
     "--model",
@@ -37,11 +60,11 @@ export function buildEnvironmentAgentArgs(input: { model: string; effort: string
     "stream-json",
     "--verbose",
     "--tools",
-    ...ENVIRONMENT_AGENT_TOOLS,
+    ...toolSet.tools,
     "--allowedTools",
-    ...ENVIRONMENT_AGENT_ALLOWED_TOOLS,
+    ...toolSet.allowed,
     "--disallowedTools",
-    ...ENVIRONMENT_AGENT_DENIED_TOOLS,
+    ...toolSet.denied,
     "--permission-mode",
     "dontAsk",
     "--no-session-persistence",
@@ -54,18 +77,20 @@ export function buildEnvironmentAgentArgs(input: { model: string; effort: string
 
 export async function runEnvironmentAgent(request: EnvironmentAgentRequest): Promise<EnvironmentAgentResult> {
   const timeoutMs = request.timeoutMs ?? ENVIRONMENT_TIMEOUT_MS;
+  const toolSet = request.toolSet ?? ENVIRONMENT_TOOL_SET;
   const { events, exitCode } = await runProcess(
     buildEnvironmentAgentArgs({
       model: request.model,
       effort: request.effort,
       maxBudgetUsd: request.maxBudgetUsd,
+      toolSet,
     }),
     request.prompt,
     {
       cwd: request.target,
       environment: claudeEnvironment(request.environment, LIMITS.maxRetries.default),
       timeoutMs,
-      timeoutMessage: `Setting up the environment stopped at its limit of ${timeoutMs / MS_PER_MINUTE} minutes.`,
+      timeoutMessage: `${toolSet.activity} stopped at its limit of ${timeoutMs / MS_PER_MINUTE} minutes.`,
       signal: request.signal,
       onEvent: () => undefined,
     },

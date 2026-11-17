@@ -4,6 +4,14 @@
  * {{DOCS}} is replaced with the documents folder, relative to the project root.
  */
 
+import {
+  DESIGN_FOLDER,
+  DESIGN_SYSTEM_FILE,
+  DESIGN_TOKENS_FILE,
+  DESIGNER_AGENT_NAME,
+  DESIGNER_AGENT_TOOLS,
+  UI_DESIGN_SKILL_NAME,
+} from "./constants/design.js";
 import { LOCAL_ENV_SKILL_NAME, ENVIRONMENT_FILE, ENVIRONMENT_FOLDER } from "./constants/environment.js";
 import {
   AGENTS_FILE,
@@ -17,6 +25,8 @@ import {
   REVIEWS_FOLDER,
   TOOL_FOLDER_NAME,
 } from "./constants/paths.js";
+import { UI_DESIGN_SKILL } from "./design.js";
+
 export interface AgentSkill {
   readonly name: string;
   readonly description: string;
@@ -443,6 +453,7 @@ Talk with the user the way a good PM talks with a client, and turn their idea in
 6. **Propose with \`plan_propose\`.** Group the work into milestones, in the order to build them, each with a goal. Make each task one deliverable change, and name the existing spec it belongs to, or say that a new spec is needed. Give each task its dependencies: the keys of new tasks, or the IDs of existing tasks, that must be done first, so it can be run in dependency order by automated mode. List what's still unclear as open questions. If \`plan_propose\` returns problems, fix them and call it again.
    - **Take the existing roadmaps into account.** Don't propose a task that repeats an existing one.
    - **When extending a roadmap,** propose only new milestones. They're added after its existing ones.
+   - **Design comes first.** When planning a new roadmap for a product with a user interface, and \`${DESIGN_FOLDER}/${DESIGN_SYSTEM_FILE}\` doesn't exist or its status is \`draft\`, propose a task in the first milestone to create or approve the design system with the \`${UI_DESIGN_SKILL_NAME}\` skill, and make each task that builds UI depend on it.
    - **For a single task,** talk through that one change only, and propose exactly one task that is one deliverable change, with its spec and its dependencies on existing tasks. When it goes into a roadmap, choose the existing milestone it fits best.
 7. **Revise on feedback.** The user approves, cancels or keeps talking. If they send feedback, revise the proposal, asking more questions if you need to.
 `,
@@ -534,6 +545,7 @@ When two conflict, the earlier one wins:
 | Tests | Each changed behaviour is tested, and the tests check what the spec says. No skipped, deleted or weakened tests |
 | Comments and dead code | No comments restating the code. No unused code, imports or parameters, and no TODOs or stubs presented as finished |
 | Docs | Docs, help text and examples that the change makes wrong are updated |
+| Design system | Only when the change touches UI and \`${DESIGN_FOLDER}/${DESIGN_TOKENS_FILE}\` exists, and always \`should-fix\`: each raw color, font size, spacing, radius, shadow or duration in UI code that a token covers; each component state \`${DESIGN_SYSTEM_FILE}\` lists that the change leaves out; and each text or control color pair below 4.5:1 for normal text, or 3:1 for large text, icons, input borders and focus indicators |
 
 ## Severity
 
@@ -561,6 +573,7 @@ Verdict: changes
 The verdict is \`approve\` when no \`blocking\` or \`should-fix\` findings remain, otherwise \`changes\`.
 `,
   },
+  UI_DESIGN_SKILL,
 ];
 
 const GENERATED_MARK = "generated-by: luseen";
@@ -621,12 +634,13 @@ Analyse every prompt, and follow this lifecycle:
 
 **0. Check open tasks.** On every prompt, first run \`luseen tasks list --json\`. If it lists tasks and the prompt isn't about one of them, list them (ID, title, status, spec), and wait for the user to choose: work on one of them, remove it with \`luseen tasks remove <id>\` and continue with the prompt, or keep it and continue with the prompt. Once the user chooses to keep them, don't ask about the same tasks again in this conversation, only when a new task appears. If there are no tasks, don't mention them. If the command fails, say so in one line and continue.
 
-**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, plan it with the \`product-engineer\` skill. It saves a roadmap or task only through the luseen MCP tools \`plan_begin\` and \`plan_propose\`, after the user approves. Never create roadmaps, milestones or roadmap tasks any other way. Without the luseen MCP server, tell the user to run \`luseen plan\`, or \`luseen plan --task\` for one concrete task. Don't start spec or code work. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask. When work starts on a task, run \`luseen tasks start <id>\`, and use the task's spec.
+**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, plan it with the \`product-engineer\` skill. It saves a roadmap or task only through the luseen MCP tools \`plan_begin\` and \`plan_propose\`, after the user approves. Never create roadmaps, milestones or roadmap tasks any other way. Without the luseen MCP server, tell the user to run \`luseen plan\`, or \`luseen plan --task\` for one concrete task. Don't start spec or code work. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask. When work starts on a task, run \`luseen tasks start <id>\`, and use the task's spec. For a design request, such as a design system, a new screen, a redesign or visual polish, use the \`${UI_DESIGN_SKILL_NAME}\` skill, and use it with \`write-code\` for every change that touches UI.
 
 **2. Refine the spec, and get it approved.**
 - **New feature:** use the \`refine-spec\` skill if it belongs in an existing spec, or the \`create-spec\` skill if not.
 - **Bug or issue:** use \`refine-spec\`. Add a test case that reproduces it, and correct any requirement that's wrong or missing.
 - **No behaviour change**, such as a refactor, formatting, a typo or a dependency update: no spec update is needed. Go to stage 3.
+- **UI change with no approved design system** (\`${DESIGN_FOLDER}/${DESIGN_SYSTEM_FILE}\` is missing or a \`draft\`): also create or finish it with the \`${UI_DESIGN_SKILL_NAME}\` skill. The user approves it at this stage, before stage 3.
 
 Show what changed in \`spec.md\`, \`validation.md\` and \`verification.md\`, and any open questions. Then offer the user three options, and stop until they choose one. Don't change production code until they clearly approve:
 - **\`approve\`:** go to stage 3.
@@ -646,6 +660,23 @@ Any other reply, such as a question, isn't approval: answer it, and offer the op
 **4. Ask to commit.** Once the user approves the implementation, run \`luseen tasks done <id>\` if it was a task, state any \`blocking\` or \`should-fix\` review finding that's still open, then ask whether to commit it. Only if they agree, commit the spec, code and tests for this change together, following the project's commit conventions and referencing the requirement IDs. Stage only files that belong to this change, and leave out review docs in \`${REVIEWS_FOLDER}/\` unless the user asks for them. Don't push unless asked. If they decline, leave the changes uncommitted.
 
 If the user tells you to skip a stage, do as they ask, and say which stage was skipped. If \`{{DOCS}}\` doesn't exist, ask the user to run \`luseen\` first. If nobody can answer, as in an unattended run, stop at stage 2 and report the spec, because silence isn't approval.`;
+
+/** FR-DSGN-038, FR-DSGN-039: the designer agent, stamped like a skill so an edited copy is kept. */
+export function renderDesignerAgent(docsPath: string, hash: (text: string) => string): string {
+  const unstamped = `---
+name: ${DESIGNER_AGENT_NAME}
+description: ${JSON.stringify(`${PRODUCT_NAME}'s UI/UX designer and UI developer. Use it for design systems, UI/UX design and building UI. ${UI_DESIGN_SKILL.description}`)}
+tools: ${DESIGNER_AGENT_TOOLS.join(", ")}
+metadata:
+  ${GENERATED_MARK}
+  content-hash: ""
+---
+
+Follow the project's \`${AGENTS_FILE}\` lifecycle for every code change, including UI code: spec approval, QA, code review and the preview.
+
+${UI_DESIGN_SKILL.body.replaceAll("{{DOCS}}", docsPath)}`;
+  return withHash(unstamped, hash(unstamped));
+}
 
 /** Where the agent finds the skills: the project's own folders, or the luseen Claude Code plugin (FR-PLUG-013). */
 export type SkillSource = "project" | "plugin";

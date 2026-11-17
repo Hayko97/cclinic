@@ -4,7 +4,7 @@
 
 Provide the luseen command-line interface with commands, options, limits, confirmation, output modes, safety checks and exit codes.
 
-`luseen environment`, `--environment` and `--no-environment` are specified in [local-environment](../local-environment/spec.md).
+`luseen environment`, `--environment` and `--no-environment` are specified in [local-environment](../local-environment/spec.md). `luseen design`, `--design` and `--no-design` are specified in [ui-design](../ui-design/spec.md) (FR-DSGN-023 to FR-DSGN-034).
 
 ## Requirements
 

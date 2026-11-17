@@ -278,6 +278,9 @@ describe("the environment store", () => {
       ".luseen/environment/compose.yaml": "x",
       ".luseen/sdd/overview.md": "x",
     });
-    expect([...(await snapshotFiles(root)).keys()].sort()).toEqual([".luseen/sdd/overview.md", "src/a.ts"]);
+    expect([...(await snapshotFiles(root, ".luseen/environment")).keys()].sort()).toEqual([
+      ".luseen/sdd/overview.md",
+      "src/a.ts",
+    ]);
   });
 });

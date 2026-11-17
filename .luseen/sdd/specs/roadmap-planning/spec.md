@@ -8,6 +8,8 @@ Make the PM agent the only way to create or extend a roadmap, and make planning 
 - **Plan in the GUI**, a chat in the side panel that mirrors the session's transcript live
 - **Claude Code itself**, by asking to plan there, or by resuming the session with `claude --resume <session-id>`
 
+For a product with a user interface and no approved design system, the PM proposes a design-system task first ([ui-design](../ui-design/spec.md) FR-DSGN-035).
+
 The user describes what they want in their own words and can attach images and documents, such as a brief, a mockup or a screenshot. The PM researches the project, its specs, the attachments and, when it helps, the web. It then talks the work through like a PM with a client: it asks questions, explains options with a recommendation, answers the user's own questions, and plays back what it understood. When the work is clear, it proposes either a roadmap of milestones and tasks with their dependencies, or one concrete task, through luseen's MCP tool `plan_propose`. luseen checks the proposal, and saves it only after the user approves it. [automated-mode](../automated-mode/spec.md) runs a saved roadmap, including any single tasks added to it. Users can still add quick tasks by hand with `luseen tasks add`.
 
 Roadmaps, milestones, tasks and dependencies are stored as described in [task-tracking](../task-tracking/spec.md). The PM's planning instructions are the `product-engineer` skill in [agent-skills](../agent-skills/spec.md). The planning tools are served by [mcp-server](../mcp-server/spec.md). The GUI's Plan panel is part of [gui](../gui/spec.md), and uses its existing design system in both the light and dark themes.

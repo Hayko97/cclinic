@@ -54,6 +54,7 @@ import {
 } from "../core/git-history.js";
 import type { LlmProvider, ScanResult } from "../core/ports.js";
 import type { CommandContext } from "./command-context.js";
+import { formatDesignOutcome, setUpDesignAfterGenerate } from "./design-step.js";
 import { formatEnvironmentOutcome, setUpAfterGenerate } from "./environment-step.js";
 import { NEXT_STEPS } from "./guide.js";
 import { askToConfirm, chooseEffort, chooseModel, isInteractive } from "./menus.js";
@@ -83,6 +84,7 @@ export interface GenerateOptions {
   readonly skills?: boolean;
   readonly plugin?: boolean;
   readonly environment?: boolean;
+  readonly design?: boolean;
   readonly git?: boolean;
   readonly quiet?: boolean;
 }
@@ -497,8 +499,24 @@ export async function runGenerate(
         },
         context,
       );
+    const setUpDesign = () =>
+      setUpDesignAfterGenerate(
+        {
+          target,
+          out: paths.out,
+          model,
+          effort,
+          maxBudgetUsd: options.maxBudgetUsd,
+          isClaudeCli: provider.name === "claude-cli",
+          wereSkillsInstalled: skills.length > 0,
+          requested: options.design,
+          mayAsk: options.yes !== true && options.quiet !== true && options.json !== true,
+        },
+        context,
+      );
     if (options.json === true) {
       const environmentOutcome = await setUpEnvironment();
+      const designOutcome = await setUpDesign();
       reporter.result(
         JSON.stringify({
           status: "success",
@@ -516,6 +534,7 @@ export async function runGenerate(
           skills,
           git: gitResult,
           environment: environmentOutcome,
+          design: designOutcome,
         }),
       );
       return;
@@ -544,6 +563,8 @@ export async function runGenerate(
     );
     const environmentText = formatEnvironmentOutcome(await setUpEnvironment());
     if (environmentText !== undefined) reporter.result(`\n${environmentText}`);
+    const designText = formatDesignOutcome(await setUpDesign());
+    if (designText !== undefined) reporter.result(`\n${designText}`);
   } finally {
     await releaseLock();
   }

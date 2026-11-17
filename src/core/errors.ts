@@ -20,6 +20,8 @@ export class ValidationFailedError extends LuseenError {
 export class CancelledError extends LuseenError {}
 /** Exits like a Claude failure, but re-running starts this step again rather than continuing it. */
 export class EnvironmentStepError extends LuseenError {}
+/** The design system step failed or reached a limit, so it exits like a Claude failure (FR-DSGN-030). */
+export class DesignStepError extends LuseenError {}
 /** A planning session approved or cancelled elsewhere, so it takes no more turns (FR-PLAN-032). */
 export class SessionClosedError extends UsageError {
   constructor(
@@ -91,7 +93,12 @@ export function exitCodeFor(error: unknown): number {
   if (error instanceof CancelledError) return EXIT_CODES.sigint;
   if (error instanceof UsageError) return EXIT_CODES.usage;
   if (error instanceof NoProviderError) return EXIT_CODES.noProvider;
-  if (error instanceof LlmError || error instanceof EnvironmentStepError || error instanceof AgentSessionError)
+  if (
+    error instanceof LlmError ||
+    error instanceof EnvironmentStepError ||
+    error instanceof DesignStepError ||
+    error instanceof AgentSessionError
+  )
     return EXIT_CODES.llm;
   if (error instanceof ValidationFailedError) return EXIT_CODES.validation;
   return EXIT_CODES.internal;

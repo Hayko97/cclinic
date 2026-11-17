@@ -10,9 +10,11 @@ import {
   mergeManagedSection,
   renderAgentsBlock,
   renderClaudeBlock,
+  renderDesignerAgent,
   renderSkill,
   type SkillSource,
 } from "../../core/agent-skills.js";
+import { CLAUDE_AGENTS_FOLDER, DESIGNER_AGENT_NAME } from "../../core/constants/design.js";
 import { AGENTS_FILE, CLAUDE_FILE, LEGACY_NAME, SKILL_FILE, SKILL_FOLDERS } from "../../core/constants/paths.js";
 import { CLAUDE_SETTINGS_FILE, CODEX_MCP_CONFIG, MCP_CONFIG_FILE } from "../../core/constants/workflow.js";
 import { holdsLegacyEntry, mergeClaudeSettings, mergeMcpConfig, type McpConfigMerge } from "../../core/mcp-config.js";
@@ -164,6 +166,12 @@ export async function installSkills(options: InstallOptions): Promise<readonly S
       entries.push({ path: relative, status });
     }
   }
+  const designerAgent = `${CLAUDE_AGENTS_FOLDER}/${DESIGNER_AGENT_NAME}.md`;
+  if (skillSource === "project" && isIncluded(designerAgent))
+    entries.push({
+      path: designerAgent,
+      status: await installSkillFile(path.join(target, designerAgent), renderDesignerAgent(docsPath, sha256), isForced),
+    });
   for (const [relative, section] of instructions)
     if (isIncluded(relative))
       entries.push({ path: relative, status: await installInstructionFile(path.join(target, relative), section) });
@@ -188,7 +196,7 @@ export function summarizeInstall(entries: readonly SkillInstallEntry[], skillSou
     .join(", ");
   if (skillSource === "plugin")
     return `Agent instructions: ${summary}. Locations: ${AGENTS_FILE}, ${CLAUDE_FILE}, ${MCP_CONFIG_FILE}, ${CLAUDE_SETTINGS_FILE}. The skills come from the luseen Claude Code plugin.`;
-  return `Agent skills: ${summary}. Locations: ${SKILL_FOLDERS.join(", ")}, ${AGENTS_FILE}, ${CLAUDE_FILE}, ${MCP_CONFIG_FILE}, ${CLAUDE_SETTINGS_FILE}
+  return `Agent skills: ${summary}. Locations: ${SKILL_FOLDERS.join(", ")}, ${CLAUDE_AGENTS_FOLDER}, ${AGENTS_FILE}, ${CLAUDE_FILE}, ${MCP_CONFIG_FILE}, ${CLAUDE_SETTINGS_FILE}
 For Codex, add the luseen MCP server to ~/.codex/config.toml:
 ${CODEX_MCP_CONFIG}`;
 }

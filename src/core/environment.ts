@@ -79,13 +79,19 @@ export function formatEnvironmentReview(file: EnvironmentFile): string {
   return [`Local environment for "${file.alias}":`, ...lines].join("\n");
 }
 
-/** Paths added, changed or removed between two snapshots, except those in the environment folder (FR-ENV-011). */
-export function changedOutsideEnvironment(
+/** Paths added, changed or removed between two snapshots, except those in the step's own folder (FR-ENV-011, FR-DSGN-031). */
+export function changedOutsideFolder(
+  folder: string,
   before: ReadonlyMap<string, string>,
   after: ReadonlyMap<string, string>,
 ): readonly string[] {
   const paths = new Set([...before.keys(), ...after.keys()]);
-  return [...paths]
-    .filter((file) => before.get(file) !== after.get(file) && !file.startsWith(`${ENVIRONMENT_FOLDER}/`))
-    .sort();
+  return [...paths].filter((file) => before.get(file) !== after.get(file) && !file.startsWith(`${folder}/`)).sort();
+}
+
+export function changedOutsideEnvironment(
+  before: ReadonlyMap<string, string>,
+  after: ReadonlyMap<string, string>,
+): readonly string[] {
+  return changedOutsideFolder(ENVIRONMENT_FOLDER, before, after);
 }

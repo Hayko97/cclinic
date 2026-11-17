@@ -96,10 +96,11 @@ luseen             # shows a summary and asks before sending anything
 You get:
 
 - `.luseen/sdd/`: project docs and specs (`spec.md`, `validation.md`, `verification.md` per area)
-- Nine agent skills in `.claude/skills/` and `.agents/skills/`
+- Ten agent skills in `.claude/skills/` and `.agents/skills/`, and a `designer` agent in `.claude/agents/`
 - A workflow section in `AGENTS.md`, and a `CLAUDE.md` that imports it
 - `.mcp.json` and a Claude Code hook, so the GUI can follow your sessions
 - Optionally, a local preview in `.luseen/environment/`
+- Optionally, a design system in `.luseen/design/`, with design tokens and a style guide
 
 Then **commit these files**, so your team and the AI agents use them.
 
@@ -165,6 +166,7 @@ Agents build each task on its own branch and merge it into `luseen/auto/<run-id>
 | `luseen gui`         | Open the local web GUI                        | no\*        |
 | `luseen skills`      | Install or update the agent skills            | no          |
 | `luseen environment` | Set up the local preview                      | yes         |
+| `luseen design`      | Create a design system for the UI             | yes         |
 | `luseen model`       | Choose the default model and reasoning level  | no          |
 | `luseen tasks`       | See and track roadmaps and tasks              | no          |
 | `luseen plan`        | Plan with the PM agent                        | yes         |

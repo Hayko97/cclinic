@@ -2,7 +2,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { DEPENDENCY_FOLDERS } from "../../core/constants/discovery.js";
-import { ENVIRONMENT_FOLDER } from "../../core/constants/environment.js";
 import { GIT_FOLDER } from "../../core/constants/git.js";
 import { ENVIRONMENT_FILE_PATH, environmentFileSchema, type EnvironmentFile } from "../../core/environment.js";
 
@@ -33,14 +32,17 @@ export async function readEnvironmentFile(target: string): Promise<EnvironmentFi
   };
 }
 
-/** Sizes and modified times are enough here, and dependency folders are skipped because builds rewrite them. */
-export async function snapshotFiles(target: string): Promise<ReadonlyMap<string, string>> {
+/**
+ * Sizes and modified times are enough here. Dependency folders are skipped because builds rewrite them, and the
+ * step's own folder because it's allowed to write there (FR-ENV-011, FR-DSGN-031).
+ */
+export async function snapshotFiles(target: string, ownFolder: string): Promise<ReadonlyMap<string, string>> {
   const files = new Map<string, string>();
   const walk = async (folder: string): Promise<void> => {
     for (const entry of await readdir(path.join(target, folder), { withFileTypes: true })) {
       const relative = folder === "" ? entry.name : `${folder}/${entry.name}`;
       if (entry.isDirectory()) {
-        if (entry.name !== GIT_FOLDER && !DEPENDENCY_FOLDERS.has(entry.name) && relative !== ENVIRONMENT_FOLDER) {
+        if (entry.name !== GIT_FOLDER && !DEPENDENCY_FOLDERS.has(entry.name) && relative !== ownFolder) {
           await walk(relative);
         }
       } else if (entry.isFile()) {

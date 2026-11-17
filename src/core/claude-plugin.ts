@@ -4,6 +4,7 @@
  */
 import { z } from "zod";
 import { PM_TOOLS } from "./constants/agents.js";
+import { DESIGNER_AGENT_NAME } from "./constants/design.js";
 import { PRODUCT_NAME, SKILL_FILE } from "./constants/paths.js";
 import {
   MARKETPLACE_DESCRIPTION,
@@ -23,7 +24,7 @@ import {
 } from "./constants/plugin.js";
 import { JSON_INDENT } from "./constants/terminal.js";
 import { CLAUDE_SETTINGS_FILE, MCP_CONFIG_FILE, MCP_SERVER_NAME } from "./constants/workflow.js";
-import { AGENT_SKILLS, renderSkill, type AgentSkill } from "./agent-skills.js";
+import { AGENT_SKILLS, renderDesignerAgent, renderSkill, type AgentSkill } from "./agent-skills.js";
 
 export const packageInfoSchema = z.object({
   version: z.string().min(1),
@@ -161,5 +162,6 @@ export function renderClaudePlugin(info: PackageInfo, hash: (text: string) => st
   for (const skill of PLUGIN_SKILLS)
     add(`${PLUGIN_SKILLS_FOLDER}/${skill.name}/${SKILL_FILE}`, renderPluginSkill(skill, info));
   add(`${PLUGIN_AGENTS_FOLDER}/${PM_AGENT_NAME}.md`, renderPmAgent());
+  add(`${PLUGIN_AGENTS_FOLDER}/${DESIGNER_AGENT_NAME}.md`, renderDesignerAgent(PLUGIN_DOCS_PATH, hash));
   return files;
 }

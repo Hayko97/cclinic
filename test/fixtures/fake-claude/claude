@@ -181,6 +181,25 @@ if (mode === "invalid-output") {
   process.exit(0);
 }
 
+// The design step runs with tools and no schema. FAKE_CLAUDE_DESIGN: valid (default), invalid, none, fail
+if (!args.includes("--json-schema") && prompt.startsWith("Create the design system for the project")) {
+  const outcome = process.env.FAKE_CLAUDE_DESIGN ?? "valid";
+  // Files are written before a failure, as a run that stops partway does.
+  for (const file of (process.env.FAKE_CLAUDE_ALSO_WRITE ?? "").split(",").filter(Boolean)) fs.writeFileSync(file, "changed by the agent\n");
+  if (outcome === "fail") fail({ api_error_status: 500, result: "Server error" });
+  const sections = ["Status", "Principles", "Color", "Typography", "Spacing and layout", "Shape and elevation", "Motion", "Accessibility", "Components", "Templates", "Decisions", "Sources", "Open questions"];
+  const markdown = sections.map((section) => `## ${section}\n\n${section === "Status" ? "draft" : "Written by the fake agent."}\n`).join("\n");
+  const tokens = { color: { $type: "color", blue: { 600: { $value: "#2563eb" } }, text: { default: { $value: "{color.blue.600}" } } } };
+  if (outcome !== "none") {
+    fs.mkdirSync(".luseen/design", { recursive: true });
+    fs.writeFileSync(".luseen/design/design-system.md", `# Design system\n\n${markdown}`);
+    fs.writeFileSync(".luseen/design/design.tokens.json", outcome === "invalid" ? "{ not json" : JSON.stringify(tokens));
+    fs.writeFileSync(".luseen/design/style-guide.html", "<!doctype html><title>Style guide</title>");
+  }
+  emit({ type: "result", is_error: false, subtype: "success", result: "I couldn't finish the design system.", total_cost_usd: 0.3 });
+  process.exit(0);
+}
+
 // The environment step runs with tools and no schema. FAKE_CLAUDE_ENVIRONMENT: valid (default), invalid, none, fail
 if (!args.includes("--json-schema")) {
   const outcome = process.env.FAKE_CLAUDE_ENVIRONMENT ?? "valid";

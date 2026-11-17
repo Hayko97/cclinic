@@ -3,7 +3,7 @@ name: review-code
 description: "Reviews a change against the project's coding rules and developer guidelines, and reports findings by severity with a verdict, without changing code. Use when QA has passed and before the preview, or when the user asks to review code before it's committed."
 metadata:
   generated-by: luseen
-  content-hash: "6500a8844236b9e42eafcea0f5f1fde712b68a0cad8b09854e7700f0af9f5d75"
+  content-hash: "60808b62a67d4911ca2602021efa0c708465528199911e6b4831453e3453a5f3"
 ---
 
 # Review code
@@ -51,6 +51,7 @@ When two conflict, the earlier one wins:
 | Tests | Each changed behaviour is tested, and the tests check what the spec says. No skipped, deleted or weakened tests |
 | Comments and dead code | No comments restating the code. No unused code, imports or parameters, and no TODOs or stubs presented as finished |
 | Docs | Docs, help text and examples that the change makes wrong are updated |
+| Design system | Only when the change touches UI and `.luseen/design/design.tokens.json` exists, and always `should-fix`: each raw color, font size, spacing, radius, shadow or duration in UI code that a token covers; each component state `design-system.md` lists that the change leaves out; and each text or control color pair below 4.5:1 for normal text, or 3:1 for large text, icons, input borders and focus indicators |
 
 ## Severity
 

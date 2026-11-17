@@ -59,9 +59,9 @@ describe("agent skills", () => {
     expect(existsSync(path.join(root, ".luseen/sdd/README.md"))).toBe(true);
     expect(existsSync(path.join(root, SKILL_FILE))).toBe(true);
     expect(existsSync(path.join(root, ".claude/skills/test-spec/SKILL.md"))).toBe(true);
-    expect(stdout).toContain("Agent skills: 22 installed");
+    expect(stdout).toContain("Agent skills: 25 installed");
     const json = luseen([project(), "--yes", "--json"]);
-    expect((JSON.parse(json.stdout) as { skills: unknown[] }).skills).toHaveLength(22);
+    expect((JSON.parse(json.stdout) as { skills: unknown[] }).skills).toHaveLength(25);
   });
 
   it("TC-SKILL-006: --no-skills leaves them out", () => {
@@ -91,7 +91,7 @@ describe("agent skills", () => {
     const root = project();
     const { code, stdout } = luseen(["skills", root], { noClaude: true });
     expect(code).toBe(0);
-    expect(stdout).toContain("22 installed");
+    expect(stdout).toContain("25 installed");
     expect(existsSync(path.join(root, SKILL_FILE))).toBe(true);
     expect(existsSync(path.join(root, ".luseen"))).toBe(false);
     const missing = luseen(["skills", "/no/such/folder"]);
@@ -109,8 +109,8 @@ describe("agent skills", () => {
 
   it("TC-SKILL-010: results are reported in text and JSON", () => {
     const root = project();
-    expect(luseen(["skills", root]).stdout).toContain("22 installed");
-    expect(luseen(["skills", root]).stdout).toContain("22 unchanged");
+    expect(luseen(["skills", root]).stdout).toContain("25 installed");
+    expect(luseen(["skills", root]).stdout).toContain("25 unchanged");
     const parsed = JSON.parse(luseen(["skills", root, "--json"]).stdout) as {
       skills: { path: string; status: string }[];
     };
@@ -162,7 +162,7 @@ describe("agent skills", () => {
     const { code, stdout } = luseen([root, "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
     expect(code).toBe(0);
     expect(existsSync(record)).toBe(false);
-    expect(stdout).toContain("22 unchanged");
+    expect(stdout).toContain("25 unchanged");
     expect(snapshot()).toEqual(before);
     if ("AGENTS.md" in files) expect(readFileSync(path.join(root, "AGENTS.md"), "utf8")).toContain("Use tabs.");
   });

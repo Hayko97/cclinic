@@ -24,7 +24,7 @@ const render = (name: string): string => renderSkill(skill(name), ".luseen/sdd",
 const CLAUDE_CODE_STEP = /4\. \*\*Run Claude Code's review[^\n]*\n/;
 
 describe("skill format", () => {
-  it("TC-SKILL-040: provides the nine skills", () => {
+  it("TC-SKILL-040: provides the ten skills", () => {
     expect(AGENT_SKILLS.map((item) => item.name)).toEqual([
       "create-spec",
       "refine-spec",
@@ -35,6 +35,7 @@ describe("skill format", () => {
       "product-engineer",
       "review-doc",
       "review-code",
+      "ui-design",
     ]);
   });
 

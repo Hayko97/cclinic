@@ -9,12 +9,13 @@ Analyse every prompt, and follow this lifecycle:
 
 **0. Check open tasks.** On every prompt, first run `luseen tasks list --json`. If it lists tasks and the prompt isn't about one of them, list them (ID, title, status, spec), and wait for the user to choose: work on one of them, remove it with `luseen tasks remove <id>` and continue with the prompt, or keep it and continue with the prompt. Once the user chooses to keep them, don't ask about the same tasks again in this conversation, only when a new task appears. If there are no tasks, don't mention them. If the command fails, say so in one line and continue.
 
-**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, plan it with the `product-engineer` skill. It saves a roadmap or task only through the luseen MCP tools `plan_begin` and `plan_propose`, after the user approves. Never create roadmaps, milestones or roadmap tasks any other way. Without the luseen MCP server, tell the user to run `luseen plan`, or `luseen plan --task` for one concrete task. Don't start spec or code work. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask. When work starts on a task, run `luseen tasks start <id>`, and use the task's spec.
+**1. Understand the prompt.** If it's a question, an explanation or a review with no change requested, just answer. If the user wants to plan, build a roadmap, create or refine tasks, or decide what to build, plan it with the `product-engineer` skill. It saves a roadmap or task only through the luseen MCP tools `plan_begin` and `plan_propose`, after the user approves. Never create roadmaps, milestones or roadmap tasks any other way. Without the luseen MCP server, tell the user to run `luseen plan`, or `luseen plan --task` for one concrete task. Don't start spec or code work. If it's a code change, work out which spec it belongs to, and tell the user. If it could be more than one, or none clearly fits, ask. When work starts on a task, run `luseen tasks start <id>`, and use the task's spec. For a design request, such as a design system, a new screen, a redesign or visual polish, use the `ui-design` skill, and use it with `write-code` for every change that touches UI.
 
 **2. Refine the spec, and get it approved.**
 - **New feature:** use the `refine-spec` skill if it belongs in an existing spec, or the `create-spec` skill if not.
 - **Bug or issue:** use `refine-spec`. Add a test case that reproduces it, and correct any requirement that's wrong or missing.
 - **No behaviour change**, such as a refactor, formatting, a typo or a dependency update: no spec update is needed. Go to stage 3.
+- **UI change with no approved design system** (`.luseen/design/design-system.md` is missing or a `draft`): also create or finish it with the `ui-design` skill. The user approves it at this stage, before stage 3.
 
 Show what changed in `spec.md`, `validation.md` and `verification.md`, and any open questions. Then offer the user three options, and stop until they choose one. Don't change production code until they clearly approve:
 - **`approve`:** go to stage 3.
@@ -52,6 +53,7 @@ Skills are in `.agents/skills/<name>/SKILL.md`. If your tool doesn't load skills
 | `product-engineer` | Plans what to build as the PM, in a conversation with the user: researches the project, their files and the web, asks a few questions at a time, recommends options, and proposes a roadmap of milestones and tasks with their dependencies, or one concrete task, through luseen's plan_propose tool |
 | `review-doc` | Writes a simple, visual review doc for a spec change, with diagrams, screenshots and mockups of how the project will work and look after it |
 | `review-code` | Reviews a change against the project's coding rules and developer guidelines, and reports findings by severity with a verdict, without changing code |
+| `ui-design` | Designs the project's user interface as its UI/UX designer and UI developer: researches best practices, agrees a visual direction with the user, and writes an accessible design system (colors, typography, spacing, components, page templates, tokens and a style guide) to .luseen/design/, then builds UI that follows it |
 
 This section is managed by luseen, so keep your own notes outside the markers.
 <!-- luseen:end -->

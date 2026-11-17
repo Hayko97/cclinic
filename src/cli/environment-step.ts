@@ -3,7 +3,7 @@ import { runEnvironmentAgent } from "../adapters/llm/environment-agent.js";
 import { readEnvironmentFile, snapshotFiles } from "../adapters/storage/environment-store.js";
 import { relativeDocsPath } from "../adapters/storage/skill-installer.js";
 import { AGENT_SKILLS } from "../core/agent-skills.js";
-import { LOCAL_ENV_SKILL_NAME, ENVIRONMENT_MAX_BUDGET_USD } from "../core/constants/environment.js";
+import { ENVIRONMENT_FOLDER, LOCAL_ENV_SKILL_NAME, ENVIRONMENT_MAX_BUDGET_USD } from "../core/constants/environment.js";
 import { ERROR_DETAIL_MAX_CHARS } from "../core/constants/llm.js";
 import { USD_DECIMAL_PLACES } from "../core/constants/terminal.js";
 import {
@@ -59,7 +59,7 @@ export async function runAgentStep(settings: AgentSettings, context: CommandCont
   const { target, out, model, effort } = settings;
   const { environment, reporter, signal } = context;
   reporter.info("Claude is setting up the local environment. This can take several minutes...");
-  const before = await snapshotFiles(target);
+  const before = await snapshotFiles(target, ENVIRONMENT_FOLDER);
   let finalMessage: string;
   let costUsd: number | null;
   try {
@@ -76,7 +76,7 @@ export async function runAgentStep(settings: AgentSettings, context: CommandCont
     if (error instanceof LlmError) throw new EnvironmentStepError(error.message, { cause: error });
     throw error;
   }
-  const changedFiles = changedOutsideEnvironment(before, await snapshotFiles(target));
+  const changedFiles = changedOutsideEnvironment(before, await snapshotFiles(target, ENVIRONMENT_FOLDER));
   if (changedFiles.length > 0) {
     reporter.warn(`Setting up the environment also changed: ${changedFiles.join(", ")}`);
   }

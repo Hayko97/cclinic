@@ -101,13 +101,19 @@ STEP 4: REVIEW
     code-only    found only in code
     docs-only    found only in documents, so it may not be built yet
 
-  Commit .luseen/sdd, .luseen/environment, .agents, .claude, AGENTS.md and CLAUDE.md, so your team shares them.
+  Commit .luseen/sdd, .luseen/environment, .luseen/design, .agents, .claude, AGENTS.md and CLAUDE.md, so your team shares them.
 
   luseen then offers to set up a local environment. If you agree, Claude creates
   files in .luseen/environment and runs build and Docker commands. A web project
   gets a link such as http://my-app.localhost:3000, a mobile app gets a simulator
   build, and a command-line tool or library gets a command to try. --yes doesn't
   agree to this, so use --environment, or run "luseen environment" later.
+
+  If the project has a user interface, luseen then offers to create a design
+  system. If you agree, Claude researches the web and writes colors, typography,
+  components, page templates, design tokens and a style guide to .luseen/design,
+  as a draft for you to approve with your agent. --yes doesn't agree to this
+  either, so use --design, or run "luseen design" later.
 
 STEP 5: WORK WITH YOUR CODING AGENT
 
@@ -161,6 +167,7 @@ COMMANDS
   luseen model --reset   go back to ${DEFAULT_CLAUDE_MODEL.label} at ${DEFAULT_CLAUDE_EFFORT.label.toLowerCase()}
   luseen skills [path]   install the skills only, with no Claude usage
   luseen environment [path]  set up a local environment for previews
+  luseen design [path]   create a design system for the user interface
   luseen plan            chat with the PM agent to plan a roadmap. --task, --resume
   luseen auto            run a whole roadmap with agents, with no human
   luseen tasks roadmaps  list roadmaps with their status, with no Claude usage

@@ -3,7 +3,7 @@ name: product-engineer
 description: "Plans what to build as the PM, in a conversation with the user: researches the project, their files and the web, asks a few questions at a time, recommends options, and proposes a roadmap of milestones and tasks with their dependencies, or one concrete task, through luseen's plan_propose tool. Use when the user wants to plan, build a roadmap, create or refine tasks, or decide what to build next."
 metadata:
   generated-by: luseen
-  content-hash: "b7c9a89319d80fbc79c85217d871ae5110dd68f8b5197a3d665935a84d1627de"
+  content-hash: "bf071e3c2e7e5375b28339e6124a3e103ee136d6edca3044e3285dc9b658297b"
 ---
 
 # Plan the work as the PM
@@ -39,5 +39,6 @@ Talk with the user the way a good PM talks with a client, and turn their idea in
 6. **Propose with `plan_propose`.** Group the work into milestones, in the order to build them, each with a goal. Make each task one deliverable change, and name the existing spec it belongs to, or say that a new spec is needed. Give each task its dependencies: the keys of new tasks, or the IDs of existing tasks, that must be done first, so it can be run in dependency order by automated mode. List what's still unclear as open questions. If `plan_propose` returns problems, fix them and call it again.
    - **Take the existing roadmaps into account.** Don't propose a task that repeats an existing one.
    - **When extending a roadmap,** propose only new milestones. They're added after its existing ones.
+   - **Design comes first.** When planning a new roadmap for a product with a user interface, and `.luseen/design/design-system.md` doesn't exist or its status is `draft`, propose a task in the first milestone to create or approve the design system with the `ui-design` skill, and make each task that builds UI depend on it.
    - **For a single task,** talk through that one change only, and propose exactly one task that is one deliverable change, with its spec and its dependencies on existing tasks. When it goes into a roadmap, choose the existing milestone it fits best.
 7. **Revise on feedback.** The user approves, cancels or keeps talking. If they send feedback, revise the proposal, asking more questions if you need to.

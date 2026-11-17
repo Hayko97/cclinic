@@ -4,7 +4,7 @@
 
 Add a code review step to the agent lifecycle. After QA passes and before the user sees the preview, a reviewer checks the change against the project's coding guidelines, and against Claude Code's built-in code review when the agent is Claude Code. The implementing agent fixes what the reviewer finds, so the user approves, and later commits, reviewed code.
 
-A new `review-code` skill holds the review method. It's installed like the other skills ([agent-skills](../agent-skills/spec.md)), and the lifecycle in `AGENTS.md` ([agent-instructions](../agent-instructions/spec.md)) names the step.
+A new `review-code` skill holds the review method. It's installed like the other skills ([agent-skills](../agent-skills/spec.md)), and the lifecycle in `AGENTS.md` ([agent-instructions](../agent-instructions/spec.md)) names the step. For a change that touches UI, the skill also checks it against the project's design system ([ui-design](../ui-design/spec.md) FR-DSGN-037).
 
 ## Where the step sits
 

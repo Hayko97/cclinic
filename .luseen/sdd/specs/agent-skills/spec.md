@@ -2,13 +2,13 @@
 
 ## Goal
 
-Install nine portable agent skills (create-spec, refine-spec, write-code, implement-spec, test-spec, local-env, product-engineer, review-doc, review-code) into .agents/skills and .claude/skills, plus a marked AGENTS.md section, without overwriting other people's or edited work and without affecting analysis.
+Install ten portable agent skills (create-spec, refine-spec, write-code, implement-spec, test-spec, local-env, product-engineer, review-doc, review-code, ui-design) into .agents/skills and .claude/skills, plus a marked AGENTS.md section, without overwriting other people's or edited work and without affecting analysis.
 
 ## Requirements
 
 | ID | Requirement | Status | Evidence |
 |---|---|---|---|
-| FR-SKILL-001 | luseen must provide exactly nine skills named create-spec, refine-spec, write-code, implement-spec, test-spec, local-env, product-engineer, review-doc and review-code. The local-env skill is specified in local-environment, and review-code in code-review. | confirmed | `sdd/specs/agent-skills/spec.md:9-15`, `sdd/specs/agent-skills/verification.md:9`, `src/core/agent-skills.ts:57-281`, `user request`, `.luseen/sdd/specs/code-review/spec.md` |
+| FR-SKILL-001 | luseen must provide exactly ten skills named create-spec, refine-spec, write-code, implement-spec, test-spec, local-env, product-engineer, review-doc, review-code and ui-design. The local-env skill is specified in local-environment, review-code in code-review, and ui-design in ui-design. | confirmed | `sdd/specs/agent-skills/spec.md:9-15`, `sdd/specs/agent-skills/verification.md:9`, `src/core/agent-skills.ts:57-281`, `user request`, `.luseen/sdd/specs/code-review/spec.md`, `.luseen/sdd/specs/ui-design/spec.md` |
 | FR-SKILL-002 | Each skill must follow the Agent Skills format: a folder named after the skill with SKILL.md whose frontmatter has a matching lowercase-hyphen name (max 64 chars) and a description of 1 to 1024 characters, and the file must be under 500 lines. | confirmed | `sdd/specs/agent-skills/spec.md:32`, `sdd/specs/agent-skills/verification.md:10` |
 | FR-SKILL-003 | luseen must install each skill with identical content to <target>/.agents/skills/<name>/SKILL.md and <target>/.claude/skills/<name>/SKILL.md. | confirmed | `sdd/specs/agent-skills/spec.md:19-23`, `sdd/specs/agent-skills/verification.md:11`, `src/adapters/storage/skill-installer.ts:79-103` |
 | FR-SKILL-004 | luseen must add a marked section to AGENTS.md listing the skills and the project document locations, creating the file if missing. | confirmed | `sdd/specs/agent-skills/spec.md:33-34`, `sdd/specs/agent-skills/verification.md:12`, `sdd/decisions/0003-agent-skills.md:26` |
