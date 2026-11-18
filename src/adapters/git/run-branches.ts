@@ -108,17 +108,28 @@ export async function openRunRepository(input: {
     ? []
     : ["-c", `user.name=${AUTO_COMMIT_IDENTITY.name}`, "-c", `user.email=${AUTO_COMMIT_IDENTITY.email}`];
 
-  const removeWorktree = async (worktree: string): Promise<void> => {
-    await git(["worktree", "remove", "--force", worktree]);
-    await git(["worktree", "prune"]);
+  // FR-AUTO-042: Git doesn't support worktree commands running at once in one repository, so tasks that start or
+  // finish together take turns, as merges do (FR-AUTO-013).
+  let worktreeTurn: Promise<unknown> = Promise.resolve();
+  const oneAtATime = <T>(step: () => Promise<T>): Promise<T> => {
+    const result = worktreeTurn.then(step);
+    worktreeTurn = result.catch(() => undefined);
+    return result;
   };
+
+  const removeWorktree = (worktree: string): Promise<void> =>
+    oneAtATime(async () => {
+      await git(["worktree", "remove", "--force", worktree]);
+      await git(["worktree", "prune"]);
+    });
 
   return {
     runBranch: input.runBranch,
 
     createTaskWorktree: async (taskBranch) => {
       const worktree = path.join(worktrees, taskBranch.slice(taskBranch.lastIndexOf("/") + 1));
-      expectOk(await git(["worktree", "add", "-b", taskBranch, worktree, input.runBranch]), `create ${taskBranch}`);
+      const added = await oneAtATime(() => git(["worktree", "add", "-b", taskBranch, worktree, input.runBranch]));
+      expectOk(added, `create ${taskBranch}`);
       return worktree;
     },
 
