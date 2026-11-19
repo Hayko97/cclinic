@@ -1,9 +1,6 @@
 ---
 name: local-env
 description: "Sets up a local environment suited to the project, and shows how to review each change, such as a link or a simulator build. Use when the user asks to set up, run or preview the project locally, or after implementing a change, so the user can try it before approving it."
-metadata:
-  generated-by: luseen
-  content-hash: "d8ca74a8732e7e6c72a913512b5105361d7d1e34463c5b70b7eb832ea067c4a4"
 ---
 
 # Set up and use the local environment

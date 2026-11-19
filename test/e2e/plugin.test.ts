@@ -229,6 +229,21 @@ describe("--plugin", () => {
     expectServerAndHook(root);
   });
 
+  it("TC-PLUG-022: luseen skills still stamps each skill and the designer agent with its metadata block", () => {
+    const root = makeTempFolder();
+    expect(luseen(["skills", root]).code).toBe(0);
+    const files = [
+      ...readdirSync(path.join(root, ".agents/skills")).map((name) =>
+        path.join(root, ".agents/skills", name, "SKILL.md"),
+      ),
+      path.join(root, ".claude/agents/designer.md"),
+    ];
+    for (const file of files)
+      expect(readFileSync(file, "utf8"), file).toMatch(
+        /^metadata:\n {2}generated-by: luseen\n {2}content-hash: "[0-9a-f]{64}"\n/m,
+      );
+  });
+
   it("TC-PLUG-015: luseen --yes --plugin generates the documents and installs the sections, server and hook", () => {
     const root = makeTempFolder();
     writeProject(root, { "src/a.ts": "export const a = 1;\n" });

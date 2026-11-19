@@ -1,9 +1,6 @@
 ---
 name: test-spec
 description: "Acts as QA for a spec or feature: automates its test cases, runs them, explores edge cases, and reports results and defects. Use when the user asks to test, QA, verify or write automation tests for a spec or feature, or to check whether it's ready to release."
-metadata:
-  generated-by: luseen
-  content-hash: "ba4022d5d0240471be7ee2b497f1cbd57e635909f82917e0a78922af217ca3c2"
 ---
 
 # Test a spec

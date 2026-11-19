@@ -18,7 +18,7 @@ describe("the Claude Code plugin's files", () => {
   });
 
   it("TC-PLUG-004 and TC-PLUG-005: no server or hooks, and the commands run the package at the plugin's version", () => {
-    const files = renderClaudePlugin(INFO, () => "hash");
+    const files = renderClaudePlugin(INFO);
     expect([...files.keys()].filter((file) => file.endsWith(".mcp.json") || file.includes("/hooks/"))).toEqual([]);
     expect(files.get("plugins/luseen/.claude-plugin/plugin.json")).not.toMatch(/"(mcpServers|hooks)"/);
     expect(files.get("plugins/luseen/skills/init/SKILL.md")).toContain("npx -y luseen@1.2.3 --yes --plugin");

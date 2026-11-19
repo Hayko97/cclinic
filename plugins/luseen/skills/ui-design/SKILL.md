@@ -1,9 +1,6 @@
 ---
 name: ui-design
 description: "Designs the project's user interface as its UI/UX designer and UI developer: researches best practices, agrees a visual direction with the user, and writes an accessible design system (colors, typography, spacing, components, page templates, tokens and a style guide) to .luseen/design/, then builds UI that follows it. Use when the user asks for a design system, a new screen, a redesign or visual polish, when a change touches UI, or when the project has a UI and no design system yet."
-metadata:
-  generated-by: luseen
-  content-hash: "990fd3ee8e8010c708f23b9b06ca5536897055f124cd34fba29353de75042fc0"
 ---
 
 # Design the user interface

@@ -1,9 +1,6 @@
 ---
 name: review-doc
 description: "Writes a simple, visual review doc for a spec change, with diagrams, screenshots and mockups of how the project will work and look after it. Use when the user chooses review-doc while reviewing a spec, or asks to see what a spec change will look like before approving it."
-metadata:
-  generated-by: luseen
-  content-hash: "e2aa30ff9ed71b26f687565042b09dba941dcf14937f2ed041502f5009060038"
 ---
 
 # Write a review doc for a spec change

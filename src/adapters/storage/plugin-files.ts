@@ -3,7 +3,6 @@ import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { packageInfoSchema, renderClaudePlugin, type PackageInfo } from "../../core/claude-plugin.js";
 import { LOGO_FILE, PLUGIN_FOLDER, PLUGIN_ICON_FILE } from "../../core/constants/plugin.js";
-import { sha256 } from "./document-store.js";
 
 /** A plugin file's content: text, or the icon's bytes. */
 export type PluginFiles = ReadonlyMap<string, string | Buffer>;
@@ -25,7 +24,7 @@ async function filesUnder(root: string, relative: string): Promise<string[]> {
 
 /** Every plugin file, as `npm run build:plugin` writes it: the rendered text files and the logo (FR-PLUG-015). */
 export async function buildPluginFiles(root: string, info?: PackageInfo): Promise<PluginFiles> {
-  const rendered = renderClaudePlugin(info ?? (await readPackageInfo(root)), sha256);
+  const rendered = renderClaudePlugin(info ?? (await readPackageInfo(root)));
   return new Map<string, string | Buffer>([
     ...rendered,
     [`${PLUGIN_FOLDER}/${PLUGIN_ICON_FILE}`, await readFile(path.join(root, LOGO_FILE))],

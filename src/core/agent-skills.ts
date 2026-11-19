@@ -606,6 +606,13 @@ ${skill.body.replaceAll("{{DOCS}}", docsPath)}`;
   return withHash(unstamped, hash(unstamped));
 }
 
+const STAMP_BLOCK = new RegExp(`^metadata:\n {2}${GENERATED_MARK}\n${HASH_LINE.source.slice(1, -1)}\n`, "m");
+
+/** The file without its `metadata` stamp, for the Claude Code plugin, whose directory refuses that key (FR-PLUG-016). */
+export function withoutStamp(text: string): string {
+  return text.replace(STAMP_BLOCK, "");
+}
+
 export type ExistingSkillState = "foreign" | "edited" | "managed";
 
 export function classifySkill(content: string, hash: (text: string) => string): ExistingSkillState {

@@ -24,7 +24,7 @@ import {
 } from "./constants/plugin.js";
 import { JSON_INDENT } from "./constants/terminal.js";
 import { CLAUDE_SETTINGS_FILE, MCP_CONFIG_FILE, MCP_SERVER_NAME } from "./constants/workflow.js";
-import { AGENT_SKILLS, renderDesignerAgent, renderSkill, type AgentSkill } from "./agent-skills.js";
+import { AGENT_SKILLS, renderDesignerAgent, renderSkill, withoutStamp, type AgentSkill } from "./agent-skills.js";
 
 export const packageInfoSchema = z.object({
   version: z.string().min(1),
@@ -130,8 +130,14 @@ tools: ${tools.join(", ")}
 ${productEngineer.body.replaceAll("{{DOCS}}", PLUGIN_DOCS_PATH)}`;
 }
 
-/** Every file of the plugin and its marketplace, by path from the repository root (FR-PLUG-012). It has no MCP server or hooks (FR-PLUG-004, FR-PLUG-005). */
-export function renderClaudePlugin(info: PackageInfo, hash: (text: string) => string): ReadonlyMap<string, string> {
+/** The plugin's copies need no edit detection, so they carry no hash (FR-PLUG-016). */
+const NO_HASH = (): string => "";
+
+/**
+ * Every file of the plugin and its marketplace, by path from the repository root (FR-PLUG-012). It has no MCP server or
+ * hooks (FR-PLUG-004, FR-PLUG-005), and no `metadata` key in any frontmatter (FR-PLUG-016).
+ */
+export function renderClaudePlugin(info: PackageInfo): ReadonlyMap<string, string> {
   const files = new Map<string, string>();
   const add = (relative: string, content: string): void => {
     files.set(`${PLUGIN_FOLDER}/${relative}`, content);
@@ -158,10 +164,16 @@ export function renderClaudePlugin(info: PackageInfo, hash: (text: string) => st
     }),
   );
   for (const skill of AGENT_SKILLS)
-    add(`${PLUGIN_SKILLS_FOLDER}/${skill.name}/${SKILL_FILE}`, renderSkill(skill, PLUGIN_DOCS_PATH, hash));
+    add(
+      `${PLUGIN_SKILLS_FOLDER}/${skill.name}/${SKILL_FILE}`,
+      withoutStamp(renderSkill(skill, PLUGIN_DOCS_PATH, NO_HASH)),
+    );
   for (const skill of PLUGIN_SKILLS)
     add(`${PLUGIN_SKILLS_FOLDER}/${skill.name}/${SKILL_FILE}`, renderPluginSkill(skill, info));
   add(`${PLUGIN_AGENTS_FOLDER}/${PM_AGENT_NAME}.md`, renderPmAgent());
-  add(`${PLUGIN_AGENTS_FOLDER}/${DESIGNER_AGENT_NAME}.md`, renderDesignerAgent(PLUGIN_DOCS_PATH, hash));
+  add(
+    `${PLUGIN_AGENTS_FOLDER}/${DESIGNER_AGENT_NAME}.md`,
+    withoutStamp(renderDesignerAgent(PLUGIN_DOCS_PATH, NO_HASH)),
+  );
   return files;
 }

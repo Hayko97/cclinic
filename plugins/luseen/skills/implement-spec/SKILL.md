@@ -1,9 +1,6 @@
 ---
 name: implement-spec
 description: "Builds a spec requirement by requirement, with tests from its test cases, and reports proof that each one works. Use when the user asks to implement, build or complete a spec, feature or requirement that has a spec folder."
-metadata:
-  generated-by: luseen
-  content-hash: "6b5fc9ee25d907f1296ce452a517e6ab8be8d16e504074153f4051c3cbe06854"
 ---
 
 # Implement a spec

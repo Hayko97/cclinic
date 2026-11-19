@@ -1,5 +1,5 @@
 /** The Claude Code plugin and its marketplace, as committed in the repository (spec: claude-plugin). */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -10,7 +10,7 @@ import {
   writePluginFiles,
 } from "../../src/adapters/storage/plugin-files.js";
 import { installSkills } from "../../src/adapters/storage/skill-installer.js";
-import { AGENT_SKILLS } from "../../src/core/agent-skills.js";
+import { AGENT_SKILLS, withoutStamp } from "../../src/core/agent-skills.js";
 import { makeTempFolder, writeProject } from "../support/helpers.js";
 
 const REPO = fileURLToPath(new URL("../..", import.meta.url));
@@ -24,6 +24,8 @@ const pkg = JSON.parse(readFileSync(path.join(REPO, "package.json"), "utf8")) as
   repository: { url: string };
 };
 const PINNED = `luseen@${pkg.version}`;
+const SKILL_KEYS = ["name", "description"];
+const AGENT_KEYS = ["name", "description", "tools"];
 
 const read = (relative: string) => readFileSync(path.join(PLUGIN, relative), "utf8");
 const readJson = (file: string) => JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
@@ -85,15 +87,39 @@ describe("what the plugin runs", () => {
 });
 
 describe("skills, commands and agents", () => {
-  it("TC-PLUG-010, TC-DSGN-003: the ten agent skills are byte-identical to what luseen skills writes", async () => {
+  it("TC-PLUG-010, TC-DSGN-003: the ten agent skills are what luseen skills writes, without the metadata block", async () => {
     const root = makeTempFolder();
     await installSkills({ target: root, out: path.join(root, ".luseen/sdd"), isForced: false });
     expect(AGENT_SKILLS).toHaveLength(10);
     expect(read("skills/ui-design/SKILL.md")).toContain("# Design the user interface");
-    for (const skill of AGENT_SKILLS)
-      expect(read(`skills/${skill.name}/SKILL.md`)).toBe(
-        readFileSync(path.join(root, ".agents/skills", skill.name, "SKILL.md"), "utf8"),
-      );
+    for (const skill of AGENT_SKILLS) {
+      const projectCopy = readFileSync(path.join(root, ".agents/skills", skill.name, "SKILL.md"), "utf8");
+      expect(read(`skills/${skill.name}/SKILL.md`)).not.toMatch(/^metadata:/m);
+      expect(read(`skills/${skill.name}/SKILL.md`)).toBe(withoutStamp(projectCopy));
+    }
+  });
+
+  it("TC-PLUG-021: every skill and agent has frontmatter of plain key: value lines, with only allowed keys", () => {
+    const files = [
+      ...readdirSync(path.join(PLUGIN, "skills")).map((name) => ({
+        file: `skills/${name}/SKILL.md`,
+        keys: SKILL_KEYS,
+      })),
+      ...readdirSync(path.join(PLUGIN, "agents")).map((name) => ({ file: `agents/${name}`, keys: AGENT_KEYS })),
+    ];
+    expect(files.length).toBeGreaterThanOrEqual(16);
+    for (const { file, keys } of files) {
+      const text = read(file);
+      const lines = text.split("\n");
+      expect(lines[0], file).toBe("---");
+      const end = lines.indexOf("---", 1);
+      expect(end, file).toBeGreaterThan(1);
+      for (const line of lines.slice(1, end)) {
+        expect(line, file).toMatch(/^[a-z]+: \S/);
+        expect(keys, `${file}: ${line}`).toContain(line.split(":")[0]);
+      }
+      expect(text, file).not.toMatch(/^\s*(metadata|generated-by|content-hash):/m);
+    }
   });
 
   it("TC-PLUG-011: init, plan, status and gui say what each must", () => {
@@ -160,7 +186,7 @@ describe("skills, commands and agents", () => {
     expect(text).toContain(uiDesign?.body.replaceAll("{{DOCS}}", ".luseen/sdd"));
     const root = makeTempFolder();
     await installSkills({ target: root, out: path.join(root, ".luseen/sdd"), isForced: false });
-    expect(readFileSync(path.join(root, ".claude/agents/designer.md"), "utf8")).toBe(text);
+    expect(withoutStamp(readFileSync(path.join(root, ".claude/agents/designer.md"), "utf8"))).toBe(text);
   });
 });
 

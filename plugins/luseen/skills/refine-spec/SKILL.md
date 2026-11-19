@@ -1,9 +1,6 @@
 ---
 name: refine-spec
 description: "Improves an existing spec: fixes vague or untestable requirements, fills coverage gaps, updates it to match the code, and resolves open questions. Use when the user asks to review, refine, update or tighten a spec, or when code and spec have drifted apart."
-metadata:
-  generated-by: luseen
-  content-hash: "7103237278ce8a24e470efb5fbb95432f7a59d5eab17a98705c554da2f0e1e92"
 ---
 
 # Refine a spec

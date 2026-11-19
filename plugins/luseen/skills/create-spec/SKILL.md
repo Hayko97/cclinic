@@ -1,9 +1,6 @@
 ---
 name: create-spec
 description: "Writes a new spec for a feature or capability, with requirements, acceptance criteria and test cases. Use when the user asks to spec, plan or document something new before building it, or describes a feature that has no spec yet."
-metadata:
-  generated-by: luseen
-  content-hash: "85623972a0bb380e60a27a8dfe9a9e2c42390d7d4c7754dd94cb6b36de4727ae"
 ---
 
 # Create a spec

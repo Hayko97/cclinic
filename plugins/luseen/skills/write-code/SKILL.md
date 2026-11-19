@@ -1,9 +1,6 @@
 ---
 name: write-code
 description: "Writes or changes code the way a careful maintainer of this project would: following its stack, architecture and conventions, in small changes without unnecessary comments or abstractions. Use whenever writing, changing or refactoring production code in this project."
-metadata:
-  generated-by: luseen
-  content-hash: "65e3196278199c13ba8b414587e8336be4d4b1f27c5191e4219808f64829f4a3"
 ---
 
 # Write code

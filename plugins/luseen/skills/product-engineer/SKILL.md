@@ -1,9 +1,6 @@
 ---
 name: product-engineer
 description: "Plans what to build as the PM, in a conversation with the user: researches the project, their files and the web, asks a few questions at a time, recommends options, and proposes a roadmap of milestones and tasks with their dependencies, or one concrete task, through luseen's plan_propose tool. Use when the user wants to plan, build a roadmap, create or refine tasks, or decide what to build next."
-metadata:
-  generated-by: luseen
-  content-hash: "bf071e3c2e7e5375b28339e6124a3e103ee136d6edca3044e3285dc9b658297b"
 ---
 
 # Plan the work as the PM

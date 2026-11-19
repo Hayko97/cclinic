@@ -1,9 +1,6 @@
 ---
 name: review-code
 description: "Reviews a change against the project's coding rules and developer guidelines, and reports findings by severity with a verdict, without changing code. Use when QA has passed and before the preview, or when the user asks to review code before it's committed."
-metadata:
-  generated-by: luseen
-  content-hash: "6f11d823a2a2b871b798a29d148b4d2a81aa8f4ceee3308b7c712d82e0937e5e"
 ---
 
 # Review code
