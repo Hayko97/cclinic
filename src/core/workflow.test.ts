@@ -55,6 +55,12 @@ function atQa(): WorkflowState {
   return advance(stateOf(applyAnswer(begin(), "G1", "approve", NO_NOTES)), "qa");
 }
 
+/** Reports a failing QA run, then, unless that stopped the change, takes the fix back to `qa`. */
+function failQa(state: WorkflowState, failures: string[] = []): WorkflowState {
+  const failed = stateOf(recordQaRun(state, { passed: false, failures }, NOW));
+  return failed.status === "stopped" ? failed : advance(failed, "qa");
+}
+
 function atReview(): WorkflowState {
   return advance(stateOf(recordQaRun(atQa(), { passed: true, failures: [] }, NOW)), "review");
 }
@@ -88,23 +94,54 @@ describe("workflow", () => {
 
   it("TC-MCP-025: needs a passing QA run to reach the review", () => {
     const failed = stateOf(recordQaRun(atQa(), { passed: false, failures: ["TC-X-1"] }, NOW));
-    expect(refusalOf(checkAdvance(failed, "review", []))).toMatch(/G2 QA passed/);
-    const passed = stateOf(recordQaRun(failed, { passed: true, failures: [] }, NOW));
+    expect(refusalOf(checkAdvance(failed, "review", []))).toMatch(/next step is "qa"/);
+    const passed = stateOf(recordQaRun(advance(failed, "qa"), { passed: true, failures: [] }, NOW));
     expect(advance(passed, "review").step).toBe("review");
     expect(qaRunsUsed(passed)).toBe(2);
   });
 
+  it("TC-MCP-025: refuses the review after a fix until a QA run passes", () => {
+    const fixed = advance(stateOf(recordQaRun(atQa(), { passed: false, failures: [] }, NOW)), "qa");
+    expect(refusalOf(checkAdvance(fixed, "review", []))).toMatch(/G2 QA passed/);
+  });
+
+  it("TC-MCP-079: a failed QA run with no failures listed still asks for a fix", () => {
+    const outcome = recordQaRun(atQa(), { passed: false, failures: [] }, NOW);
+    expect("message" in outcome && outcome.message).not.toMatch(/Failures:/);
+    expect("message" in outcome && outcome.message).toMatch(/write-code.*"qa"/);
+  });
+
   it("TC-MCP-026: stops after the 3rd failing QA run and refuses more", () => {
     let state = atQa();
-    for (let run = 0; run < 3; run += 1) state = stateOf(recordQaRun(state, { passed: false, failures: [] }, NOW));
+    for (let run = 0; run < 3; run += 1) state = failQa(state);
     expect(state.status).toBe("stopped");
     expect(refusalOf(checkAdvance(state, "review", []))).toMatch(/stopped/);
     expect(refusalOf(recordQaRun(state, { passed: true, failures: [] }, NOW))).toMatch(/stopped/);
   });
 
+  it("TC-MCP-077: a failed QA run goes back to the developer, without asking the user", () => {
+    const previewed = { ...atQa(), preview: { isRunning: true, detail: "http://localhost", at: NOW } };
+    const outcome = recordQaRun(previewed, { passed: false, failures: ["TC-X-001 fails"] }, NOW);
+    const failed = stateOf(outcome);
+    expect("message" in outcome && outcome.message).toMatch(
+      /TC-X-001 fails.*code, the test or the spec.*without asking the user.*"qa".*workflow_reset/,
+    );
+    expect(failed).toMatchObject({ step: "implement", status: "open", pending: null, preview: null });
+    expect(refusalOf(recordQaRun(failed, { passed: true, failures: [] }, NOW))).toMatch(
+      /only accepted at the "qa" step/,
+    );
+    expect(checkAdvance(failed, "qa", [])).toEqual({ gate: undefined, isAnswerNeeded: false });
+  });
+
+  it("TC-MCP-078: a 2nd failing QA run still goes back to the developer, not a stop", () => {
+    const failed = stateOf(recordQaRun(failQa(atQa()), { passed: false, failures: [] }, NOW));
+    expect(failed).toMatchObject({ step: "implement", status: "open" });
+    expect(qaRunsUsed(failed)).toBe(2);
+  });
+
   it("TC-MCP-027: resuming a stopped change starts the QA count again", () => {
     let state = atQa();
-    for (let run = 0; run < 3; run += 1) state = stateOf(recordQaRun(state, { passed: false, failures: [] }, NOW));
+    for (let run = 0; run < 3; run += 1) state = failQa(state);
     const resumed = stateOf(resumeChange(state, NOW));
     expect(resumed.status).toBe("open");
     expect(qaRunsUsed(resumed)).toBe(0);
@@ -140,8 +177,7 @@ describe("workflow", () => {
 
   it("TC-MCP-031: stops when review fixes would need a 4th QA run", () => {
     let state = atQa();
-    state = stateOf(recordQaRun(state, { passed: false, failures: [] }, NOW));
-    state = stateOf(recordQaRun(state, { passed: false, failures: [] }, NOW));
+    state = failQa(failQa(state));
     state = advance(stateOf(recordQaRun(state, { passed: true, failures: [] }, NOW)), "review");
     state = stateOf(recordReview(state, { verdict: "changes", findings: FINDINGS }, NOW));
     expect(state.status).toBe("stopped");
@@ -202,7 +238,7 @@ describe("workflow", () => {
   it("TC-MCP-012: summarizes the step, counts and decisions", () => {
     const failed = stateOf(recordQaRun(atQa(), { passed: false, failures: ["TC-X-1"] }, NOW));
     expect(summarizeState(failed)).toMatchObject({
-      step: "qa",
+      step: "implement",
       qaRunsUsed: 1,
       codeReviewsUsed: 0,
       approverMode: "user",
@@ -295,7 +331,7 @@ describe("workflow edge cases", () => {
 describe("ending a stopped change", () => {
   it("TC-MCP-065: ends a stopped change with nothing committed, and refuses an open one", () => {
     let state = atQa();
-    for (let run = 0; run < 3; run += 1) state = stateOf(recordQaRun(state, { passed: false, failures: [] }, NOW));
+    for (let run = 0; run < 3; run += 1) state = failQa(state);
     expect(stateOf(endStoppedChange(state, NOW))).toMatchObject({
       status: "done",
       isCommitted: false,

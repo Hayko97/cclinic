@@ -382,7 +382,7 @@ function requireOpenAt(state: WorkflowState, step: Step, tool: string): string |
   return undefined;
 }
 
-/** FR-MCP-019, FR-MCP-020: one QA run, and a stop after the last allowed run fails. */
+/** FR-MCP-019, FR-MCP-020, FR-MCP-047: one QA run, a fix after a failure, and a stop after the last allowed run fails. */
 export function recordQaRun(state: WorkflowState, report: QaReport, now: string): Outcome {
   const refusal = requireOpenAt(state, "qa", "qa_report");
   if (refusal !== undefined) return { refusal };
@@ -397,7 +397,11 @@ export function recordQaRun(state: WorkflowState, report: QaReport, now: string)
       recorded,
       `QA failed ${used} times. Report what fails, show the preview if it can start, and don't ask for approval.`,
     );
-  return { state: recorded, message: `QA run ${used} failed. Fix it and report the next run.` };
+  const failures = report.failures.length > 0 ? ` Failures: ${report.failures.join("; ")}.` : "";
+  return {
+    state: startRework({ ...recorded, step: "implement" }),
+    message: `QA run ${used} failed.${failures} Hand these bugs to the developer agent, and decide whether the code, the test or the spec is wrong. Fix wrong code or a wrong test with the write-code skill without asking the user anything, then advance to "qa" and report the next run. If the spec is wrong, call workflow_reset instead.`,
+  };
 }
 
 function stop(state: WorkflowState, reason: string): Outcome {

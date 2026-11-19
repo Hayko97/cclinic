@@ -3,7 +3,7 @@ name: test-spec
 description: "Acts as QA for a spec or feature: automates its test cases, runs them, explores edge cases, and reports results and defects. Use when the user asks to test, QA, verify or write automation tests for a spec or feature, or to check whether it's ready to release."
 metadata:
   generated-by: luseen
-  content-hash: "05e5500107088f82792bc631aabbcd45060792764d2b6d631263af85a3e96436"
+  content-hash: "ba4022d5d0240471be7ee2b497f1cbd57e635909f82917e0a78922af217ca3c2"
 ---
 
 # Test a spec
@@ -30,7 +30,7 @@ Work as an independent QA engineer. Your job is to find out whether the feature 
 ## Rules
 
 - **Never weaken a test to make it pass:** don't loosen an assertion, skip it, retry until it passes, or change the expected result to match what the code does.
-- **Don't change production code.** Report defects. If the user asks you to fix one, use the `write-code` skill, as a separate step.
+- **Don't change production code.** Report defects. If you're running QA for the agent that implemented the change, return the defects to it as bugs to fix, and don't ask the user whether to fix them. Otherwise, if the user asks you to fix one, use the `write-code` skill, as a separate step.
 - **If the spec and code disagree,** report it, and don't choose. Add it to `.luseen/sdd/open-questions.md`.
 - **Never claim a result you didn't see.**
 

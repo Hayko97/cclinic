@@ -425,7 +425,8 @@ export function createWorkflowTools(ports: WorkflowPorts): {
     },
     {
       name: "qa_report",
-      description: "Records one QA run: passed, and the failing test cases. At most 3 runs per change.",
+      description:
+        "Records one QA run: passed, and the failing test cases. A failure sends the change back to implement for a fix. At most 3 runs per change.",
       inputSchema: qaReportInputSchema,
       run: (input) =>
         withOpen(async (state) => save(recordQaRun(state, qaReportInputSchema.parse(input), ports.now()))),

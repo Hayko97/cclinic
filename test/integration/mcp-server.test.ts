@@ -119,6 +119,14 @@ async function driveTo(call: Awaited<ReturnType<typeof connect>>["call"], step: 
   }
 }
 
+/** Reports failing QA runs, taking each fix back to `qa` until the change stops. */
+async function failQa(call: Awaited<ReturnType<typeof connect>>["call"], times: number) {
+  for (let run = 1; run <= times; run += 1) {
+    await call("qa_report", { passed: false });
+    if (run < times) await call("workflow_advance", { to: "qa" });
+  }
+}
+
 function statusOf(root: string, id: number): string | undefined {
   const store = openTaskStore(path.join(root, ".luseen"), "read");
   const status = store?.getTask(id)?.status;
@@ -277,7 +285,7 @@ describe("steps and gates", () => {
     await call("qa_report", { passed: false, failures: ["TC-AUTH-001"] });
     expect(await call("workflow_status")).toMatchObject({
       change: {
-        step: "qa",
+        step: "implement",
         taskId: 1,
         spec: SPEC,
         changeType: "feature",
@@ -340,10 +348,28 @@ describe("steps and gates", () => {
     expect(await call("workflow_status")).toMatchObject({ change: { step: "implement" } });
   });
 
+  it("TC-MCP-077: a failed QA run sends its bugs back to the developer, asking the user nothing", async () => {
+    const { call, asked } = await connect(makeProject(), ["approve"]);
+    await driveTo(call, "qa");
+    const failed = await call("qa_report", { passed: false, failures: ["TC-X-001 fails"] });
+    expect(failed).toMatchObject({ isError: false });
+    expect(String(failed.message)).toMatch(
+      /TC-X-001 fails.*code, the test or the spec.*without asking the user.*"qa".*workflow_reset/,
+    );
+    expect(await call("workflow_status")).toMatchObject({
+      change: { step: "implement", status: "open" },
+    });
+    expect(await call("qa_report", { passed: true })).toMatchObject({ isError: true });
+    expect(await call("workflow_advance", { to: "qa" })).toMatchObject({ isError: false });
+    expect(asked).toHaveLength(1);
+    expect(await call("qa_report", { passed: true })).toMatchObject({ isError: false });
+    expect(await call("workflow_advance", { to: "review" })).toMatchObject({ isError: false });
+  });
+
   it("TC-MCP-026 and TC-MCP-027: stops after 3 failed QA runs, and resumes when the user agrees", async () => {
     const { call } = await connect(makeProject(), ["approve", "yes"]);
     await driveTo(call, "qa");
-    for (let run = 0; run < 3; run += 1) await call("qa_report", { passed: false });
+    await failQa(call, 3);
     expect(await call("workflow_advance", { to: "review" })).toMatchObject({ isError: true });
     expect(await call("qa_report", { passed: true })).toMatchObject({ isError: true });
     await call("workflow_resume");
@@ -356,7 +382,7 @@ describe("steps and gates", () => {
     const { call } = await connect(root, ["approve", "no"]);
     await driveTo(call, "qa", 1);
     await call("task_start", { id: 1 });
-    for (let run = 0; run < 3; run += 1) await call("qa_report", { passed: false });
+    await failQa(call, 3);
     expect(await call("workflow_resume")).toMatchObject({ isError: false });
     const ended = JSON.parse(readFileSync(path.join(root, ".luseen/workflow/task-1.json"), "utf8")) as Record<
       string,
@@ -917,7 +943,7 @@ describe("preview after a stop", () => {
     });
     const { call } = await connect(root, ["approve", "yes"]);
     await driveTo(call, "qa");
-    for (let run = 0; run < 3; run += 1) await call("qa_report", { passed: false });
+    await failQa(call, 3);
     expect(await call("preview_start")).toMatchObject({ isError: false, preview: { isRunning: true } });
     expect(await call("workflow_status")).toMatchObject({ change: { status: "stopped", preview: null } });
     await call("workflow_resume");

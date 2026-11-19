@@ -293,6 +293,20 @@ describe("agent workflow", () => {
     }
   });
 
+  it("TC-INSTR-060: QA bugs go to the developer agent, with no question to the user between runs", () => {
+    const step = workflow.slice(
+      workflow.indexOf("2. **Fix what fails.**"),
+      workflow.indexOf("3. **Review the code.**"),
+    );
+    for (const text of [
+      "QA reports each failed test case or unmet acceptance criterion as a bug to the developer agent",
+      "Unless the spec is wrong, don't ask the user for approval or anything else between QA runs",
+      "the developer fixes the bugs, then QA runs again, until it passes or the 3rd run fails",
+    ]) {
+      expect(step).toContain(text);
+    }
+  });
+
   it("TC-INSTR-036: a QA run started by the implementing agent only follows test-spec", () => {
     expect(workflow).toContain(
       "If you're running QA for the agent that implemented the change, follow only the `test-spec` skill. Don't start this lifecycle, change the spec or stop at stage 2.",
@@ -326,6 +340,21 @@ describe("agent workflow", () => {
     ]) {
       expect(step).toContain(text);
     }
+  });
+
+  it("TC-SKILL-052: QA's defects go to the developer agent as bugs, with no question to the user", () => {
+    const body = skill("implement-spec").body;
+    const step = body.slice(body.indexOf("Hand it to QA"), body.indexOf("Review the code."));
+    for (const text of [
+      "QA reports each defect to you, the developer agent, as a bug to fix",
+      "Unless the spec is wrong, don't ask the user for approval or anything else between QA runs",
+      "fix the bugs, then run QA again, until it passes or the 3rd run fails",
+    ]) {
+      expect(step).toContain(text);
+    }
+    expect(skill("test-spec").body).toContain(
+      "If you're running QA for the agent that implemented the change, return the defects to it as bugs to fix, and don't ask the user whether to fix them.",
+    );
   });
 
   it("TC-SKILL-035: test-spec runs the full checks when no spec covers the change", () => {

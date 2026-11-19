@@ -22,3 +22,4 @@ Acceptance criteria from the user's point of view.
 | VAL-SKILL-016 | FR-SKILL-034 | The roadmap I plan can run automatically. | Every proposed task says which other tasks it needs first. |
 | VAL-SKILL-017 | FR-SKILL-035 | Extending a roadmap doesn't duplicate it. | New proposals build on my existing roadmaps without repeating their tasks, and extensions only add milestones at the end. |
 | VAL-SKILL-018 | FR-SKILL-036 | The PM can turn one idea into one clear task. | Asking for a single task gives me one well-scoped task with its spec, dependencies and best-fitting milestone. |
+| VAL-SKILL-019 | FR-SKILL-037 | Bugs QA finds go straight to the developer. | With the installed skills, a failed QA run leads to a fix and another QA run, not a question to me. |
