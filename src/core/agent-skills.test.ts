@@ -676,7 +676,7 @@ describe("code review", () => {
     );
     at("Read enough of the surrounding code to judge each changed line");
     at(
-      "List problems in other files, or in code the change doesn't touch, as follow-ups. They don't affect the verdict",
+      "List problems in other files, or in code the change doesn't touch, as follow-ups, each with its file and line and what's wrong, so it can be saved as a task. They don't affect the verdict",
     );
   });
 
@@ -747,7 +747,7 @@ describe("code review", () => {
   it("TC-CREV-015: fixes go back through QA and review, at most 3 reviews", () => {
     for (const text of [
       "run QA again, which counts toward its limit, then the review again",
-      "If the fixes need QA and the 3 QA runs are used up, stop: report the findings and the untested fixes, show the preview if it can start, and don't ask for approval",
+      "If the fixes need QA and the 3 QA runs are used up, stop: report the findings and the untested fixes, save the findings as tasks (step 4), show the preview if it can start, and don't ask for approval",
       "The review runs at most 3 times for a change, counting every run",
       "the count starts again only after the user replies",
     ]) {
@@ -757,7 +757,7 @@ describe("code review", () => {
 
   it("TC-CREV-016: after the 3rd failing review, it stops without asking for approval", () => {
     expect(reviewStep).toContain(
-      "If the 3rd review still has `blocking` or `should-fix` findings, stop: report them, show the preview if it can start, and don't ask for approval",
+      "If the 3rd review still has `blocking` or `should-fix` findings, stop: report them, save them as tasks (step 4), show the preview if it can start, and don't ask for approval",
     );
   });
 
@@ -871,6 +871,72 @@ describe("the luseen MCP tools in the workflow", () => {
     expect(block).toContain("`review_report` after each review, with its verdict and findings by severity");
     expect(skill("implement-spec").body).toContain(
       "report each review with `review_report`, with its verdict and findings by severity",
+    );
+  });
+});
+
+describe("problems left for later", () => {
+  const block = renderAgentsBlock(".luseen/sdd");
+  const stage3 = block.slice(block.indexOf("**3. Implement"), block.indexOf("**4. Ask"));
+  const report = stage3.slice(stage3.indexOf("4. Report each requirement"), stage3.indexOf("5. **Show a preview."));
+  const implementer = render("implement-spec");
+
+  it("TC-INSTR-062: saves unfixed problems as tasks without asking, and not those fixed in the change", () => {
+    for (const text of [
+      "Without asking, save as a task each problem this change won't fix",
+      "a review follow-up or a bug you noticed in code the change doesn't touch",
+      "each failed test case or `blocking` or `should-fix` finding still open when you stop after the 3rd QA run or review",
+      "Don't save problems fixed in this change",
+    ]) {
+      expect(report).toContain(text);
+    }
+    expect(stage3).toContain("If the 3rd QA run still fails, stop: report what fails, save it as tasks (step 4)");
+    expect(stage3).toContain("findings, stop: report them, save them as tasks (step 4)");
+  });
+
+  it("TC-INSTR-063: says how to save a task and what it contains", () => {
+    for (const text of [
+      "`task_add` if you have the luseen MCP tools, or `luseen tasks add` otherwise, with no milestone",
+      "a title naming the problem, a description with the file and line, what's wrong, where it was found (QA run, review run or while working) and a suggested fix",
+      "the spec's name (`spec` for `task_add`, `--spec` for `luseen tasks add`) when a spec covers that code",
+    ]) {
+      expect(report).toContain(text);
+    }
+  });
+
+  it("TC-INSTR-064: skips duplicates, and doesn't raise the agent's own tasks again", () => {
+    expect(report).toContain("Check the open tasks first, and skip a problem one of them already records");
+    const stage0 = block.slice(block.indexOf("**0. Check open tasks.**"), block.indexOf("**1. Understand"));
+    expect(stage0).toContain(
+      "Don't list tasks you saved yourself in this conversation (stage 3), whatever the user answered before",
+    );
+  });
+
+  it("TC-INSTR-065: lists saved tasks and asks which other issues to save, without counting it as approval", () => {
+    for (const text of [
+      "list the tasks saved with their IDs",
+      "list the `nit` findings left and the findings you disagreed with, and ask the user which of them, or anything else, to save as tasks for later, and save only those they choose",
+      "This question isn't approval",
+      "In an unattended run, don't ask it, and don't save those",
+    ]) {
+      expect(report).toContain(text);
+    }
+  });
+
+  it("TC-INSTR-066: the section with the task lines stays under 200 lines", () => {
+    expect(block.split("\n").length).toBeLessThan(200);
+  });
+
+  it("TC-CREV-036: implement-spec saves tasks like the workflow, and review-code only describes follow-ups", () => {
+    const step13 = implementer.slice(implementer.indexOf("13. **Report"), implementer.indexOf("14. **Ask"));
+    expect(step13).toContain(report.slice(report.indexOf("**Save problems left for later.**")).trim());
+    expect(implementer).toContain(
+      "If the 3rd QA run still fails, stop: report the failures, save them as tasks (step 13)",
+    );
+    expect(implementer).toContain("findings, stop: report them, save them as tasks (step 13)");
+    const reviewer = render("review-code");
+    expect(reviewer).toContain(
+      "as follow-ups, each with its file and line and what's wrong, so it can be saved as a task. They don't affect the verdict. Don't save tasks yourself.",
     );
   });
 });

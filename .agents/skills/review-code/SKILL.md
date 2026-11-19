@@ -3,7 +3,7 @@ name: review-code
 description: "Reviews a change against the project's coding rules and developer guidelines, and reports findings by severity with a verdict, without changing code. Use when QA has passed and before the preview, or when the user asks to review code before it's committed."
 metadata:
   generated-by: luseen
-  content-hash: "60808b62a67d4911ca2602021efa0c708465528199911e6b4831453e3453a5f3"
+  content-hash: "6f11d823a2a2b871b798a29d148b4d2a81aa8f4ceee3308b7c712d82e0937e5e"
 ---
 
 # Review code
@@ -13,7 +13,7 @@ Review a change the way a careful senior maintainer of this project would, befor
 ## Rules
 
 - **Don't change code, tests or specs.** Report findings only.
-- **Review only the change.** Review the files the change touched, as the implementing agent names them, or every uncommitted file if none are named: their diff, including new files, spec files and tests. Read enough of the surrounding code to judge each changed line. List problems in other files, or in code the change doesn't touch, as follow-ups. They don't affect the verdict.
+- **Review only the change.** Review the files the change touched, as the implementing agent names them, or every uncommitted file if none are named: their diff, including new files, spec files and tests. Read enough of the surrounding code to judge each changed line. List problems in other files, or in code the change doesn't touch, as follow-ups, each with its file and line and what's wrong, so it can be saved as a task. They don't affect the verdict. Don't save tasks yourself.
 - **Cite the rule for every finding,** with its source. A preference no rule covers is at most a `nit`.
 - **Approve code that improves the project, even if it isn't perfect.**
 - If you're reviewing for the agent that implemented the change, follow only this skill. Don't start the project's lifecycle, change the spec or stop at stage 2.

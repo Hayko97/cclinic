@@ -48,6 +48,10 @@ Stage 3 also requires a QA pass against the spec's test cases and acceptance cri
 | FR-INSTR-036 | The workflow must tell agents that when the luseen MCP tools are available, they must call `workflow_status` at the start of each prompt, use `tasks_list` instead of `luseen tasks list --json`, and move through every stage with the tools (`workflow_begin`, `task_start`, `workflow_advance`, `qa_report`, `review_report`, `preview_start`), and that when the tools aren't available they must follow the written steps. | confirmed | `src/core/agent-skills.ts`, `src/core/agent-skills.test.ts`, `.luseen/sdd/specs/mcp-server/spec.md`, `user request` |
 | FR-INSTR-037 | The workflow must tell agents never to answer an approval question themselves, never to run `luseen approve`, and, when a tool refuses a step, to tell the user the reason instead of working around it. | confirmed | `src/core/agent-skills.ts`, `src/core/agent-skills.test.ts`, `.luseen/sdd/specs/mcp-server/spec.md` FR-MCP-028, FR-MCP-029, `user request` |
 | FR-INSTR-038 | When a QA run before the 3rd fails, the workflow must tell agents to report each failure as a bug to the developer agent (the one that implemented the change), have it fix them, and run QA again, repeating until QA passes or the 3rd run fails, without asking the user for approval or anything else between QA runs, unless the spec is wrong and the change goes back to stage 2. | confirmed | `src/core/agent-skills.ts`, `src/core/agent-skills.test.ts`, `AGENTS.md`, `user request` |
+| FR-INSTR-039 | The workflow must tell agents to save as a task, without asking the user first, each problem that won't be fixed in the current change: a follow-up the review reports in code the change doesn't touch, a bug the agent notices in such code while working, and each failed test case or `blocking` or `should-fix` finding still open when the agent stops after the 3rd QA or review run. Problems fixed in the change, including QA bugs and review findings the developer fixes, must not become tasks. | confirmed | `src/core/agent-skills.ts:85`, `src/core/agent-skills.ts:659`, `src/core/agent-skills.test.ts:878`, `user request` |
+| FR-INSTR-040 | Each task saved under FR-INSTR-039 or FR-INSTR-042 must be added with `task_add` when the luseen MCP tools are available, and with `luseen tasks add` otherwise, with no milestone; its title must name the problem, its description must give the file and line, what's wrong, where it was found (QA run, review run or noticed while working) and a suggested fix, and it must name the spec (`spec` for `task_add`, `--spec` for `luseen tasks add`) when a spec covers that code. | confirmed | `src/core/agent-skills.ts:85`, `src/core/agent-skills.test.ts:878`, `src/application/workflow-tools.ts:396`, `.luseen/sdd/specs/task-tracking/spec.md` FR-TASK-005, `user request` |
+| FR-INSTR-041 | Before saving a task, the workflow must tell agents to check the open tasks and not save one for a problem an open task already records. Tasks the agent saves itself must not be raised again by the open-task check (FR-INSTR-029) in the same conversation. | confirmed | `src/core/agent-skills.ts:85`, `src/core/agent-skills.ts:638`, `src/core/agent-skills.test.ts:878`, `user request` |
+| FR-INSTR-042 | The stage 3 report must list the tasks saved, with their IDs. It must then list the `nit` findings left unfixed and the findings the agent disagreed with, and ask the user which of them, and anything else, to save as tasks for later, and save only those the user chooses. This question must not count as approval, and the agent may ask it together with the approval question. In an unattended run, the agent must not ask it, and must not save these as tasks. | confirmed | `src/core/agent-skills.ts:85`, `src/core/agent-skills.ts:659`, `src/core/agent-skills.test.ts:878`, `user request` |
 
 ## Edge cases
 
@@ -78,6 +82,12 @@ Stage 3 also requires a QA pass against the spec's test cases and acceptance cri
 - After a review doc, the user chooses `refine`: the spec is refined, and the next review offers all three options, so a new doc can be made that replaces the old one.
 - The user replies with something other than the three options, such as a question: the agent answers it and offers the options again; it doesn't treat the reply as approval.
 - Unattended run: the agent stops at the three options and doesn't create a review doc on its own.
+- A review follow-up that an open task already records: no second task is saved, and the report names the existing task.
+- The agent stops after the 3rd QA run: each failure still open is saved as a task, and the agent still doesn't ask for approval.
+- The review has only `nit` findings: no task is saved without the user; the report lists the nits and asks which to save.
+- The user answers "none" to the task question: nothing is saved, and the question isn't counted as approval.
+- The luseen MCP tools aren't available and luseen isn't installed: the agent says the task couldn't be saved, and lists the problem in the report instead.
+- Automated mode (`luseen auto`): its agents may not change tasks, so they list problems left for later in their report, as when a task can't be saved.
 
 ## Non-goals
 
@@ -85,4 +95,5 @@ Stage 3 also requires a QA pass against the spec's test cases and acceptance cri
 - Configuring Gemini CLI or Aider to read AGENTS.md.
 - luseen committing or pushing changes.
 - Installing or editing the skills themselves (covered by agent-skills).
+- Saving problems left for later in automated mode, and the PM agent prioritizing them. That is separate automated-mode work.
 - Skill and docs generation (covered by spec-analysis and spec-output).

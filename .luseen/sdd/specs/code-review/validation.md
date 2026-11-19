@@ -19,3 +19,4 @@ Acceptance criteria from the user's point of view.
 | VAL-CREV-013 | FR-CREV-020 | The instructions stay short enough to follow | The `AGENTS.md` section is still under 200 lines |
 | VAL-CREV-014 | FR-CREV-014, FR-CREV-021 | Code I see and commit is always tested and reviewed | Changes I ask for after the preview are tested and reviewed again, and the agent never asks for approval of review fixes that QA couldn't test |
 | VAL-CREV-015 | FR-CREV-022, FR-CREV-023 | Reviews are counted and independent | With the luseen tools, every review is recorded and fixes are tested again before I see them; in auto runs, a separate reviewer reviews the developer's work |
+| VAL-CREV-016 | FR-CREV-024 | Review follow-ups become work I can pick up later | Whether I follow AGENTS.md or the `implement-spec` skill, review follow-ups end up as tasks, and the reviewer itself never changes my task list |
