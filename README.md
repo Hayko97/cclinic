@@ -1,54 +1,24 @@
 # luseen
 
-`luseen` sets up spec-driven development for your project. It reads your code, uses Claude to write specs, and gives your coding agent skills to work from them. You can then plan work with a PM agent, run whole roadmaps with AI, and watch everything in a local web GUI.
+Spec-driven development for your project, with Claude.
 
-## Quick start
+luseen writes specs for your project, gives your coding agent the skills to work from them, plans roadmaps with a PM agent, and can build whole roadmaps with AI agents.
 
-```bash
-npm install -g luseen       # install
-claude auth login            # connect to Claude, if you haven't already
-cd /path/to/your-project
-luseen doctor               # check your setup, with no Claude usage
-luseen                      # set up specs and agent skills for the project
-luseen gui                  # open the web GUI
-```
+## Install
 
-Each step is explained below.
-
-## 1. Install
-
-You need Node.js 22.18 or newer (`node --version`). Install luseen from npm:
+You need **Node.js 22.18+** and **Claude Code** logged in.
 
 ```bash
 npm install -g luseen
-luseen --version
+claude auth login
+luseen doctor          # checks everything is ready
 ```
 
-Or run it without installing, from your project folder:
-
-```bash
-npx luseen doctor
-npx luseen
-```
-
-`npx` downloads luseen the first time. Add `@latest` (`npx luseen@latest`) to make sure you run the newest version.
-
-Update or remove it:
-
-```bash
-npm install -g luseen@latest   # update
-npm uninstall -g luseen        # remove
-```
-
-If the install fails:
-
-- **`luseen: command not found`:** npm's global folder isn't on your `PATH`. Run `npm prefix -g`, and add its `bin` folder to your `PATH`.
-- **`EACCES: permission denied`:** don't use `sudo`. Install Node.js with a version manager such as [nvm](https://github.com/nvm-sh/nvm), or [change npm's global folder](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally).
-- **"luseen needs Node.js 22.18 or newer":** update Node.js, then install luseen again.
+No global install? Use `npx luseen` instead of `luseen`.
 
 ### Or install the Claude Code plugin
 
-In Claude Code, add this repository as a plugin marketplace, install the plugin, then set up your project:
+Prefer to stay inside Claude Code? Run these in Claude Code:
 
 ```text
 /plugin marketplace add Hayko97/cclinic
@@ -56,157 +26,241 @@ In Claude Code, add this repository as a plugin marketplace, install the plugin,
 /luseen:init
 ```
 
-On Claude Code 2.1.275 or later, `/plugin install luseen --marketplace Hayko97/cclinic` does the first two in one step.
+The plugin itself holds no MCP server or hook. `/luseen:init` adds luseen's local MCP server to your project's `.mcp.json` and its hook to `.claude/settings.json`, after asking, and writes the specs. Approve the `luseen` server when Claude Code asks (or in `/mcp`).
 
-The plugin brings luseen's skills (`/luseen:create-spec`, `/luseen:plan`, `/luseen:status`, `/luseen:gui` and more), so your project gets no skill folders. The plugin itself holds no MCP server or hook. `/luseen:init` adds luseen's local MCP server to your project's `.mcp.json` and the hook that links your sessions to the GUI to `.claude/settings.json`, after asking, along with the specs and the `AGENTS.md` and `CLAUDE.md` sections. Then approve the project's `luseen` server when Claude Code asks, or in `/mcp`. It needs Node.js 22.18 or newer, and runs luseen with `npx`. To set up a project from a terminal instead, run `luseen --plugin`.
+## Use it: new project, from scratch
 
-To work on luseen itself, install it from this repository instead:
-
-```bash
-git clone https://github.com/Hayko97/cclinic.git
-cd cclinic
-npm install
-npm run build
-npm link
+```mermaid
+flowchart LR
+    A[1. Write<br/>README.md] --> B[2. luseen<br/>specs] --> C[3. luseen plan<br/>chat with PM] --> D[4. Agent builds<br/>task by task] --> E[5. luseen auto<br/>builds the rest]
 ```
 
-## 2. Connect to Claude
+> Write the README first. `luseen` needs something to read, and `luseen plan` needs the specs from `luseen`.
 
-Use one of these:
-
-```bash
-claude auth login                      # A (default): your Claude Code login and plan
-export ANTHROPIC_API_KEY=<your-key>    # B: an Anthropic API key
-```
-
-Check it, with no Claude usage:
+### 1. Create the folder and describe the idea
 
 ```bash
-luseen doctor
+mkdir clinic-booking && cd clinic-booking
+git init
 ```
 
-## 3. Set up your project
+Write `README.md` in plain words:
+
+```markdown
+# Clinic Booking
+
+A web app where patients book appointments with a clinic's doctors.
+
+## Users
+
+- Patient: finds a doctor, books and cancels.
+- Receptionist: sees the day's schedule.
+
+## Features
+
+- Sign up and log in with email.
+- Doctor list with free 30-minute slots.
+- Book a slot (only once). Cancel up to 2 hours before.
+
+## Stack
+
+React + Vite, Node + Fastify, PostgreSQL.
+
+## Not now
+
+Payments, mobile app.
+```
+
+### 2. Generate the specs
 
 ```bash
-cd /path/to/your-project
-luseen --dry-run   # optional: see what would be analysed, with no Claude usage
-luseen             # shows a summary and asks before sending anything
+luseen
 ```
 
-You get:
-
-- `.luseen/sdd/`: project docs and specs (`spec.md`, `validation.md`, `verification.md` per area)
-- Ten agent skills in `.claude/skills/` and `.agents/skills/`, and a `designer` agent in `.claude/agents/`
-- A workflow section in `AGENTS.md`, and a `CLAUDE.md` that imports it
-- `.mcp.json` and a Claude Code hook, so the GUI can follow your sessions
-- Optionally, a local preview in `.luseen/environment/`
-- Optionally, a design system in `.luseen/design/`, with design tokens and a style guide
-
-Then **commit these files**, so your team and the AI agents use them.
-
-Prefer a browser? Run `luseen gui` and use its **Setup** screen instead.
-
-## 4. Open the GUI
+It asks before sending anything to Claude. Say **no** to the local preview for now, since there's no code to run yet. Then answer `.luseen/sdd/open-questions.md`, and commit:
 
 ```bash
-luseen gui
+git add -A && git commit -m "chore: set up luseen"
 ```
 
-It opens your browser at a private link on `127.0.0.1` (port 4417, or a free port if it's taken). Keep the terminal open, and press Ctrl+C to stop.
-
-| In the GUI  | What you do                                                        |
-| ----------- | ------------------------------------------------------------------ |
-| Setup       | Generate docs, install skills, set up the preview, pick a model    |
-| Canvas      | See roadmaps, milestones and tasks, with their status              |
-| Plan        | Plan a roadmap or one task with the PM agent, then approve it      |
-| Run with AI | Run a roadmap with agents. Stop it, or Continue it later           |
-| Task panel  | See a task's steps, answer its questions, read its Claude sessions |
-| Top bar     | Your Claude plan limits, so you see a limit coming                 |
-
-Options: `--port <n>`, `--no-open`, `-C <folder>`. More in [GUI_FLOW.md](GUI_FLOW.md).
-
-## 5. Work with your coding agent
-
-Open your agent (Claude Code, Codex, Cursor, Copilot, Gemini CLI) in the project and ask for a change. It follows these steps, and waits for you at each one:
-
-1. **Spec:** it updates the spec. You reply `approve`, `refine` or `review-doc`.
-2. **Build:** it writes the code and tests.
-3. **Check:** a QA agent tests it, and a reviewer checks the code.
-4. **Preview:** it starts the local preview, and you try it.
-5. **Commit:** only if you say yes. It never pushes on its own.
-
-Answer a waiting question in the agent's chat, with `luseen approve`, or in the GUI. More in [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md).
-
-## 6. Plan work
+### 3. Plan the roadmap with the PM agent
 
 ```bash
-luseen plan                 # plan a roadmap with the PM agent, as a chat
-luseen plan --task          # plan one task
-luseen plan --resume        # continue a planning session
-luseen tasks list           # see open tasks
+luseen plan                               # choose "New roadmap"
+luseen plan --attach docs/mockup.png      # or attach mockups and documents
 ```
 
-The PM is a Claude session you chat with in the terminal, the GUI or Claude Code. Attach briefs or screenshots if you like. It researches, asks a few questions at a time, recommends options, then proposes milestones and tasks. Nothing is saved until you approve. More in [PLANNING_FLOW.md](PLANNING_FLOW.md).
+Also in `luseen gui` (**New roadmap**), or in Claude Code: "plan a roadmap for the first release" (or `/luseen:plan`).
 
-## 7. Run a roadmap with AI
+The PM is a chat. It reads your specs and files, asks a few questions at a time, recommends options, and proposes milestones and tasks. **Nothing is saved until you approve.** An example:
+
+```text
+You  > Plan the first release. Start with the foundation: scaffold, lint,
+       tests and a runnable app. Then the features, smallest first.
+
+PM   > I read overview.md and the 3 specs. A few questions:
+       1. Auth: email + password (recommended), or magic links?
+       2. Reminder emails in this release, or later?
+       3. Deploy target: none yet (recommended), or a specific host?
+
+You  > Email + password. Reminders later. No deploy yet.
+
+PM   > Proposed roadmap "First release":
+       M1 Foundation  T1 Scaffold, lint, tests
+                      T2 Database + migrations (needs T1)
+                      T3 App shell + health page (needs T1)
+       M2 Accounts    T4 Sign up + log in (needs T2, T3)
+       M3 Booking     T5 Doctor list + free slots (needs T2)
+                      T6 Book a slot (needs T4, T5)
+                      T7 Cancel up to 2 hours before (needs T6)
+       Approve, or tell me what to change.
+
+You  > Split T6: the double-booking rule as its own task.
+
+PM   > Updated: T6 Book a slot, T7 Block double booking (needs T6),
+       T8 Cancel (needs T6). Approve?
+
+You  > approve
+
+luseen > Saved roadmap 1: 3 milestones, 8 tasks.
+```
+
+See what was saved:
 
 ```bash
-luseen auto --roadmap <id> --dry-run   # see the plan only
-luseen auto --roadmap <id>             # run it
+luseen tasks roadmap      # roadmaps, milestones and tasks
+luseen tasks list         # open tasks, in order
 ```
 
-Agents build each task on its own branch and merge it into `luseen/auto/<run-id>/run`. Your branch is never touched, and nothing is pushed. If your Claude plan limit is reached, the run stops cleanly and tells you when it resets. Continue it later from the GUI. You get a report in `.luseen/auto/<run-id>/report.md`. More in [AUTO_FLOW.md](AUTO_FLOW.md).
+Stopped mid-chat? `luseen plan --resume` continues it. Need one more task later? `luseen plan --task --roadmap 1`.
 
-## Commands
+### 4. Build the foundation with your agent
 
-| Command              | What it does                                  | Uses Claude |
-| -------------------- | --------------------------------------------- | ----------- |
-| `luseen`             | Generate docs and install skills              | yes         |
-| `luseen doctor`      | Check your setup                              | no          |
-| `luseen gui`         | Open the local web GUI                        | no\*        |
-| `luseen skills`      | Install or update the agent skills            | no          |
-| `luseen environment` | Set up the local preview                      | yes         |
-| `luseen design`      | Create a design system for the UI             | yes         |
-| `luseen model`       | Choose the default model and reasoning level  | no          |
-| `luseen tasks`       | See and track roadmaps and tasks              | no          |
-| `luseen plan`        | Plan with the PM agent                        | yes         |
-| `luseen auto`        | Run a roadmap with agents                     | yes         |
-| `luseen approve`     | Answer a question your agent is waiting on    | no          |
-| `luseen mcp`         | The server your coding agent starts by itself | depends     |
-| `luseen clean`       | Delete the cache and failed drafts            | no          |
-| `luseen guide`       | Full walkthrough in the terminal              | no          |
+Open Claude Code (or Codex, Cursor, Copilot, Gemini CLI) in the folder:
 
-\* Only the actions you start in it, such as Plan or Run with AI.
+```text
+You    > work on task 1
+Agent  > Task 1 uses the "foundation" spec. Spec change:
+         FR-…: the project builds, lints and runs its tests with one command.
+         approve / refine / review-doc?
+You    > approve
+Agent  > (writes code and tests, QA tests it, a reviewer checks it)
+         All checks pass. Try it: npm run dev → http://localhost:5173
+         Approve, or tell me what to change?
+You    > approve
+Agent  > Task 1 done. Commit it?
+You    > yes
+```
 
-Run `luseen help <command>` for a command's options.
+Repeat for each Foundation task. Once the app runs:
 
-## Good to know
+```bash
+luseen environment     # every later change ends with a preview link
+luseen design          # design system, for projects with screens
+```
 
-- **Re-running `luseen`** only reprocesses what changed. If the docs were edited by hand, it stops. `--force` replaces them all.
-- **Privacy:** `.env` files, keys and credential files are never read. Known secrets are removed before sending. No telemetry.
-- **Git:** luseen never pushes. It sends Claude only recent commit messages and file names, never diffs or authors (`--no-git` turns this off).
-- **Limits:** big runs stop before sending anything. See `luseen --help` for `--max-files`, `--max-input-tokens` and more.
+### 5. Let agents build the rest
+
+```bash
+luseen auto --roadmap 1 --dry-run   # checks everything, starts nothing
+luseen auto --roadmap 1             # agents build the remaining tasks
+```
+
+Agents work on their own branches. Your branch is never touched and nothing is pushed. Read `.luseen/auto/<run-id>/report.md`, then merge `luseen/auto/<run-id>/run` yourself. Watch it live in `luseen gui`.
+
+New idea later? `luseen plan --task`, or ask your agent for it.
+
+More detail, with a full README template and best practices: [NEW_PROJECT_FLOW.md](NEW_PROJECT_FLOW.md).
+
+## Use it: existing project
+
+```bash
+cd my-project
+luseen --dry-run       # see what will be read and the cost. Sends nothing
+luseen                 # writes the specs from your code
+git add -A && git commit -m "chore: set up luseen"
+```
+
+Then ask your coding agent for any change.
+
+## Use it: Claude Code plugin
+
+After [installing the plugin](#or-install-the-claude-code-plugin), use these in Claude Code:
+
+| Command               | Does                                        |
+| --------------------- | ------------------------------------------- |
+| `/luseen:init`        | Set up luseen in this project               |
+| `/luseen:plan`        | Plan a roadmap or one task with the PM      |
+| `/luseen:status`      | Where the current change is, and open tasks |
+| `/luseen:gui`         | Open the web board                          |
+| `/luseen:create-spec` | Write a spec for a new feature              |
+| `/luseen:refine-spec` | Fix or update a spec                        |
+| `/luseen:ui-design`   | Create a design system or design a screen   |
+
+Or just ask in plain words: "add password reset", "work on task 3".
+
+## How a change works
+
+Ask your agent (Claude Code, Codex, Cursor, Copilot, Gemini CLI) for a change. It stops for you at each step:
+
+1. **Spec**: it updates the spec. You reply `approve`, `refine` or `review-doc`.
+2. **Build**: code and tests. QA and a code review run on their own.
+3. **Preview**: you try it, then `approve`.
+4. **Commit**: only if you say yes. It never pushes.
+
+## Everyday commands
+
+```bash
+luseen gui                         # web board: roadmaps, tasks, agents, questions
+luseen plan                        # plan a roadmap
+luseen plan --task                 # plan one task
+luseen tasks list                  # open tasks
+luseen tasks show 5                # one task
+luseen auto --roadmap 1 --dry-run  # check an AI run first
+luseen auto --roadmap 1            # agents build the roadmap on their own branch
+luseen environment                 # set up the local preview
+luseen design                      # create a design system
+luseen approve                     # answer a question your agent is waiting on
+```
+
+`luseen auto` never touches your branch and never pushes. You review `.luseen/auto/<run-id>/report.md` and merge it yourself.
+
+Every command: `luseen help`, or `luseen help <command>`.
+
+## Update
+
+```bash
+npm install -g luseen@latest
+luseen skills          # update the agent skills in your project
+```
+
+## Problems
+
+| Problem                              | Fix                                                       |
+| ------------------------------------ | --------------------------------------------------------- |
+| `luseen: command not found`          | Use `npx luseen`, or add `$(npm prefix -g)/bin` to `PATH` |
+| "No files to analyse remain…"        | The folder is empty: write a README first                 |
+| `luseen plan`: `.luseen/sdd` missing | Run `luseen` first                                        |
+| Claude not found (exit 3)            | `claude auth login`, then `luseen doctor`                 |
+| Usage limit (exit 4)                 | Wait for the reset, run the same command again            |
 
 ## Guides
 
-| Guide                                      | About                                               |
-| ------------------------------------------ | --------------------------------------------------- |
-| [SETUP_FLOW.md](SETUP_FLOW.md)             | What `luseen` does when it sets up a project        |
-| [GUI_FLOW.md](GUI_FLOW.md)                 | Every screen of the GUI                             |
-| [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md) | How your agent takes a change from prompt to commit |
-| [PLANNING_FLOW.md](PLANNING_FLOW.md)       | Planning roadmaps and tasks with the PM             |
-| [AUTO_FLOW.md](AUTO_FLOW.md)               | Running a roadmap with AI                           |
+| Guide                                      | About                                     |
+| ------------------------------------------ | ----------------------------------------- |
+| [NEW_PROJECT_FLOW.md](NEW_PROJECT_FLOW.md) | New project, step by step                 |
+| [SETUP_FLOW.md](SETUP_FLOW.md)             | Setup in detail, and how it works inside  |
+| [DEVELOPMENT_FLOW.md](DEVELOPMENT_FLOW.md) | How your agent takes a change to a commit |
+| [PLANNING_FLOW.md](PLANNING_FLOW.md)       | Planning with the PM                      |
+| [AUTO_FLOW.md](AUTO_FLOW.md)               | Running a roadmap with AI                 |
+| [GUI_FLOW.md](GUI_FLOW.md)                 | Every screen of the GUI                   |
 
 ## Developing luseen
 
-Specs are in [`.luseen/sdd/`](.luseen/sdd/README.md). Follow [`developer-guidelines.md`](.luseen/sdd/developer-guidelines.md).
-
 ```bash
-npm run setup:browsers  # once: headless Chromium for the GUI page tests
-npm run verify          # lint, types, architecture, tests and coverage
-npm run test:e2e        # the built binary, against a fake claude
+git clone https://github.com/Hayko97/cclinic.git && cd cclinic
+npm install && npm run build && npm link
+npm run verify         # lint, types, tests, coverage
 ```
 
-Automated tests never call real Claude.
-
-The Claude Code plugin in `plugins/luseen/` and `.claude-plugin/marketplace.json` are generated: run `npm run build:plugin` after changing the skills or the version, and commit the result. A test fails when they're out of date.
+Specs are in [`.luseen/sdd/`](.luseen/sdd/README.md). After changing skills or the version, run `npm run build:plugin` and commit the result.
