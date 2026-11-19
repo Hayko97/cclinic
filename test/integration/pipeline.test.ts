@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { generateDocuments, prepareRun, type RunSettings } from "../../src/application/pipeline.js";
 import {
   checkOutputFolder,
@@ -18,10 +18,28 @@ import {
   UsageError,
   ValidationFailedError,
 } from "../../src/core/errors.js";
+import { DOCUMENT_FILES } from "../../src/core/constants/paths.js";
 import { GUIDELINE_BASELINE } from "../../src/core/guidelines-baseline.js";
 import type { ExtractedFile, LlmRequest, ScannedFile } from "../../src/core/ports.js";
 import { manifestSchema, projectDataSchema, specContentSchema, splitSpecSchema } from "../../src/core/schemas.js";
 import { defaultResponse, FakeLlm, makeSpecContent, makeTempFolder, silentLogger } from "../support/helpers.js";
+
+// Simulates a luseen rendering bug, the only kind of problem a run still fails on (FR-ANA-035).
+const rendering = vi.hoisted(() => ({ isBroken: false }));
+vi.mock("../../src/core/rendering.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/core/rendering.js")>();
+  return {
+    ...actual,
+    renderDocuments: (...args: Parameters<typeof actual.renderDocuments>) => {
+      const files = actual.renderDocuments(...args);
+      if (rendering.isBroken) files.set(DOCUMENT_FILES.GUIDELINES, "# Guidelines\n");
+      return files;
+    },
+  };
+});
+afterEach(() => {
+  rendering.isBroken = false;
+});
 
 function codeFile(relative: string, content = "line one\nline two"): ExtractedFile {
   return {
@@ -146,7 +164,10 @@ describe("analysis pipeline", () => {
       if (!isCombineCall(request)) return undefined;
       return defaultResponse(request);
     });
-    await expect(run(root, reuse, { settings: { noCache: true } })).rejects.toBeInstanceOf(ValidationFailedError);
+    const { result } = await run(root, reuse, { settings: { noCache: true } });
+    expect(read(root, "specs/beta/spec.md")).toContain("FR-BETA-002");
+    expect(read(root, "specs/beta/spec.md")).not.toContain("FR-BETA-001");
+    expect(result.warnings).toContain("Repaired beta: renumbered FR-BETA-001 to FR-BETA-002");
   });
 
   it("TC-ANA-025: re-runs are cached, and each change re-analyses", async () => {
@@ -431,11 +452,8 @@ describe("generated output", () => {
   it("TC-OUT-011: the cache and failed folders stay out of git", async () => {
     const root = makeTempFolder();
     execFileSync("git", ["init", "-q"], { cwd: root });
-    const invalid = new FakeLlm((request, index) => {
-      if (index >= 0 && isSpecCall(request)) return makeSpecContent("WRONG", ["a/one.ts:1"]);
-      return undefined;
-    });
-    await expect(run(root, invalid)).rejects.toBeInstanceOf(ValidationFailedError);
+    rendering.isBroken = true;
+    await expect(run(root, new FakeLlm())).rejects.toBeInstanceOf(ValidationFailedError);
     const status = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
       cwd: root,
       encoding: "utf8",
@@ -481,12 +499,10 @@ describe("generated output", () => {
     const root = makeTempFolder();
     await run(root, new FakeLlm());
     const before = read(root, "README.md");
-    const invalid = new FakeLlm((request) =>
-      isSpecCall(request) ? makeSpecContent("WRONG", ["a/one.ts:1"]) : undefined,
-    );
-    const error = await run(root, invalid, { settings: { noCache: true } }).catch((caught: unknown) => caught);
+    rendering.isBroken = true;
+    const error = await run(root, new FakeLlm(), { settings: { noCache: true } }).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ValidationFailedError);
-    expect((error as ValidationFailedError).problems.join()).toContain("malformed ID");
+    expect((error as ValidationFailedError).problems.join()).toContain("developer-guidelines.md");
     expect(read(root, "README.md")).toBe(before);
     const failed = path.join(root, ".luseen/failed");
     expect(readdirSync(failed).filter((name) => name !== ".gitignore")).toHaveLength(1);
@@ -541,19 +557,19 @@ describe("recovering from invalid results", () => {
       ? makeSpecContent("ALPHA", ["missing/file.ts:1"])
       : undefined;
 
-  it("TC-ANA-038: a failed run keeps valid results, and only redoes what failed", async () => {
+  it("TC-ANA-044: a spec with nothing verifiable is left out, and the run still publishes", async () => {
     const root = makeTempFolder();
-    await expect(run(root, new FakeLlm(stillInvalid), { settings: { concurrency: 1 } })).rejects.toBeInstanceOf(
-      ValidationFailedError,
-    );
-    const second = new FakeLlm();
-    const { result } = await run(root, second);
-    expect(second.calls).toHaveLength(1);
-    expect(second.calls[0]?.prompt).toContain("Spec: alpha.");
-    expect(result.specCount).toBe(2);
+    const llm = new FakeLlm(stillInvalid);
+    const { result } = await run(root, llm);
+    expect(llm.calls.filter((call) => call.prompt.includes("Spec: alpha."))).toHaveLength(2);
+    expect(result.specCount).toBe(1);
+    expect(existsSync(path.join(root, ".luseen/sdd/specs/alpha"))).toBe(false);
+    expect(existsSync(path.join(root, ".luseen/failed"))).toBe(false);
+    expect(read(root, "open-questions.md")).toContain('couldn\'t produce a verified spec for "alpha"');
+    expect(read(root, "README.md")).not.toContain("specs/alpha/");
   });
 
-  it("TC-ANA-039: an invalid result already in the cache is regenerated", async () => {
+  it("TC-ANA-032: an invalid result already in the cache is regenerated", async () => {
     const root = makeTempFolder();
     const llm = new FakeLlm();
     const { paths } = await run(root, llm);
@@ -562,7 +578,8 @@ describe("recovering from invalid results", () => {
     for (const entry of readdirSync(paths.cache).filter((name) => name.endsWith(".json"))) {
       const file = path.join(paths.cache, entry);
       const value: unknown = JSON.parse(readFileSync(file, "utf8"));
-      if (Array.isArray(value) && (value[0] as { name?: string } | undefined)?.name === "alpha") {
+      const specs = (value as { specs?: { name?: string }[] }).specs;
+      if (specs?.[0]?.name === "alpha") {
         writeFileSync(file, JSON.stringify(invalid));
         replaced += 1;
       }
@@ -572,5 +589,132 @@ describe("recovering from invalid results", () => {
     await run(root, second);
     expect(second.calls).toHaveLength(1);
     expect(second.calls[0]?.prompt).toContain("Spec: alpha.");
+  });
+});
+
+describe("repairing what the retry gets wrong", () => {
+  const first = <T>(items: readonly T[]): T => {
+    const [item] = items;
+    if (item === undefined) throw new Error("expected an item");
+    return item;
+  };
+  const alphaSpec = (
+    request: LlmRequest<unknown>,
+    content: ReturnType<typeof makeSpecContent>,
+  ): ReturnType<typeof makeSpecContent> | undefined =>
+    isSpecCall(request) && request.prompt.includes("Spec: alpha.") ? content : undefined;
+
+  it("TC-ANA-040: an ID with a suffix and a duplicate VAL are renumbered, and the run publishes", async () => {
+    const root = makeTempFolder();
+    const base = makeSpecContent("ALPHA", ["a/one.ts:1"]);
+    const content = {
+      ...base,
+      acceptanceCriteria: [...base.acceptanceCriteria, { ...first(base.acceptanceCriteria), userNeed: "Again" }],
+      testCases: [...base.testCases, { ...first(base.testCases), id: "TC-ALPHA-001B", then: "Also happens" }],
+    };
+    const llm = new FakeLlm((request) => alphaSpec(request, content));
+    const { result } = await run(root, llm);
+    const verification = read(root, "specs/alpha/verification.md");
+    expect(verification).toContain("| TC-ALPHA-002 | FR-ALPHA-001 |");
+    expect(verification).not.toContain("TC-ALPHA-001B");
+    expect(read(root, "specs/alpha/validation.md")).toContain("| VAL-ALPHA-002 |");
+    expect(result.warnings).toContain("Repaired alpha: renumbered TC-ALPHA-001B to TC-ALPHA-002");
+    expect(result.warnings).toContain("Repaired alpha: renumbered VAL-ALPHA-001 to VAL-ALPHA-002");
+    expect(read(root, "scan-report.md")).toContain("renumbered TC-ALPHA-001B to TC-ALPHA-002");
+    expect(existsSync(path.join(root, ".luseen/failed"))).toBe(false);
+  });
+
+  it("TC-ANA-042: a whole-file citation is removed, and a requirement left without evidence becomes a question", async () => {
+    const root = makeTempFolder();
+    const base = makeSpecContent("ALPHA", ["a/one.ts:1-2", "a/one.ts"]);
+    const content = {
+      ...base,
+      requirements: [
+        ...base.requirements,
+        {
+          id: "FR-ALPHA-002",
+          statement: "It must offer a licence.",
+          status: "code-only" as const,
+          evidence: ["a/one.ts"],
+        },
+      ],
+      acceptanceCriteria: [
+        ...base.acceptanceCriteria,
+        { ...first(base.acceptanceCriteria), id: "VAL-ALPHA-002", covers: ["FR-ALPHA-002"] },
+      ],
+      testCases: [...base.testCases, { ...first(base.testCases), id: "TC-ALPHA-002", covers: ["FR-ALPHA-002"] }],
+    };
+    const { result } = await run(root, new FakeLlm((request) => alphaSpec(request, content)));
+    const spec = read(root, "specs/alpha/spec.md");
+    expect(spec).toContain("| FR-ALPHA-001 | It must do ALPHA. | code-only | `a/one.ts:1-2` |");
+    expect(spec).not.toContain("FR-ALPHA-002");
+    expect(read(root, "specs/alpha/verification.md")).not.toContain("TC-ALPHA-002");
+    expect(read(root, "specs/alpha/validation.md")).not.toContain("VAL-ALPHA-002");
+    expect(read(root, "open-questions.md")).toContain("It must offer a licence.");
+    expect(result.warnings.join("\n")).toContain('alpha: FR-ALPHA-001: removed evidence "a/one.ts"');
+    expect(result.warnings.join("\n")).toContain("moved FR-ALPHA-002 to the open questions");
+  });
+
+  it("TC-ANA-046: a repaired result is cached, so an unchanged re-run makes no calls", async () => {
+    const root = makeTempFolder();
+    const content = { ...makeSpecContent("ALPHA", ["a/one.ts:1"]), testCases: [] };
+    await run(root, new FakeLlm((request) => alphaSpec(request, content)));
+    const markdown = ["README.md", "open-questions.md", "scan-report.md", "specs/beta/spec.md"];
+    const before = markdown.map((file) => read(root, file));
+    const second = new FakeLlm();
+    const { result } = await run(root, second);
+    expect(second.calls).toHaveLength(0);
+    expect(markdown.map((file) => read(root, file))).toEqual(before);
+    expect(result.warnings.join()).toContain("moved FR-ALPHA-001 to the open questions");
+  });
+
+  it("TC-ANA-046: a cached result saved before repairs existed is still used", async () => {
+    const root = makeTempFolder();
+    const { paths } = await run(root, new FakeLlm());
+    let converted = 0;
+    for (const entry of readdirSync(paths.cache).filter((name) => name.endsWith(".json"))) {
+      const file = path.join(paths.cache, entry);
+      const value = JSON.parse(readFileSync(file, "utf8")) as { specs?: unknown; repairs?: unknown; project?: unknown };
+      if (value.repairs === undefined) continue;
+      writeFileSync(file, JSON.stringify(value.specs ?? value.project));
+      converted += 1;
+    }
+    expect(converted).toBe(3);
+    const second = new FakeLlm();
+    await run(root, second);
+    expect(second.calls).toHaveLength(0);
+  });
+
+  it("TC-ANA-049: split specs get valid, unique names and areas, and the run publishes", async () => {
+    const root = makeTempFolder();
+    const llm = new FakeLlm((request) => {
+      if (isSpecCall(request) && request.prompt.includes("Spec: alpha.")) throw new TruncatedError("cut off");
+      if (request.schema !== splitSpecSchema) return undefined;
+      return {
+        specs: [
+          { name: "alpha-a", area: "A(B", ...makeSpecContent("A(B", ["a/one.ts:1"]) },
+          { name: "beta", area: "beta", ...makeSpecContent("beta", ["a/one.ts:2"]) },
+        ],
+      };
+    });
+    const { result } = await run(root, llm);
+    expect(result.specCount).toBe(3);
+    expect(read(root, "specs/alpha-a/spec.md")).toContain("| FR-AB-001 |");
+    expect(read(root, "specs/beta/spec.md")).toContain("| FR-BETA-001 | It must do BETA. |");
+    expect(read(root, "specs/beta-2/spec.md")).toMatch(/\| FR-BETA[A-Z]+-001 \| It must do beta\. \|/);
+  });
+
+  it("TC-ANA-047: a link to a document that isn't generated becomes plain text", async () => {
+    const root = makeTempFolder();
+    const base = makeSpecContent("ALPHA", ["a/one.ts:1"]);
+    const content = {
+      ...base,
+      requirements: [{ ...first(base.requirements), statement: "It must follow the [guide](docs/guide.md)." }],
+    };
+    const { result } = await run(root, new FakeLlm((request) => alphaSpec(request, content)));
+    expect(read(root, "specs/alpha/spec.md")).toContain("It must follow the guide.");
+    expect(result.warnings).toContain("Repaired specs/alpha/spec.md: removed the broken link to docs/guide.md");
+    expect(read(root, "scan-report.md")).toContain("removed the broken link to docs/guide.md");
+    expect(existsSync(path.join(root, ".luseen/failed"))).toBe(false);
   });
 });

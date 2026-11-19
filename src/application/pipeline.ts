@@ -17,9 +17,11 @@ import {
   withSplitRequest,
 } from "../core/prompts.js";
 import { countRedactions, redact } from "../core/redaction.js";
-import { renderDocuments, type ScanReportData } from "../core/rendering.js";
+import { renderDocuments } from "../core/rendering.js";
+import { removedSpecQuestion, repairProject, repairSpec, repairSpecEntries } from "../core/repair.js";
 import {
-  generatedSpecsSchema,
+  cachedProjectSchema,
+  cachedSpecsSchema,
   moduleSummarySchema,
   projectDataSchema,
   specContentSchema,
@@ -33,6 +35,7 @@ import {
 } from "../core/schemas.js";
 import {
   buildFileIndex,
+  repairLinks,
   validateProject,
   validateRendered,
   validateSpec,
@@ -230,6 +233,7 @@ export async function generateDocuments(
   const analysedPaths = prepared.files.map((file) => file.path);
   const previous = await deps.store.readManifest();
   const previousRetired = previous?.retiredIds ?? [];
+  const previousIds = previous?.specs.flatMap((spec) => spec.ids.map((item) => item.id)) ?? [];
   const newestCommit = settings.history?.newestCommit ?? "";
   const historyText = settings.history?.text ?? "";
 
@@ -340,21 +344,25 @@ export async function generateDocuments(
   const combineKey = hash(
     ["combine", baseKey, newestCommit, JSON.stringify(combineInput), analysedPaths.join("\n")].join("\n"),
   );
-  const project = await cached<ProjectData>(
+  const combined = await cached(
     combineKey,
-    projectDataSchema,
+    cachedProjectSchema,
     deps.signal,
     async (signal) => {
       const prompt = buildCombinePrompt(combineInput, analysedPaths, previous, historyText);
       const first = await callLlm(prompt, projectDataSchema, signal);
       const problems = validateProject(first, index);
-      if (problems.length === 0) return first;
+      if (problems.length === 0) return { project: first, repairs: [] };
       logger.info(`Retrying project data to fix ${problems.length} problems...`);
       for (const problem of problems) logger.debug(problem);
-      return callLlm(withProblems(prompt, problems), projectDataSchema, signal);
+      // What the retry still gets wrong is repaired, so the run never fails on it (FR-ANA-033).
+      const repaired = repairProject(await callLlm(withProblems(prompt, problems), projectDataSchema, signal), index);
+      return { project: repaired.value, repairs: [...repaired.repairs] };
     },
-    (value) => validateProject(value, index).length === 0,
+    (value) => validateProject(value.project, index).length === 0,
   );
+  const repairs = [...combined.repairs];
+  let project: ProjectData = combined.project;
 
   // Generate each spec in its own call (FR-ANA-025).
   logger.info(`Generating ${project.specs.length} specs...`);
@@ -373,15 +381,15 @@ export async function generateDocuments(
         JSON.stringify(summaries),
       ].join("\n"),
     );
-    const specs = await cached<GeneratedSpec[]>(
+    const result = await cached(
       key,
-      generatedSpecsSchema,
+      cachedSpecsSchema,
       signal,
       (innerSignal) => generateSpec(entry, project.specs, summaries, innerSignal),
-      (values) => values.every((spec) => validateSpec(spec, index, previousRetired).length === 0),
+      (value) => value.specs.every((spec) => validateSpec(spec, index, previousRetired).length === 0),
     );
     logger.info(`  ${entry.name}`);
-    return specs;
+    return { entry, ...result };
   });
 
   async function generateSpec(
@@ -389,7 +397,7 @@ export async function generateDocuments(
     allSpecs: readonly SpecEntry[],
     summaries: readonly ModuleSummary[],
     signal: AbortSignal,
-  ): Promise<GeneratedSpec[]> {
+  ): Promise<{ specs: GeneratedSpec[]; repairs: string[] }> {
     const prompt = buildSpecPrompt(entry, allSpecs, summaries, analysedPaths, previous, project, historyText);
     const named = (content: SpecContent): GeneratedSpec => ({
       ...content,
@@ -397,6 +405,15 @@ export async function generateDocuments(
       area: entry.area,
     });
     let first: GeneratedSpec;
+    const repairAll = (specs: readonly GeneratedSpec[]): { specs: GeneratedSpec[]; repairs: string[] } => {
+      // Split specs take names and areas from the model, and IDs are checked against the area.
+      const entries = repairSpecEntries(specs);
+      const results = entries.value.map((spec) => repairSpec(spec, index, previousRetired, previousIds));
+      return {
+        specs: results.flatMap((result) => (result.value === undefined ? [] : [result.value])),
+        repairs: [...entries.repairs, ...results.flatMap((result) => result.repairs)],
+      };
+    };
     try {
       first = named(await callLlm(prompt, specContentSchema, signal));
     } catch (error) {
@@ -404,7 +421,7 @@ export async function generateDocuments(
       logger.info(`Spec ${entry.name} was too long, so it's being split...`);
       try {
         const split = await callLlm(withSplitRequest(prompt, entry), splitSpecSchema, signal);
-        return split.specs;
+        return repairAll(split.specs);
       } catch (splitError) {
         if (splitError instanceof TruncatedError) {
           throw new TruncatedError(`Spec "${entry.name}" is too long for one response, even after splitting.`, {
@@ -415,19 +432,48 @@ export async function generateDocuments(
       }
     }
     const problems = validateSpec(first, index, previousRetired);
-    if (problems.length === 0) return [first];
+    if (problems.length === 0) return { specs: [first], repairs: [] };
     logger.info(`Retrying spec ${entry.name} to fix ${problems.length} problems...`);
     for (const problem of problems) logger.debug(problem);
-    return [named(await callLlm(withProblems(prompt, problems), specContentSchema, signal))];
+    // What the retry still gets wrong is repaired, so the run never fails on it (FR-ANA-030 to FR-ANA-032).
+    return repairAll([named(await callLlm(withProblems(prompt, problems), specContentSchema, signal))]);
   }
 
-  const specs = generated.flat();
-  const reportData: ScanReportData = {
-    scan: prepared.scan,
-    warnings: prepared.warnings,
-    redactions: prepared.redactions,
+  const removed = generated.filter((result) => result.specs.length === 0).map((result) => result.entry);
+  project = {
+    ...project,
+    specs: project.specs.filter((entry) => !removed.includes(entry)),
+    openQuestions: [...project.openQuestions, ...removed.map(removedSpecQuestion)],
   };
-  const documents = renderDocuments(project, specs, reportData);
+  repairs.push(...generated.flatMap((result) => result.repairs));
+  // Split specs can repeat another spec's name or area. Specs that weren't split come first, so they keep theirs.
+  const isSplit = (spec: GeneratedSpec, entry: SpecEntry): boolean => spec.name !== entry.name;
+  const entries = repairSpecEntries([
+    ...generated.flatMap((result) => result.specs.filter((spec) => !isSplit(spec, result.entry))),
+    ...generated.flatMap((result) => result.specs.filter((spec) => isSplit(spec, result.entry))),
+  ]);
+  repairs.push(...entries.repairs);
+  const specs = entries.value.flatMap((spec) => {
+    const result = repairSpec(spec, index, previousRetired, previousIds);
+    repairs.push(...result.repairs);
+    return result.value === undefined ? [] : [result.value];
+  });
+  const render = (): ReturnType<typeof repairLinks> =>
+    repairLinks(
+      renderDocuments(project, specs, {
+        scan: prepared.scan,
+        warnings: [...prepared.warnings, ...repairs.map((repair) => `Repaired ${repair}`)],
+        redactions: prepared.redactions,
+      }),
+    );
+  let linked = render();
+  if (linked.repairs.length > 0) {
+    // Rendered again, so the scan report lists the link repairs too.
+    repairs.push(...linked.repairs);
+    linked = render();
+  }
+  const documents = linked.files;
+  for (const repair of repairs) logger.debug(`Repaired ${repair}`);
 
   const manifest = buildManifest({ prepared, settings, deps, specs, documents, accounting, previous });
   documents.set(DOCUMENT_FILES.MANIFEST, `${JSON.stringify(manifest, null, JSON_INDENT)}\n`);
@@ -454,7 +500,7 @@ export async function generateDocuments(
     costUsd: accounting.hasCost ? accounting.costUsd : null,
     cachedChunks: prepared.chunks.filter((chunk) => chunk.isCached).length,
     totalChunks: prepared.chunks.length,
-    warnings: prepared.warnings,
+    warnings: [...prepared.warnings, ...repairs.map((repair) => `Repaired ${repair}`)],
   };
 }
 

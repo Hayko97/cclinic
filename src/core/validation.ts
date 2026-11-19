@@ -183,6 +183,36 @@ function resolveLink(from: string, target: string): string {
   return parts.join("/");
 }
 
+// Link text may hold one level of brackets, such as [the [v2] guide](guide.md).
+const LABELLED_MARKDOWN_LINK = /\[((?:[^[\]]|\[[^[\]]*\])*)\]\(([^)\s]+\.md)(?:#[^)\s]*)?\)/g;
+
+/** Replaces links to documents that weren't generated with their text, as model text can contain them (FR-ANA-035). */
+export function repairLinks(files: ReadonlyMap<string, string>): {
+  files: Map<string, string>;
+  repairs: string[];
+} {
+  const repairs: string[] = [];
+  const repaired = new Map<string, string>();
+  for (const [path, content] of files) {
+    if (!path.endsWith(".md")) {
+      repaired.set(path, content);
+      continue;
+    }
+    const isBroken = (target: string): boolean => !/^[a-z]+:/i.test(target) && !files.has(resolveLink(path, target));
+    const unlink = (link: string, target: string, replacement: string): string => {
+      if (!isBroken(target)) return link;
+      repairs.push(`${path}: removed the broken link to ${target}`);
+      return replacement;
+    };
+    const fixed = content
+      .replace(LABELLED_MARKDOWN_LINK, (link: string, text: string, target: string) => unlink(link, target, text))
+      // A link the pattern above can't read loses its target, so it's no longer a link.
+      .replace(MARKDOWN_LINK, (link: string, target: string) => unlink(link, target, "]"));
+    repaired.set(path, fixed);
+  }
+  return { files: repaired, repairs };
+}
+
 export function validateRendered(files: ReadonlyMap<string, string>, specNames: readonly string[]): string[] {
   const problems: string[] = [];
   for (const name of specNames) {
@@ -196,6 +226,7 @@ export function validateRendered(files: ReadonlyMap<string, string>, specNames: 
     if (!guidelines.includes(`\n## ${section}\n`)) problems.push(`developer-guidelines.md: "${section}" is missing`);
   }
   for (const [path, content] of files) {
+    if (!path.endsWith(".md")) continue;
     for (const match of content.matchAll(MARKDOWN_LINK)) {
       const target = match[1] ?? "";
       if (/^[a-z]+:/i.test(target)) continue;

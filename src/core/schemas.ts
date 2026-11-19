@@ -134,3 +134,16 @@ export const manifestSchema = z.preprocess(
   }),
 );
 export type Manifest = z.infer<typeof manifestSchema>;
+
+const repairs = z.array(z.string());
+
+/** A result is cached with its repairs, so a re-run reports them again. Older entries hold the result alone. */
+export const cachedSpecsSchema = z.union([
+  z.object({ specs: generatedSpecsSchema, repairs }),
+  generatedSpecsSchema.transform((specs) => ({ specs, repairs: [] as string[] })),
+]);
+
+export const cachedProjectSchema = z.union([
+  z.object({ project: projectDataSchema, repairs }),
+  projectDataSchema.transform((project) => ({ project, repairs: [] as string[] })),
+]);
