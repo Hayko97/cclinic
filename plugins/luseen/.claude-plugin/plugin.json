@@ -1,6 +1,6 @@
 {
   "name": "luseen",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Generate spec-driven development documents for an existing project, using Claude",
   "author": {
     "name": "Hayko97"
