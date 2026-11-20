@@ -12,3 +12,4 @@ Acceptance criteria in plain language.
 | VAL-PLUG-008 | FR-PLUG-013 | Installing luseen from npm still works as before | Running `luseen` from npm in a project installs the skill folders, the agent instructions, the MCP server and the hook, exactly as before the plugin changed |
 | VAL-PLUG-006 | FR-PLUG-012 | The plugin never drifts from the CLI it runs | A release always has the plugin at the package's version, with the same skills `luseen skills` installs |
 | VAL-PLUG-007 | FR-PLUG-015 | Luseen is recognisable in the plugin directory | The plugin shows the Luseen logo, a moon in an eye, when submitted to Anthropic's directory |
+| VAL-PLUG-009 | FR-PLUG-017 | `/luseen:init` in an empty folder tells me how to start | It points me to starting a new project with the PM instead of failing |

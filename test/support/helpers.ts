@@ -345,7 +345,7 @@ const NOT_PLANNING = (): Promise<never> => Promise.reject(new UsageError("Planni
 
 /** A planner for GUI tests that don't plan: an empty panel, and every change refused. */
 export const NO_PLANNER: Planner = {
-  view: () => Promise.resolve({ open: null, sessions: [], turn: null, notice: null, version: 0 }),
+  view: () => Promise.resolve({ open: null, sessions: [], turn: null, step: null, notice: null, version: 0 }),
   subscribe: () => () => undefined,
   start: NOT_PLANNING,
   open: NOT_PLANNING,
@@ -358,6 +358,7 @@ export const NO_PLANNER: Planner = {
   retry: NOT_PLANNING,
   approve: NOT_PLANNING,
   cancel: NOT_PLANNING,
+  finishDesign: NOT_PLANNING,
   upload: NOT_PLANNING,
   removeUpload: NOT_PLANNING,
   attachment: () => Promise.resolve(undefined),

@@ -42,6 +42,8 @@ import {
   ANSWER_LAST_MESSAGE,
   repeatedMessageOf,
   isPlanningNote,
+  projectDesignArgs,
+  projectSpecsArgs,
   sourceSchema,
   sourcesSchema,
   suggestionsSchema,
@@ -82,6 +84,16 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   "x-content-type-options": "nosniff",
   "referrer-policy": "no-referrer",
   "cache-control": "no-store",
+};
+
+/**
+ * FR-GUI-089: the design agent's style guide is shown as written, so it's sandboxed: no scripts, no requests, only its
+ * own styles, images and fonts.
+ */
+export const STYLE_GUIDE_HEADERS: Readonly<Record<string, string>> = {
+  ...SECURITY_HEADERS,
+  "content-security-policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:",
+  "content-type": "text/html; charset=utf-8",
 };
 
 /** How a browser writes the GUI's address: without the port when it's HTTP's default. */
@@ -176,6 +188,8 @@ export type Route =
   | { readonly name: "plan-retry" }
   | { readonly name: "plan-approve" }
   | { readonly name: "plan-cancel" }
+  | { readonly name: "plan-design" }
+  | { readonly name: "style-guide" }
   | { readonly name: "plan-upload" }
   | { readonly name: "plan-upload-check" }
   | { readonly name: "plan-remove-upload"; readonly id: string }
@@ -246,6 +260,9 @@ const ROUTES: readonly {
   { method: "POST", pattern: /^\/api\/plan\/retry$/, route: () => ({ name: "plan-retry" }) },
   { method: "POST", pattern: /^\/api\/plan\/approve$/, route: () => ({ name: "plan-approve" }) },
   { method: "POST", pattern: /^\/api\/plan\/cancel$/, route: () => ({ name: "plan-cancel" }) },
+  // FR-GUI-089: a new project's design system, approved or skipped, and its style guide to look at.
+  { method: "POST", pattern: /^\/api\/plan\/design$/, route: () => ({ name: "plan-design" }) },
+  { method: "GET", pattern: /^\/api\/design\/style-guide$/, route: () => ({ name: "style-guide" }) },
   // FR-PLAN-037: an image a session's message has, by its stored file name, for its thumbnail.
   {
     method: "GET",
@@ -385,6 +402,8 @@ export type PlanMessage = z.output<typeof planMessageSchema>;
 export const planRequestSchema = z.strictObject({
   target: z.discriminatedUnion("kind", [
     z.strictObject({ kind: z.literal("new-roadmap") }),
+    // FR-GUI-085: only in an empty folder.
+    z.strictObject({ kind: z.literal("new-project") }),
     z.strictObject({ kind: z.literal("extend-roadmap"), roadmapId: idSchema }),
     z.strictObject({ kind: z.literal("task"), roadmapId: idSchema.nullable() }),
   ]),
@@ -400,6 +419,8 @@ const planIdBodySchema = z.string().regex(PLAN_ID_PATTERN, "That isn't a plannin
 export const planOpenSchema = z.strictObject({ planId: planIdBodySchema, ...planOptionsShape });
 /** FR-PLAN-039, FR-PLAN-045: a session whose proposal is approved or cancelled, from the panel or Needs you. */
 export const planDecisionSchema = z.strictObject({ planId: planIdBodySchema });
+/** FR-GUI-089: a new project's draft design system, approved or skipped. */
+export const planDesignSchema = z.strictObject({ planId: planIdBodySchema, isApproved: z.boolean() });
 
 /** FR-PLAN-033: one uploaded file, as base64. Its type and size are checked once decoded (FR-PLAN-022). */
 export const planUploadSchema = z.strictObject({
@@ -496,6 +517,12 @@ export const jobRequestSchema = z.discriminatedUnion("command", [
     dependsOn: z.array(idSchema).max(GUI_MAX_DEPENDENCIES).default([]),
   }),
   z.strictObject({ command: z.enum(["tasks-depend", "tasks-undepend"]), id: idSchema, on: idSchema }),
+  // FR-GUI-088, FR-GUI-089: a new project's specs and design, started only by its planning session.
+  z.strictObject({
+    command: z.enum(["project-specs", "project-design"]),
+    model: modelValueSchema,
+    effort: effortValueSchema,
+  }),
   z.strictObject({
     command: z.enum(["tasks-start", "tasks-done", "tasks-remove", "milestone-remove", "roadmap-remove"]),
     id: idSchema,
@@ -561,6 +588,10 @@ export function jobArgs(request: JobRequest): string[] {
       return ["--json", "--yes", ...generateArgs(request.options)];
     case "generate-preview":
       return ["--dry-run", "--json", ...generateArgs(request.options)];
+    case "project-specs":
+      return ["--json", ...projectSpecsArgs(request.model, request.effort)];
+    case "project-design":
+      return [...projectDesignArgs(request.model, request.effort), "--json"];
     case "auto":
       return ["auto", ...autoArgs(request.options), "--yes", "--json"];
     case "auto-preview":
@@ -595,7 +626,16 @@ export function describeJob(args: readonly string[]): string {
 }
 
 /** FR-GUI-035: commands that change the same files, of which only one may run. Others, such as doctor, may run side by side. */
-const CONFLICTING: ReadonlySet<JobKind> = new Set<JobKind>(["generate", "clean", "skills", "environment"]);
+const CONFLICTING: ReadonlySet<JobKind> = new Set<JobKind>([
+  "generate",
+  "clean",
+  "skills",
+  "environment",
+  "project-specs",
+  "project-design",
+]);
+/** FR-GUI-088: jobs only a new project's planning session starts, never a request from the page. */
+export const SESSION_JOBS: ReadonlySet<JobKind> = new Set<JobKind>(["project-specs", "project-design"]);
 
 /** The running job that stops this one from starting, if any (FR-GUI-035). Only one auto run goes at a time. */
 export function blockingJob<T extends { readonly kind: JobKind }>(kind: JobKind, running: readonly T[]): T | undefined {

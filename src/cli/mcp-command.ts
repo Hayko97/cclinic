@@ -103,11 +103,14 @@ function summarizeRun(target: string) {
 const HOST_HOLDER = { place: "claude-code", pid: process.pid } as const;
 
 /** FR-PLAN-044, FR-MCP-046: the planning tools, for Claude Code itself or for one session luseen drives. */
-function planTools(target: string, connection: McpConnection, planId: string | undefined) {
+function planTools(target: string, connection: McpConnection, driven: PlanSession | undefined) {
   const ports = decisionPorts(target);
   return createPlanTools({
     ...ports,
-    mode: planId === undefined ? { kind: "host" } : { kind: "driven", planId },
+    mode:
+      driven === undefined
+        ? { kind: "host" }
+        : { kind: "driven", planId: driven.id, isNewProject: driven.target.kind === "new-project" },
     holder: HOST_HOLDER,
     ...documentPaths(target),
     isRunning: isProcessRunning,
@@ -116,9 +119,10 @@ function planTools(target: string, connection: McpConnection, planId: string | u
 }
 
 /** FR-MCP-046: a driven server serves one open session only. */
-async function requireOpenPlan(target: string, planId: string): Promise<void> {
+async function requireOpenPlan(target: string, planId: string): Promise<PlanSession> {
   const session = await planStoreFor(target).read(planId);
   if (session?.status !== "open") throw new UsageError(`There's no open planning session ${planId}.`);
+  return session;
 }
 
 /** FR-PLAN-032: the sessions this server held are let go when Claude Code ends it. */
@@ -135,16 +139,17 @@ export async function createProjectServer(options: McpOptions, context: CommandC
   const approverMode = parseApprover(options);
   const paths = projectPaths(target, undefined);
   const connection = createMcpServer({ name: MCP_SERVER_NAME, version: context.version });
-  if (!existsSync(paths.out)) {
-    // FR-MCP-046: a driven server serves a session of a project that is set up.
-    if (options.plan !== undefined)
+  if (options.plan !== undefined) {
+    // FR-MCP-046, FR-MCP-048: a driven server serves a session of a project that is set up, or a new project's.
+    const session = existsSync(paths.out) ? undefined : await planStoreFor(target).read(options.plan);
+    if (!existsSync(paths.out) && (session?.status !== "open" || session.target.kind !== "new-project"))
       throw new UsageError(`There are no project documents in ${paths.out}. Run "luseen" in the project first.`);
-    for (const tool of createNotSetUpTools()) connection.addTool(tool);
+    const driven = session ?? (await requireOpenPlan(target, options.plan));
+    for (const tool of planTools(target, connection, driven)) connection.addTool(tool);
     return connection;
   }
-  if (options.plan !== undefined) {
-    await requireOpenPlan(target, options.plan);
-    for (const tool of planTools(target, connection, options.plan)) connection.addTool(tool);
+  if (!existsSync(paths.out)) {
+    for (const tool of createNotSetUpTools()) connection.addTool(tool);
     return connection;
   }
   const git = { environment: context.environment };

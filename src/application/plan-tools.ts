@@ -2,9 +2,11 @@
  * The MCP server's planning tools, for a PM in Claude Code or in a turn luseen drives (roadmap-planning
  * FR-PLAN-007, FR-PLAN-009, FR-PLAN-044 to FR-PLAN-046; mcp-server FR-MCP-007, FR-MCP-046).
  */
-import { PLAN_DRIVEN_TOOL_NAMES } from "../core/constants/agents.js";
+import { BRIEF_TOOL_NAME, PLAN_DRIVEN_TOOL_NAMES } from "../core/constants/agents.js";
 import { UsageError } from "../core/errors.js";
 import {
+  briefProposeInputSchema,
+  checkBrief,
   checkProposal,
   newPlanSession,
   parseProposal,
@@ -32,7 +34,8 @@ export interface PlanToolPorts extends DecisionPorts {
    * `host`: a Claude Code session's own server, which begins and resumes sessions and asks the user about
    * proposals. `driven`: the server of one session a luseen process drives, which shows proposals itself.
    */
-  readonly mode: { readonly kind: "host" } | { readonly kind: "driven"; readonly planId: string };
+  readonly mode:
+    { readonly kind: "host" } | { readonly kind: "driven"; readonly planId: string; readonly isNewProject: boolean };
   /** This server's process, as the holder of the sessions it begins or resumes. */
   readonly holder: Holder;
   readonly overviewPath: string;
@@ -200,6 +203,14 @@ export function createPlanTools(ports: PlanToolPorts): readonly WorkflowTool[] {
         const { planId, proposal } = planProposeInputSchema.parse(input);
         const session = await ownSession(planId);
         if (isReply(session)) return session;
+        // FR-PLAN-053: a new project's roadmap comes after its specs.
+        if (session.project !== null && session.project.phase !== "roadmap") {
+          return refused(
+            session.project.phase === "brief" || session.project.phase === "specs"
+              ? "Propose the brief with brief_propose first. luseen tells you when the specs are written."
+              : "The first roadmap is already saved, so there's nothing more to propose.",
+          );
+        }
         const parsed = parseProposal(proposal, session.target);
         if (typeof parsed === "string") return refused(`The proposal isn't in the right shape: ${parsed}`);
         const problems = checkProposal(parsed, { ...ports.readContext(), target: session.target });
@@ -219,8 +230,37 @@ export function createPlanTools(ports: PlanToolPorts): readonly WorkflowTool[] {
         return decide(waiting);
       },
     },
+    {
+      name: BRIEF_TOOL_NAME,
+      description:
+        "Proposes a new project's brief, which luseen saves as README.md once the user approves it. luseen checks it: if it returns problems, fix them and call it again.",
+      inputSchema: briefProposeInputSchema,
+      run: async (input) => {
+        const { planId, markdown, hasScreens } = briefProposeInputSchema.parse(input);
+        const session = await ownSession(planId);
+        if (isReply(session)) return session;
+        if (session.project?.phase !== "brief") return refused("This session doesn't take a brief now.");
+        const problems = checkBrief({ markdown, hasScreens });
+        if (problems.length > 0) {
+          return refused(
+            `Fix these problems and call ${BRIEF_TOOL_NAME} again:\n${problems.map((problem) => `- ${problem}`).join("\n")}`,
+          );
+        }
+        await changeRecord(ports.records, planId, (current) => ({
+          ...current,
+          project:
+            current.project === null
+              ? null
+              : { ...current.project, brief: { markdown: markdown.trim(), hasScreens, proposedAt: ports.now() } },
+          updatedAt: ports.now(),
+        }));
+        return reply("shown", "The brief is accepted and shown to the user with your reply. End your turn now.");
+      },
+    },
   ];
-  return ports.mode.kind === "driven"
-    ? tools.filter((tool) => (PLAN_DRIVEN_TOOL_NAMES as readonly string[]).includes(tool.name))
-    : tools;
+  const { mode } = ports;
+  if (mode.kind === "host") return tools.filter((tool) => tool.name !== BRIEF_TOOL_NAME);
+  // FR-MCP-048: only a new project's server offers brief_propose.
+  const offered: readonly string[] = [...PLAN_DRIVEN_TOOL_NAMES, ...(mode.isNewProject ? [BRIEF_TOOL_NAME] : [])];
+  return tools.filter((tool) => offered.includes(tool.name));
 }

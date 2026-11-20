@@ -69,7 +69,10 @@ describe("luseen plan", () => {
     const noClaude = luseen(["plan", "-C", root], { withClaude: false });
     expect(noClaude.code).toBe(2);
     expect(noClaude.stderr).toContain("Install Claude Code");
-    const noDocs = luseen(["plan", "-C", makeTempFolder()]);
+    // A folder with files and no documents; an empty one starts a new project instead (FR-PLAN-047).
+    const withFiles = makeTempFolder();
+    writeProject(withFiles, { "README.md": "# App\n" });
+    const noDocs = luseen(["plan", "-C", withFiles]);
     expect(noDocs.code).toBe(2);
     expect(noDocs.stderr).toContain("Run luseen in the project folder first");
   });

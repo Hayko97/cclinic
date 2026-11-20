@@ -32,14 +32,14 @@ flowchart TD
     P -- "no, terminal or GUI" --> D[Use the luseen CLI]
 ```
 
-| Your situation                                 | Path | First real command                  |
-| ---------------------------------------------- | ---- | ----------------------------------- |
-| Empty folder, an idea, nothing written yet     | A    | write `README.md`, then `luseen`    |
-| A scaffold (`npm create vite`, `rails new`, …) | A    | write `README.md`, then `luseen`    |
-| A working codebase, small or large             | B    | `luseen --dry-run`, then `luseen`   |
-| You only use Claude Code and want no CLI       | C    | `/plugin install …`, `/luseen:init` |
+| Your situation                                 | Path | First real command                              |
+| ---------------------------------------------- | ---- | ----------------------------------------------- |
+| Empty folder, an idea, nothing written yet     | A    | `luseen` or `luseen gui`: the PM interviews you |
+| A scaffold (`npm create vite`, `rails new`, …) | A    | write `README.md`, then `luseen`                |
+| A working codebase, small or large             | B    | `luseen --dry-run`, then `luseen`               |
+| You only use Claude Code and want no CLI       | C    | `/plugin install …`, `/luseen:init`             |
 
-> **Why a new project needs a brief.** luseen writes specs from what it reads. In an empty folder there is nothing to read, so `luseen` stops with exit code 2 ("No files to analyse remain after the exclusion rules"), and `luseen plan` refuses to start until `.luseen/sdd/` exists. A one-page brief is enough to get going.
+> **An empty folder starts with the PM.** luseen writes specs from what it reads, and an empty folder has nothing to read. So in an empty folder, `luseen` in a terminal, `luseen plan` and the GUI's **Start a new project** start a new-project session instead: the PM interviews you and reads the files you attach, writes the brief as `README.md` once you approve it, and luseen then writes the specs, sets up your coding agents, and has the PM propose the first roadmap. A project with screens also gets a draft design system to approve. In a script (`--yes`, `--json` or no terminal), `luseen` stops with exit code 2 and says so. You can still write the brief yourself first, as below.
 
 ---
 
@@ -459,20 +459,21 @@ Developer, PM and QA agents build each task on its own branch, and merge it into
 
 ## 8. Troubleshooting
 
-| Problem                                          | Fix                                                                                                                               |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `luseen: command not found`                      | Add npm's global `bin` folder to your `PATH` (see `npm prefix -g`), or use `npx luseen`                                           |
-| `EACCES: permission denied` on install           | Don't use `sudo`. Install Node.js with a version manager such as nvm                                                              |
-| "No files to analyse remain…" (exit 2)           | The folder is empty, or everything was excluded. Write a brief ([A2](#step-a2-write-a-brief)), or check `luseen --dry-run --json` |
-| "`.luseen/sdd` doesn't exist" from `luseen plan` | Run `luseen` in the project first                                                                                                 |
-| Exit 3, no Claude provider                       | `claude auth login`, or set `ANTHROPIC_API_KEY`. Then `luseen doctor`                                                             |
-| Exit 4, usage limit or budget hit                | Wait for the limit to reset, or raise `--max-budget-usd`, then run the same command again                                         |
-| Exit 5, specs failed validation                  | The draft is saved in `.luseen/failed/`. Run again; add `--debug-file debug.log` to see why                                       |
-| Too many files or tokens (exit 2)                | Use `--exclude`, or raise `--max-files` / `--max-input-tokens` on purpose                                                         |
-| It refuses your home folder or `/`               | `cd` into the project folder. Use `--allow-broad-target` only if you mean it                                                      |
-| No terminal (CI) and no `--yes` (exit 2)         | Add `--yes` to confirm without a prompt                                                                                           |
-| The agent doesn't follow the steps               | Check `AGENTS.md` has the luseen section and `CLAUDE.md` imports it; run `luseen skills`                                          |
-| Anything else                                    | `luseen doctor`, or `luseen guide` for the offline walkthrough                                                                    |
+| Problem                                          | Fix                                                                                                                                                                              |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `luseen: command not found`                      | Add npm's global `bin` folder to your `PATH` (see `npm prefix -g`), or use `npx luseen`                                                                                          |
+| `EACCES: permission denied` on install           | Don't use `sudo`. Install Node.js with a version manager such as nvm                                                                                                             |
+| "Nothing to analyse in …" (exit 2)               | The folder is empty and `luseen` ran in a script. Run `luseen` in a terminal or `luseen gui` to start a new project with the PM, or write a brief ([A2](#step-a2-write-a-brief)) |
+| "No files to analyse remain…" (exit 2)           | Everything was excluded in a project that's set up. Check `luseen --dry-run --json`                                                                                              |
+| "`.luseen/sdd` doesn't exist" from `luseen plan` | Run `luseen` in the project first                                                                                                                                                |
+| Exit 3, no Claude provider                       | `claude auth login`, or set `ANTHROPIC_API_KEY`. Then `luseen doctor`                                                                                                            |
+| Exit 4, usage limit or budget hit                | Wait for the limit to reset, or raise `--max-budget-usd`, then run the same command again                                                                                        |
+| Exit 5, specs failed validation                  | The draft is saved in `.luseen/failed/`. Run again; add `--debug-file debug.log` to see why                                                                                      |
+| Too many files or tokens (exit 2)                | Use `--exclude`, or raise `--max-files` / `--max-input-tokens` on purpose                                                                                                        |
+| It refuses your home folder or `/`               | `cd` into the project folder. Use `--allow-broad-target` only if you mean it                                                                                                     |
+| No terminal (CI) and no `--yes` (exit 2)         | Add `--yes` to confirm without a prompt                                                                                                                                          |
+| The agent doesn't follow the steps               | Check `AGENTS.md` has the luseen section and `CLAUDE.md` imports it; run `luseen skills`                                                                                         |
+| Anything else                                    | `luseen doctor`, or `luseen guide` for the offline walkthrough                                                                                                                   |
 
 ---
 

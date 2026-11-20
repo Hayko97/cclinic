@@ -88,7 +88,19 @@ Every screen and panel has its own URL, so reload, back and forward keep your pl
 
 ## 4. Setup
 
-When the project has no `.luseen/sdd`, the GUI opens on Setup and says generating is the first step.
+When the project has no `.luseen/sdd`, the GUI opens on Setup and says generating is the first step. In an empty folder, Setup shows **Start a new project** instead of the generate form:
+
+```mermaid
+flowchart LR
+    S[Start a new project] --> B[Brief<br/>PM interview, brief card] --> P[Specs<br/>job: luseen --yes --no-design] --> R[Roadmap<br/>PM proposes, you approve] --> D[Design<br/>job: luseen design, approve or skip] --> Y([Ready:<br/>work on task N])
+```
+
+- The Plan panel shows a progress strip: Brief, Specs, Roadmap, Design (with screens) and Ready.
+- Approving the brief writes `README.md` and copies your attached files to `docs/`. The specs and the design step run as jobs you can watch in Jobs.
+- A failed step shows its message with Retry, and the setup waits at that step. Reopening the session continues it.
+- When it's done, the canvas banner says which task to start in your coding agent.
+
+For a folder that has files:
 
 ```mermaid
 flowchart TD

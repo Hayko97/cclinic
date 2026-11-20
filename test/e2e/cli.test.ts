@@ -7,6 +7,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -617,12 +618,81 @@ describe("safety and limits", () => {
     expect((await luseen([root, "--yes", "--max-input-tokens", "1"])).code).toBe(0);
   });
 
-  it("TC-DISC-028: nothing to analyse exits 2, with no calls", async () => {
+  it("TC-DISC-020, TC-CLI-084: nothing to analyse exits 2, says how to start a new project, with no calls", async () => {
     const root = makeTempFolder();
     writeProject(root, { "node_modules/a.js": "a" });
     const { code, stderr } = await luseen([root, "--yes"]);
     expect(code).toBe(2);
-    expect(stderr).toContain("No files to analyse");
+    expect(stderr).toContain(`Nothing to analyse in ${realpathSync(root)}.`);
+    expect(stderr).toContain("`luseen gui` to start a new project with the PM");
+  });
+
+  it("TC-CLI-085: an empty folder's dry run is empty, exits 0, and writes nothing", async () => {
+    const root = makeTempFolder();
+    const { code, stdout } = await luseen([root, "--dry-run", "--json"]);
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout)).toMatchObject({ status: "dry-run", empty: true, included: [] });
+    expect(readdirSync(root)).toEqual([]);
+  });
+
+  it("TC-CLI-032: a set-up project whose files are all excluded still says no files remain", async () => {
+    const root = sampleProject();
+    await luseen([root, "--yes"]);
+    const { code, stderr } = await luseen([root, "--yes", "--exclude", "**/*"]);
+    expect(code).toBe(2);
+    expect(stderr).toContain("No files to analyse remain after the exclusion rules");
+  });
+
+  it("TC-CLI-084 (QA): an empty folder with only .git, with --yes, exits 2 naming luseen and luseen gui, with no calls", async () => {
+    const root = makeTempFolder();
+    mkdirSync(path.join(root, ".git"));
+    const record = path.join(makeTempFolder(), "c.jsonl");
+    const { code, stderr } = await luseen([root, "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
+    expect(code).toBe(2);
+    expect(stderr).toContain(`Nothing to analyse in ${realpathSync(root)}.`);
+    expect(stderr).toContain("Run `luseen` in a terminal or `luseen gui` to start a new project with the PM");
+    expect(existsSync(record)).toBe(false);
+    expect(readdirSync(root)).toEqual([".git"]);
+  });
+
+  it("TC-DISC-020 (QA): a folder with only node_modules prints Nothing to analyse, exits 2, and never calls claude", async () => {
+    const root = makeTempFolder();
+    writeProject(root, { "node_modules/a.js": "a" });
+    const record = path.join(makeTempFolder(), "c.jsonl");
+    const { code, stderr } = await luseen([root, "--yes"], { env: { FAKE_CLAUDE_RECORD: record } });
+    expect(code).toBe(2);
+    expect(stderr).toContain(`Nothing to analyse in ${realpathSync(root)}.`);
+    expect(existsSync(record)).toBe(false);
+    expect(existsSync(path.join(root, ".luseen"))).toBe(false);
+  });
+
+  it("TC-CLI-032 (QA): a set-up project whose files are all excluded exits 2 before sending", async () => {
+    const root = sampleProject();
+    await luseen([root, "--yes"]);
+    const record = path.join(makeTempFolder(), "c.jsonl");
+    const { code, stderr } = await luseen([root, "--yes", "--exclude", "**/*"], {
+      env: { FAKE_CLAUDE_RECORD: record },
+    });
+    expect(code).toBe(2);
+    expect(stderr).toContain("No files to analyse remain after the exclusion rules");
+    expect(stderr).not.toContain("Nothing to analyse");
+    expect(existsSync(record)).toBe(false);
+  });
+
+  it("TC-CLI-085 (QA): the empty dry run's JSON has 0 files, and --dry-run alone, --json alone and --quiet don't ask", async () => {
+    const root = makeTempFolder();
+    writeProject(root, { "node_modules/a.js": "a" });
+    const dry = await luseen([root, "--dry-run", "--json"]);
+    expect(dry.code).toBe(0);
+    const parsed = JSON.parse(dry.stdout) as Record<string, unknown>;
+    expect(parsed).toMatchObject({ status: "dry-run", empty: true, included: [], estimatedTokens: 0 });
+    expect(parsed["target"]).toBe(realpathSync(root));
+    for (const flags of [["--dry-run"], ["--json"], ["--quiet"]]) {
+      const run = await luseen([root, ...flags]);
+      expect(run.code, flags.join(" ")).toBe(2);
+      expect(run.stderr + run.stdout, flags.join(" ")).toContain("Nothing to analyse");
+    }
+    expect(readdirSync(root)).toEqual(["node_modules"]);
   });
 
   it("TC-OUT-021: a hand edit exits 2 before any call", async () => {

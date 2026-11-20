@@ -40,6 +40,10 @@ export interface CanvasPorts {
   readonly readLayout: () => Promise<Layout | undefined>;
   /** Whether `luseen` has generated the project's documents yet (FR-GUI-053). */
   readonly hasDocuments: () => boolean;
+  /** FR-GUI-090: whether the folder is empty, so the banner offers a new project. */
+  readonly isEmpty?: () => Promise<boolean>;
+  /** FR-GUI-090: the first task to work on once a new project's setup is done, while it's still open. */
+  readonly newProjectTask?: () => Promise<number | null>;
   /** Saves what `change` makes of the saved layout, one change at a time, so none is lost to another. */
   readonly updateLayout: (change: (saved: Layout | undefined) => Layout) => Promise<void>;
   /** FR-GUI-041: where a session's transcript may be read from, if anywhere. */
@@ -106,12 +110,16 @@ export async function readCanvas(ports: CanvasPorts): Promise<CanvasPayload> {
   const sources = await ports.readSources();
   const canvas = buildCanvas({ ...sources, activity: await liveActivity(ports, sources) }, ports.now());
   const saved = await ports.readLayout();
+  const hasDocuments = ports.hasDocuments();
   return {
     canvas,
     layout: resolveLayout(canvas, saved),
     frameWidths: frameWidths(canvas),
     cardOrder: cardOrder(canvas),
-    nextStep: nextStep(canvas, ports.hasDocuments()),
+    nextStep: nextStep(canvas, hasDocuments, {
+      isEmpty: !hasDocuments && (await ports.isEmpty?.()) === true,
+      firstTaskId: hasDocuments ? ((await ports.newProjectTask?.()) ?? null) : null,
+    }),
     sizes: LAYOUT,
     foldLines: TRANSCRIPT_FOLD_LINES,
     // Limits that can't be read are shown as unknown; the canvas itself still loads.

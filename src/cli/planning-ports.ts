@@ -13,7 +13,13 @@ import { openPlanStore, type PlanStore } from "../adapters/storage/plan-store.js
 import { openTaskStore } from "../adapters/storage/task-store.js";
 import { readTranscriptLines } from "../adapters/transcripts/transcript-reader.js";
 import type { DecisionPorts, PlanningContext, PmCall, TurnPorts } from "../application/planning-session.js";
-import { AGENT_DENIED_TOOLS, PLAN_DRIVEN_TOOL_NAMES, PLAN_LIMITS, PM_TOOLS } from "../core/constants/agents.js";
+import {
+  AGENT_DENIED_TOOLS,
+  BRIEF_TOOL_NAME,
+  PLAN_DRIVEN_TOOL_NAMES,
+  PLAN_LIMITS,
+  PM_TOOLS,
+} from "../core/constants/agents.js";
 import { parseTranscriptLine, type TranscriptEntry } from "../core/canvas.js";
 import { MS_PER_MINUTE } from "../core/constants/limits.js";
 import { DOCUMENT_FILES } from "../core/constants/paths.js";
@@ -119,7 +125,10 @@ export interface PmSettings {
 
 /** FR-PLAN-005: the PM's tools, with only the planning tools of its own `luseen mcp --plan` server. */
 function pmCallOptions(settings: PmSettings, call: PmCall) {
-  const planTools = PLAN_DRIVEN_TOOL_NAMES.map((name) => `mcp__${MCP_SERVER_NAME}__${name}`);
+  // FR-MCP-048: a new project's PM may also propose its brief.
+  const planTools = [...PLAN_DRIVEN_TOOL_NAMES, ...(call.session.project === null ? [] : [BRIEF_TOOL_NAME])].map(
+    (name) => `mcp__${MCP_SERVER_NAME}__${name}`,
+  );
   const sessionId = call.session.claudeSessionId;
   if (sessionId === null)
     throw new UsageError(`Planning session ${call.session.id} isn't linked to a Claude session yet.`);

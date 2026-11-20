@@ -45,6 +45,7 @@ const isOpen = () => !panel().hidden;
 
 function targetText(target) {
   if (target.kind === "new-roadmap") return "New roadmap";
+  if (target.kind === "new-project") return "New project";
   if (target.kind === "extend-roadmap") return `More milestones for roadmap #${target.roadmapId}`;
   return target.roadmapId === null ? "One standalone task" : `One task in roadmap #${target.roadmapId}`;
 }
@@ -214,6 +215,7 @@ function chosenTarget() {
 /** The target pill's short label. */
 function targetPill(target) {
   if (target.kind === "new-roadmap") return "New roadmap";
+  if (target.kind === "new-project") return "New project";
   if (target.kind === "extend-roadmap") return `Extend #${target.roadmapId}`;
   return target.roadmapId === null ? "Single task" : `Task in #${target.roadmapId}`;
 }
@@ -420,6 +422,120 @@ function proposalCard(open) {
   );
 }
 
+/** FR-GUI-087: a new project's waiting brief, which becomes README.md, with the files that go to docs/. */
+function briefCard(open) {
+  const brief = open.project.brief;
+  // Pressed once: a second approval would find the first's README.md (FR-PLAN-051).
+  const decide = (choice) => (event) => {
+    for (const control of event.currentTarget.parentElement.querySelectorAll("button")) control.disabled = true;
+    void call(`/api/plan/${choice}`, { planId: open.id }).then(reported);
+  };
+  return element(
+    "section",
+    { className: "plan-card", "aria-label": "Brief" },
+    element("p", { className: "plan-card-kind" }, "Brief, saved as README.md"),
+    element("div", { className: "plan-md" }, ...renderMarkdown(brief.markdown)),
+    brief.files.length === 0
+      ? null
+      : element(
+          "div",
+          {},
+          element("p", { className: "plan-card-kind" }, "Copied to docs/"),
+          element("ul", {}, ...brief.files.map((name) => element("li", {}, name))),
+        ),
+    element(
+      "div",
+      { className: "actions" },
+      button("Cancel", decide("cancel"), "", { "data-plan-decide": "cancel" }),
+      button("Approve", decide("approve"), "primary", { "data-plan-decide": "approve" }),
+      element("span", { className: "muted" }, "or reply below to change it"),
+    ),
+  );
+}
+
+/**
+ * FR-GUI-089: a new project's draft design system, to look at, then approve or skip. When the design step failed,
+ * there's no draft: Retry is in the problem shown, and Skip finishes the setup without one.
+ */
+function designCard(open) {
+  const decide = (isApproved) => (event) => {
+    event.currentTarget.disabled = true;
+    void call("/api/plan/design", { planId: open.id, isApproved }).then(reported);
+  };
+  const hasDesign = open.project.hasDesign;
+  return element(
+    "section",
+    { className: "plan-card", "aria-label": "Design system" },
+    element("p", { className: "plan-card-kind" }, hasDesign ? "Design system (draft)" : "Design system"),
+    hasDesign
+      ? element(
+          "p",
+          {},
+          "The designer wrote .luseen/design/design-system.md, design.tokens.json and style-guide.html. ",
+          element(
+            "a",
+            { href: "/api/design/style-guide", target: "_blank", rel: "noopener noreferrer" },
+            "Open the style guide",
+          ),
+        )
+      : element("p", { className: "muted" }, "There's no draft yet. Retry the design step, or skip it for now."),
+    element(
+      "div",
+      { className: "actions" },
+      button(hasDesign ? "Skip, and remove the draft" : "Skip", decide(false), "", { "data-plan-design": "skip" }),
+      hasDesign ? button("Approve design", decide(true), "primary", { "data-plan-design": "approve" }) : null,
+    ),
+  );
+}
+
+/** FR-PLAN-055, FR-GUI-090: what the setup made, and the first task to work on. */
+function summaryCard(summary) {
+  const task = /work on task \d+/.exec(summary)?.[0];
+  return element(
+    "section",
+    { className: "plan-card", "aria-label": "Project set up", role: "status" },
+    element("p", { className: "plan-card-kind" }, "Ready"),
+    element("div", { className: "plan-md" }, ...renderMarkdown(summary)),
+    task === undefined ? null : element("div", { className: "actions" }, copyButton(task, `Copy "${task}"`, "")),
+  );
+}
+
+const STEP_LABELS = { specs: "Writing the specs", design: "Drafting the design system" };
+
+/** FR-GUI-086: Brief, Specs, Roadmap, Design (with screens) and Ready, each done, current or waiting. */
+function drawProgress(open) {
+  const list = byId("plan-progress");
+  const project = open?.project ?? null;
+  list.hidden = project === null && state.target.kind !== "new-project";
+  if (list.hidden) return;
+  const phase = project?.phase ?? "brief";
+  const steps = [
+    ["brief", "Brief"],
+    ["specs", "Specs"],
+    ["roadmap", "Roadmap"],
+    ...(project?.hasScreens === false ? [] : [["design", "Design"]]),
+    ["done", "Ready"],
+  ];
+  const at = steps.findIndex(([name]) => name === phase);
+  list.replaceChildren(
+    ...steps.map(([, label], index) => {
+      const status = index < at || phase === "done" ? "done" : index === at ? "current" : "waiting";
+      const word = { done: "done", current: "now", waiting: "next" }[status];
+      return element(
+        "li",
+        { className: `plan-step is-${status}`, "aria-current": status === "current" ? "step" : undefined },
+        element(
+          "span",
+          { className: "plan-step-mark", "aria-hidden": "true" },
+          status === "done" ? "✓" : String(index + 1),
+        ),
+        element("span", {}, label),
+        element("span", { className: "visually-hidden" }, ` (${word})`),
+      );
+    }),
+  );
+}
+
 function reported(reply) {
   if (reply?.message !== undefined) notify(reply.message);
 }
@@ -584,6 +700,21 @@ function conversation(open) {
     );
   });
   if (open.proposal !== null && open.status === "open") nodes.push(proposalCard(open));
+  const project = open.project ?? null;
+  if (project?.brief != null && open.status === "open") nodes.push(briefCard(open));
+  const step = state.view?.step ?? null;
+  if (step !== null)
+    nodes.push(
+      element(
+        "p",
+        { className: "plan-working", role: "status" },
+        element("span", { className: "plan-spinner", "aria-hidden": "true" }),
+        element("span", {}, `${STEP_LABELS[step.kind]} · `),
+        timer(step.startedAt),
+      ),
+    );
+  else if (project?.phase === "design" && open.status === "open") nodes.push(designCard(open));
+  if (project?.summary != null) nodes.push(summaryCard(project.summary));
   // FR-PLAN-038: a message a stopped turn left unanswered shows until the transcript has it.
   const unanswered = unansweredShown(open, items);
   if (unanswered !== null) nodes.push(itemNode(unanswered, { open, isReplaced: false }));
@@ -601,7 +732,7 @@ function conversation(open) {
       ),
     );
   }
-  if (open.status !== "open" && open.outcome !== null)
+  if (open.status !== "open" && open.outcome !== null && project?.summary == null)
     nodes.push(element("p", { className: "plan-outcome", role: "status" }, open.outcome));
   return nodes;
 }
@@ -670,6 +801,17 @@ async function openSession(planId) {
 
 /** FR-PLAN-035: centred in the conversation area, with no form. */
 function emptyState() {
+  if (state.target.kind === "new-project")
+    return element(
+      "div",
+      { className: "plan-empty" },
+      element("h2", { id: "plan-start-heading" }, "What are you building?"),
+      element(
+        "p",
+        { className: "muted" },
+        "The PM will ask a few questions, then write the brief. Attach a brief, requirements or mockups with +, or drop or paste files.",
+      ),
+    );
   const isTask = state.target.kind === "task";
   return element(
     "div",
@@ -770,6 +912,7 @@ function draw() {
         : []),
   );
 
+  drawProgress(open);
   drawLog();
 
   const suggestions = byId("plan-suggestions");
@@ -932,6 +1075,20 @@ export function startPlan() {
   // FR-GUI-053: the empty canvas and List offer New roadmap too.
   document.addEventListener("click", (event) => {
     if (event.target.closest?.("[data-new-roadmap]")) void openPlan({ kind: "new-roadmap" });
+  });
+  // FR-GUI-085: Setup's Start a new project, with the model chosen there, or its setup continued.
+  document.addEventListener("click", (event) => {
+    const start = event.target.closest?.("[data-new-project]");
+    if (!start) return;
+    for (const [from, name] of [
+      ["new-project-model", "model"],
+      ["new-project-effort", "effort"],
+    ]) {
+      const chosen = byId(from)?.value ?? "";
+      if (chosen !== "") byId("plan-options").querySelector(`[name="${name}"]`).value = chosen;
+    }
+    if (start.dataset.planId) void openPlanSession(start.dataset.planId);
+    else void openPlan({ kind: "new-project" });
   });
 
   const composer = byId("plan-composer");

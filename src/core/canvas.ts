@@ -626,6 +626,8 @@ export function cardOrder(view: CanvasView): string[] {
 }
 
 export type NextStep =
+  | { readonly kind: "new-project" }
+  | { readonly kind: "first-task"; readonly taskId: number }
   | { readonly kind: "generate" }
   | { readonly kind: "plan" }
   | { readonly kind: "run"; readonly roadmapId: number }
@@ -635,8 +637,14 @@ export type NextStep =
  * FR-GUI-053: the one step to suggest, checked in this order: not generated, no roadmap, a roadmap with open
  * tasks and no run, then a run going. Nothing when none applies.
  */
-export function nextStep(view: CanvasView, hasDocuments: boolean): NextStep | null {
-  if (!hasDocuments) return { kind: "generate" };
+export function nextStep(
+  view: CanvasView,
+  hasDocuments: boolean,
+  project: { readonly isEmpty: boolean; readonly firstTaskId: number | null } = { isEmpty: false, firstTaskId: null },
+): NextStep | null {
+  // FR-GUI-090: an empty folder starts a new project instead, and a new project's setup ends with its first task.
+  if (!hasDocuments) return project.isEmpty ? { kind: "new-project" } : { kind: "generate" };
+  if (project.firstTaskId !== null) return { kind: "first-task", taskId: project.firstTaskId };
   if (view.roadmaps.length === 0) return { kind: "plan" };
   const statusOf = new Map(view.tasks.map((task) => [task.id, task.status]));
   const toRun = view.roadmaps.find(

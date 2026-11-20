@@ -17,6 +17,16 @@ describe("the Claude Code plugin's files", () => {
     expect(() => repositorySlug({ ...INFO, repository: { url: "https://gitlab.com/o/r" } })).toThrow("isn't on GitHub");
   });
 
+  it("TC-PLUG-023: in an empty folder, init runs no setup and points to a new project with the PM", () => {
+    const init = renderClaudePlugin(INFO).get("plugins/luseen/skills/init/SKILL.md") ?? "";
+    expect(init).toContain("**Check for an empty folder.**");
+    expect(init).toContain("Don't run setup.");
+    expect(init).toContain("`npx luseen`");
+    expect(init).toContain("`npx luseen gui`");
+    // Checked before anything that runs setup.
+    expect(init.indexOf("empty folder")).toBeLessThan(init.indexOf("--yes --plugin"));
+  });
+
   it("TC-PLUG-004 and TC-PLUG-005: no server or hooks, and the commands run the package at the plugin's version", () => {
     const files = renderClaudePlugin(INFO);
     expect([...files.keys()].filter((file) => file.endsWith(".mcp.json") || file.includes("/hooks/"))).toEqual([]);

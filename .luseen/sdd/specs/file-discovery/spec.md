@@ -22,7 +22,7 @@ Find the project's own code and documents on any technology stack, excluding dep
 | FR-DISC-012 | Symlinks must not be followed, so files outside the target are never read and symlink loops do not hang the scan. | confirmed | `sdd/specs/file-discovery/spec.md:42`, `sdd/specs/file-discovery/verification.md:31`, `src/adapters/discovery/file-walker.ts:105-208` |
 | FR-DISC-013 | Files must be processed in sorted path order, producing the same result for an unchanged project, and each included file must be classified as code, config or document. | confirmed | `sdd/specs/file-discovery/spec.md:43-44`, `sdd/specs/file-discovery/verification.md:32-33`, `src/adapters/discovery/file-walker.ts:105-208` |
 | FR-DISC-014 | Every skipped file must be recorded with a reason (a skipped folder may be a single entry), unreadable files (e.g. permission denied, or a forced-in binary that is not readable as text) must be recorded as skipped without stopping the scan, and the records must feed scan-report.md. | confirmed | `sdd/specs/file-discovery/spec.md:21`, `sdd/specs/file-discovery/spec.md:44-45`, `sdd/specs/file-discovery/verification.md:12`, `sdd/specs/file-discovery/verification.md:34-35`, `src/adapters/discovery/file-walker.ts:36-39` |
-| FR-DISC-015 | When no files remain after discovery, luseen must report this clearly, exit with code 2 (usage error) and not call an LLM. | confirmed | `sdd/specs/file-discovery/spec.md:46`, `sdd/specs/file-discovery/verification.md:36`, `src/cli/generate-command.ts:353-355` |
+| FR-DISC-015 | When no files remain after discovery, luseen must not call an LLM for analysis, and must report it as cli-commands FR-CLI-040 says: an empty folder offers a new project, and a set-up project exits 2. | confirmed | `src/cli/generate-command.ts:335-339`, `.luseen/sdd/specs/cli-commands/spec.md` FR-CLI-040, `user request 2026-11-20` |
 
 ## Edge cases
 
@@ -36,7 +36,7 @@ Find the project's own code and documents on any technology stack, excluding dep
 - Symlinks pointing outside the target and symlink loops.
 - Permission-denied files are skipped and the scan continues (POSIX only).
 - Git submodules are scanned as ordinary files unless ignored.
-- A folder containing only node_modules results in no files.
+- A folder containing only node_modules results in no files, so it counts as empty when it has no `.luseen/sdd`.
 
 ## Non-goals
 

@@ -1,9 +1,11 @@
 /** Reads the design system, and keeps the old one while the setup step makes a new one (FR-DSGN-030, FR-DSGN-032). */
-import { access, mkdir, readdir, readFile, rename, rm } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DESIGN_FOLDER, DESIGN_PREVIOUS_FOLDER, DESIGN_SYSTEM_FILE } from "../../core/constants/design.js";
+import { UsageError } from "../../core/errors.js";
 import {
   checkDesignSystem,
+  withDesignStatus,
   DESIGN_SYSTEM_PATH,
   DESIGN_TOKENS_PATH,
   STYLE_GUIDE_PATH,
@@ -61,6 +63,18 @@ export async function readDesignSystem(target: string): Promise<DesignState> {
     hasStyleGuide: await exists(path.join(target, STYLE_GUIDE_PATH)),
   });
   return check.kind === "valid" ? { kind: "valid", status: check.status } : check;
+}
+
+/** FR-DSGN-044: approves a valid draft, changing only its status; refuses one that doesn't pass FR-DSGN-030. */
+export async function approveDesignSystem(target: string): Promise<string> {
+  const state = await readDesignSystem(target);
+  if (state.kind === "missing") throw new UsageError(`There's no design system in ${DESIGN_FOLDER} to approve.`);
+  if (state.kind === "invalid")
+    throw new UsageError(`The design system can't be approved as it is: ${state.problems.join("; ")}.`);
+  if (state.status === "approved") return "The design system is already approved.";
+  const file = path.join(target, DESIGN_SYSTEM_PATH);
+  await writeFile(file, withDesignStatus(await readFile(file, "utf8"), "approved"));
+  return `Approved the design system in ${DESIGN_SYSTEM_PATH}.`;
 }
 
 async function moveEntries(from: string, to: string, skipped: string | undefined): Promise<void> {

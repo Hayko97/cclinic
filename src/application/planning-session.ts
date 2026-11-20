@@ -2,7 +2,8 @@
  * A planning session with the PM, the same from `luseen plan`, the GUI and the MCP tools (spec: roadmap-planning):
  * driving one PM turn, and approving or cancelling a proposal.
  */
-import { PLAN_LIMITS } from "../core/constants/agents.js";
+import { BRIEF_FILE, PLAN_LIMITS, PROJECT_DOCS_FOLDER } from "../core/constants/agents.js";
+import { DOCUMENTS_FOLDER_NAME, TOOL_FOLDER_NAME } from "../core/constants/paths.js";
 import { AgentSessionError, SessionClosedError, UsageError } from "../core/errors.js";
 import {
   answerLastMessage,
@@ -14,10 +15,12 @@ import {
   placeName,
   PROPOSAL_NO_LONGER_FITS,
   releaseHold,
+  ROADMAP_REQUEST_START,
   takeHold,
   type Holder,
   type PlanSession,
   type PlanTarget,
+  type ProjectState,
   type WaitingProposal,
 } from "../core/planning.js";
 import type { RoadmapOverview, Task } from "../core/tasks.js";
@@ -79,16 +82,13 @@ export async function approveProposal(ports: DecisionPorts, id: string): Promise
         throw new UsageError(`The proposal can't be saved as it is now: ${problems.join(" ")} Ask the PM to fix it.`);
       }
       saved = ports.save(session.target, session.proposal);
-      const closed: PlanSession = {
-        ...session,
-        status: "approved",
-        holder: null,
-        outcome: saved,
-        updatedAt: ports.now(),
-      };
-      return { save: closed, value: { session: closed, message: saved } };
+      const next: PlanSession =
+        session.project === null
+          ? { ...session, status: "approved", holder: null, outcome: saved, updatedAt: ports.now() }
+          : afterRoadmap(session, session.project, saved, ports.now());
+      return { save: next, value: { session: next, message: saved } };
     });
-    await ports.records.deleteAttachments(id);
+    if (decided.session.status === "approved") await ports.records.deleteAttachments(id);
     return decided;
   } catch (error) {
     if (saved === undefined) throw error;
@@ -98,6 +98,19 @@ export async function approveProposal(ports: DecisionPorts, id: string): Promise
       { cause: error },
     );
   }
+}
+
+/** FR-PLAN-053: a new project's roadmap is saved, so it goes on to its design, or is done without screens. */
+function afterRoadmap(session: PlanSession, project: ProjectState, saved: string, now: string): PlanSession {
+  const phase = project.hasScreens === true ? "design" : "done";
+  return {
+    ...session,
+    ...(phase === "done" ? { status: "approved", holder: null } : {}),
+    proposal: null,
+    outcome: saved,
+    project: { ...project, phase },
+    updatedAt: now,
+  };
 }
 
 /** FR-PLAN-032: takes the session for `holder`, or says where it's held. */
@@ -137,9 +150,11 @@ export async function cancelSession(
   id: string,
   by: Actor,
 ): Promise<Decision> {
-  const message = "Cancelled. Nothing was saved.";
+  let message = "Cancelled. Nothing was saved.";
   const closed = await changeRecord(ports.records, id, (current) => {
     if (current.status !== "open") throw new UsageError(`Planning session ${id} is already ${current.status}.`);
+    // FR-PLAN-056: a new project past its brief keeps what was already written.
+    if (current.project !== null && current.project.phase !== "brief") message = keptFilesMessage(current);
     const holder = current.holder;
     if (holder !== null && holder.pid !== by.pid && current.proposal === null && by.isRunning(holder.pid)) {
       throw new UsageError(`Planning session ${id} is open in ${placeName(holder.place)}. Cancel it there.`);
@@ -157,6 +172,18 @@ export async function cancelSession(
   });
   await ports.records.deleteAttachments(id);
   return { session: closed, message };
+}
+
+function keptFilesMessage(session: PlanSession): string {
+  const project = session.project;
+  const written = project?.files ?? [];
+  const kept = [
+    BRIEF_FILE,
+    ...(written.some((file) => file.startsWith(`${PROJECT_DOCS_FOLDER}/`)) ? [`${PROJECT_DOCS_FOLDER}/`] : []),
+  ];
+  if (project?.phase !== "specs") kept.push(`${TOOL_FOLDER_NAME}/${DOCUMENTS_FOLDER_NAME} and the agent setup`);
+  if (project?.phase === "design" || project?.phase === "done") kept.push("the saved roadmap");
+  return `Cancelled. Kept what was already written: ${kept.join(", ")}.`;
 }
 
 /** One PM turn's request: the message to send, and whether the Claude session has to be started first. */
@@ -210,9 +237,10 @@ export async function runTurn(ports: TurnPorts, id: string, message: string, cou
     if (current.status !== "open") throw new SessionClosedError(id, current.status, current.outcome);
     // The first prompt is kept as `pendingFirstMessage`; a later message of the user's is kept until it's answered.
     // luseen's own notes, such as Retry's request, keep the user's message that's still waiting (FR-PLAN-014).
+    // FR-PLAN-053: the first roadmap's request is kept like the user's own, so a stopped turn sends it again.
     const unansweredMessage = message.startsWith(FIRST_MESSAGE_MARKER)
       ? null
-      : isPlanningNote(message)
+      : isPlanningNote(message) && !message.startsWith(ROADMAP_REQUEST_START)
         ? current.unansweredMessage
         : message;
     return {

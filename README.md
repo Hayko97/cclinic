@@ -35,7 +35,7 @@ flowchart LR
     A[1. Write<br/>README.md] --> B[2. luseen<br/>specs] --> C[3. luseen plan<br/>chat with PM] --> D[4. Agent builds<br/>task by task] --> E[5. luseen auto<br/>builds the rest]
 ```
 
-> Write the README first. `luseen` needs something to read, and `luseen plan` needs the specs from `luseen`.
+> **Starting from an empty folder?** Run `luseen` (or `luseen gui` and **Start a new project**). The PM interviews you, reads the documents you attach, and writes the brief as `README.md` once you approve it. luseen then writes the specs, sets up your coding agents and has the PM propose the first roadmap, plus a draft design system when the project has screens. Prefer to write the brief yourself? Follow the steps below.
 
 ### 1. Create the folder and describe the idea
 
@@ -239,7 +239,7 @@ luseen skills          # update the agent skills in your project
 | Problem                              | Fix                                                       |
 | ------------------------------------ | --------------------------------------------------------- |
 | `luseen: command not found`          | Use `npx luseen`, or add `$(npm prefix -g)/bin` to `PATH` |
-| "No files to analyse remain…"        | The folder is empty: write a README first                 |
+| "Nothing to analyse in …"            | Empty folder in a script: run `luseen` or `luseen gui`    |
 | `luseen plan`: `.luseen/sdd` missing | Run `luseen` first                                        |
 | Claude not found (exit 3)            | `claude auth login`, then `luseen doctor`                 |
 | Usage limit (exit 4)                 | Wait for the reset, run the same command again            |

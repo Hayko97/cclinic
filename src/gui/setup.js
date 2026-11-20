@@ -277,10 +277,20 @@ const MCP_STATUS = {
 /** FR-GUI-014, FR-GUI-018: whether the project is set up, and how a host agent connects. */
 async function drawSetup() {
   const setup = await api("/api/setup");
+  // FR-GUI-085: an empty folder, or a new project still being set up, starts with the PM instead of generating.
+  const project = setup.newProject;
+  const isNewProject = setup.isEmpty || (project !== null && !setup.hasDocuments);
   byId("setup-status").textContent = setup.hasDocuments
     ? "This project's documents are generated. Run any step again here."
-    : "This project isn't set up yet. Generating its documents is the first step.";
+    : isNewProject
+      ? "This folder is empty. Starting a new project with the PM is the first step."
+      : "This project isn't set up yet. Generating its documents is the first step.";
   byId("setup-status").classList.toggle("is-first-step", !setup.hasDocuments);
+  byId("new-project-card").hidden = !isNewProject;
+  byId("generate-card").hidden = isNewProject;
+  const start = byId("new-project-start");
+  start.textContent = project === null ? "Start a new project" : "Continue the new project";
+  start.dataset.planId = project?.planId ?? "";
   const status = byId("mcp-status");
   status.textContent = MCP_STATUS[setup.mcp.status] ?? setup.mcp.status;
   status.className = setup.mcp.status === "installed" ? "ok" : "muted";

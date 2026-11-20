@@ -3,6 +3,9 @@ import { z } from "zod";
 import { TOOL_INPUT_SHORT_CHARS } from "./constants/gui.js";
 import {
   ATTACHMENT_LIMITS,
+  BRIEF_FILE,
+  BRIEF_LIMITS,
+  BRIEF_SECTIONS,
   BYTES_PER_MEGABYTE,
   DOCUMENT_EXTENSIONS,
   IMAGE_EXTENSIONS,
@@ -22,9 +25,10 @@ import {
   type Task,
 } from "./tasks.js";
 
-/** What the session plans (FR-PLAN-004, FR-PLAN-017). */
+/** What the session plans (FR-PLAN-004, FR-PLAN-017), or a new project from an empty folder (FR-PLAN-047). */
 export type PlanTarget =
   | { readonly kind: "new-roadmap" }
+  | { readonly kind: "new-project" }
   | { readonly kind: "extend-roadmap"; readonly roadmapId: number }
   | { readonly kind: "task"; readonly roadmapId: number | null };
 
@@ -74,7 +78,7 @@ export function parseProposal(value: unknown, target: PlanTarget): PlannedPropos
   }
   const parsed = roadmapProposalSchema.safeParse(value);
   if (!parsed.success) return describeIssue(parsed.error);
-  if (target.kind === "new-roadmap" && parsed.data.roadmap === null)
+  if ((target.kind === "new-roadmap" || target.kind === "new-project") && parsed.data.roadmap === null)
     return "roadmap: a new roadmap needs a title and goal";
   return { kind: "roadmap", proposal: parsed.data };
 }
@@ -183,6 +187,13 @@ function targetInstruction(target: PlanTarget): string {
   switch (target.kind) {
     case "new-roadmap":
       return "Plan a NEW roadmap. Your proposal must have `roadmap` with a title and goal.";
+    case "new-project":
+      return [
+        "This is a NEW PROJECT in an empty folder: there's no code, no documents and no specs yet, so don't look for them.",
+        "Interview the user first, a few questions at a time, until you know: what the project is; who uses it and what each user does; the main features with their concrete rules (with numbers where they apply); the stack, or the one you recommend; how the code is written and tested; what's out of scope for now; and whether it has screens.",
+        "Read every file the user attaches. Play back what you understood, then call `brief_propose` with the brief.",
+        "Don't call `plan_propose` until luseen tells you the specs are written.",
+      ].join("\n");
     case "extend-roadmap":
       return `EXTEND roadmap ${target.roadmapId}. Set \`roadmap\` to null, and propose only new milestones, which go after its existing ones.`;
     case "task":
@@ -207,8 +218,25 @@ export interface PlanContextInput {
   readonly specsListPath: string;
 }
 
+/** FR-PLAN-049: a new project's context: nothing exists yet, so the PM interviews and proposes a brief. */
+function renderProjectContext(input: PlanContextInput): string {
+  return [
+    `Planning session: ${input.planId}. Pass it as \`planId\` to every plan_* and brief_* tool.`,
+    "",
+    `## Task\n\n${targetInstruction(input.target)}`,
+    "",
+    "## Tools",
+    "",
+    "- `plan_suggest`: up to 4 short answers the user can pick, and the web pages you used as sources. Call it in any turn where an answer is a choice, and write the choices in your text too.",
+    `- \`brief_propose\`: the brief, as { "markdown", "hasScreens": true or false }. The Markdown starts with \`# <project name>\` and has these \`##\` sections in this order: ${BRIEF_SECTIONS.join(", ")}. Main features has a \`###\` heading for each feature area, with its rules as a list. If it returns problems, fix them and call it again in the same turn.`,
+    "",
+    "Reply to the user in plain Markdown text. Never invent an answer: write what the user couldn't answer in the brief as open questions.",
+  ].join("\n");
+}
+
 /** FR-PLAN-006, FR-PLAN-044: what the PM is planning and what exists, for its first turn or `plan_begin`. */
 export function renderPlanContext(input: PlanContextInput): string {
+  if (input.target.kind === "new-project") return renderProjectContext(input);
   return [
     `Planning session: ${input.planId}. Pass it as \`planId\` to every plan_* tool.`,
     "",
@@ -303,9 +331,29 @@ export function repeatedMessageOf(text: string): string | null {
   return repeated === "" ? null : repeated;
 }
 
+/** FR-PLAN-050: a waiting brief as the terminal shows it. */
+export function renderWaitingBrief(markdown: string): string {
+  return `Brief (saved as ${BRIEF_FILE}):\n\n${markdown}`;
+}
+
+/** FR-PLAN-053: how luseen's request for a new project's first roadmap starts. */
+export const ROADMAP_REQUEST_START = "The specs are written in";
+
+/** FR-PLAN-053: asks the PM, in the same session, for the first roadmap once the specs exist. */
+export function roadmapRequest(docsFolder: string, specNames: readonly string[]): string {
+  return [
+    `${ROADMAP_REQUEST_START} ${docsFolder}. The specs are: ${specNames.join(", ") || "none"}.`,
+    "Don't ask again what the brief already answers. Call plan_propose now with a NEW roadmap for the first release:",
+    "its first milestone is Foundation (scaffold, lint, tests and a runnable app shell), then one milestone per feature area, smallest first, with small tasks.",
+    "Every task names its spec from the list above.",
+    `The proposal's shape: ${proposalShape({ kind: "new-project" })}`,
+  ].join("\n");
+}
+
 /** Whether a message is one luseen wrote to the PM, such as Retry's request or a nudge, not the user's own. */
 export function isPlanningNote(text: string): boolean {
   return (
+    text.startsWith(ROADMAP_REQUEST_START) ||
     text.startsWith(NUDGE_MESSAGE) ||
     text === PROPOSE_NOW_MESSAGE ||
     text.startsWith(ANSWER_LAST_MESSAGE) ||
@@ -349,6 +397,67 @@ export const planTargetSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("extend-roadmap"), roadmapId: z.number().int().positive() }),
   z.strictObject({ kind: z.literal("task"), roadmapId: z.number().int().positive().nullable() }),
 ]);
+
+/** A session's own target: a planning target, or a new project (FR-PLAN-047), which only luseen starts. */
+export const sessionTargetSchema = z.discriminatedUnion("kind", [
+  ...planTargetSchema.options,
+  z.strictObject({ kind: z.literal("new-project") }),
+]);
+
+/** FR-PLAN-048: a new-project session's phases, in order. */
+export const PROJECT_PHASES = ["brief", "specs", "roadmap", "design", "done"] as const;
+export type ProjectPhase = (typeof PROJECT_PHASES)[number];
+
+/** FR-PLAN-050: a brief as `brief_propose` takes it. */
+export const briefSchema = z.strictObject({
+  markdown: z.string(),
+  hasScreens: z.boolean(),
+});
+export type Brief = z.infer<typeof briefSchema>;
+
+/** FR-PLAN-050: why a brief can't be shown to the user, or nothing when it can. */
+export function checkBrief(brief: Brief): string[] {
+  const problems: string[] = [];
+  const text = brief.markdown.trim();
+  if (text.length < BRIEF_LIMITS.minChars || text.length > BRIEF_LIMITS.maxChars) {
+    problems.push(
+      `The brief must be ${BRIEF_LIMITS.minChars} to ${BRIEF_LIMITS.maxChars} characters; it has ${text.length}.`,
+    );
+  }
+  if (!/^# \S/.test(text)) problems.push("The brief must start with `# <project name>`.");
+  const headings = [...text.matchAll(/^## (.+)$/gm)].map((match) => (match[1] ?? "").trim());
+  let from = 0;
+  for (const section of BRIEF_SECTIONS) {
+    const at = headings.indexOf(section, from);
+    if (at === -1) {
+      problems.push(
+        headings.includes(section)
+          ? `The section "## ${section}" is out of order: the sections go ${BRIEF_SECTIONS.join(", ")}.`
+          : `The section "## ${section}" is missing.`,
+      );
+      continue;
+    }
+    from = at + 1;
+  }
+  const features = /^## Main features$([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(text)?.[1] ?? "";
+  if (headings.includes("Main features") && !/^### \S/m.test(features)) {
+    problems.push('The section "## Main features" needs a `###` heading for each feature area.');
+  }
+  return problems;
+}
+
+/** FR-PLAN-048, FR-PLAN-050: where a new-project session is, and its waiting brief. */
+const projectStateSchema = z.strictObject({
+  phase: z.enum(PROJECT_PHASES),
+  brief: briefSchema.extend({ proposedAt: z.string() }).nullable(),
+  /** From the approved brief; null until then. */
+  hasScreens: z.boolean().nullable(),
+  /** The first roadmap was asked for, so it isn't asked for again (FR-PLAN-053). */
+  isRoadmapAsked: z.boolean(),
+  /** The files the approved brief wrote, such as README.md and docs/spec-2.pdf (FR-PLAN-051, FR-PLAN-055). */
+  files: z.array(z.string()).default([]),
+});
+export type ProjectState = z.infer<typeof projectStateSchema>;
 
 export type AttachmentKind = "image" | "document";
 
@@ -463,7 +572,7 @@ export type WaitingProposal = z.infer<typeof waitingProposalSchema>;
 export const planSessionSchema = z.strictObject({
   version: z.literal(1),
   id: planIdSchema,
-  target: planTargetSchema,
+  target: sessionTargetSchema,
   status: z.enum(["open", "approved", "cancelled"]),
   claudeSessionId: z.string().nullable(),
   transcriptPath: z.string().nullable(),
@@ -491,6 +600,8 @@ export const planSessionSchema = z.strictObject({
   lastPlace: z.enum(["terminal", "gui", "claude-code"]).nullable(),
   /** What happened at the end: the saved IDs, or that it was cancelled. */
   outcome: z.string().nullable(),
+  /** Only for a new-project session (FR-PLAN-048). */
+  project: projectStateSchema.nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -529,6 +640,10 @@ export function newPlanSession(fields: {
     holder: fields.holder,
     lastPlace: fields.holder.place,
     outcome: null,
+    project:
+      fields.target.kind === "new-project"
+        ? { phase: "brief", brief: null, hasScreens: null, isRoadmapAsked: false, files: [] }
+        : null,
     createdAt: fields.now,
     updatedAt: fields.now,
   };
@@ -633,7 +748,7 @@ export function releaseHold(session: PlanSession, holder: Holder, now: string): 
 
 /** Problems with the target a resumed session plans for, from what exists now (FR-PLAN-031). */
 export function missingTarget(target: PlanTarget, overview: RoadmapOverview): string | undefined {
-  const roadmapId = target.kind === "new-roadmap" ? null : target.roadmapId;
+  const roadmapId = target.kind === "new-roadmap" || target.kind === "new-project" ? null : target.roadmapId;
   if (roadmapId === null || overview.roadmaps.some((roadmap) => roadmap.id === roadmapId)) return undefined;
   return `Roadmap ${roadmapId}, which this session plans for, doesn't exist any more.`;
 }
@@ -675,6 +790,23 @@ export const planSuggestInputSchema = z.strictObject({
 export const planProposeInputSchema = z.strictObject({
   planId: planIdSchema,
   proposal: z.record(z.string(), z.unknown()),
+});
+
+/** FR-PLAN-052: the arguments of the `luseen` run that writes a new project's specs and agent setup. */
+export function projectSpecsArgs(model: string, effort: string): string[] {
+  return ["--yes", "--no-design", "--no-environment", `--model=${model}`, `--effort=${effort}`];
+}
+
+/** FR-PLAN-054, FR-DSGN-043: the arguments of the `luseen design` run for a new project; the user agreed already. */
+export function projectDesignArgs(model: string, effort: string): string[] {
+  return ["design", "--yes", `--model=${model}`, `--effort=${effort}`];
+}
+
+/** FR-MCP-048 */
+export const briefProposeInputSchema = z.strictObject({
+  planId: planIdSchema,
+  markdown: z.string(),
+  hasScreens: z.boolean(),
 });
 
 /** FR-PLAN-045: what the user may answer to a proposal asked about in Claude Code. */

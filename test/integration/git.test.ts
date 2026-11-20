@@ -428,7 +428,7 @@ describe("the run", () => {
   it("TC-GIT-007: nothing to analyse creates no repository", async () => {
     const root = makeTempFolder();
     writeProject(root, { "node_modules/a.js": "a\n" });
-    await expect(runGenerate(root, { ...options, yes: true }, context())).rejects.toThrow("No files to analyse");
+    await expect(runGenerate(root, { ...options, yes: true }, context())).rejects.toThrow("Nothing to analyse");
     expect(existsSync(path.join(root, ".git"))).toBe(false);
   });
 });

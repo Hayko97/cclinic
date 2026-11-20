@@ -22,15 +22,19 @@ import {
   readTranscriptTail,
 } from "../adapters/transcripts/transcript-reader.js";
 import { problemOf, type CanvasPorts } from "../application/gui-canvas.js";
-import { createJobs, type JobProcess } from "../application/gui-jobs.js";
+import { createJobs, type JobProcess, type Jobs } from "../application/gui-jobs.js";
+import { resultOf } from "../application/gui-setup.js";
 import { createPlanner, type PlannerPorts } from "../application/gui-planning.js";
 import { createGuiHandler } from "../application/gui-routes.js";
 import { GUI_DEFAULT_PORT, GUI_HOST, GUI_TOKEN_BYTES, GUI_TOKEN_QUERY } from "../core/constants/gui.js";
 import { PLAN_ATTACHMENTS_FOLDER } from "../core/constants/agents.js";
-import { UsageError } from "../core/errors.js";
+import { STYLE_GUIDE_PATH } from "../core/design.js";
+import { AgentSessionError, UsageError } from "../core/errors.js";
+import type { JobRequest } from "../core/gui.js";
 import { LIMITS } from "../core/constants/limits.js";
 import { luseenBin } from "./luseen-bin.js";
 import { resolveModelAndEffort } from "./generate-command.js";
+import { isEmptyProject, newProjectTask, openNewProjectSession, projectPorts } from "./new-project-ports.js";
 import { checkPlanning, pmSkill } from "./plan-command.js";
 import { decisionPorts, documentPaths, planStoreFor, transcriptChecks, turnPorts } from "./planning-ports.js";
 import type { CommandContext } from "./command-context.js";
@@ -100,6 +104,8 @@ function canvasPorts(
     },
     readLayout: () => readLayout(target),
     hasDocuments: documentsCheck(target),
+    isEmpty: () => isEmptyProject(target),
+    newProjectTask: () => newProjectTask(target, planStoreFor(target)),
     updateLayout: (change) => {
       // One change at a time: a drag saved during Tidy up isn't overwritten by Tidy's older copy.
       const next = layoutChanges.then(async () => saveLayout(target, change(await readLayout(target))));
@@ -131,6 +137,22 @@ function waitForStop(signal: AbortSignal): Promise<void> {
 }
 
 /**
+ * FR-GUI-088, FR-GUI-089: runs a new project's step as a job, shown in Jobs, and waits for it. A failure says what
+ * the command said.
+ */
+async function runSessionJob(jobs: Jobs, request: JobRequest, what: string): Promise<void> {
+  const ended = await jobs.whenEnded(jobs.start(request).id);
+  if (ended === undefined) throw new AgentSessionError(`${what} stopped: the GUI lost track of its job.`);
+  if (ended.exitCode === 0) return;
+  const result = resultOf(ended);
+  const said =
+    typeof result === "object" && result !== null && "message" in result && typeof result.message === "string"
+      ? result.message
+      : (ended.exitMeaning ?? `exit code ${String(ended.exitCode)}`);
+  throw new AgentSessionError(`${what} stopped: ${said}`);
+}
+
+/**
  * FR-GUI-023, FR-PLAN-033: the Plan panel's planner, with the same checks, options, defaults and PM as
  * `luseen plan`. A turn's PM is stopped by its own signal (Stop) as well as by the GUI stopping.
  */
@@ -138,6 +160,7 @@ function plannerPorts(
   target: string,
   context: CommandContext,
   repeat: (ms: number, run: () => Promise<void>) => () => void,
+  jobs: Jobs,
 ): PlannerPorts {
   const records = planStoreFor(target);
   const checks = transcriptChecks();
@@ -145,8 +168,8 @@ function plannerPorts(
   let uploadFolder: Promise<string> | undefined;
   const folder = (): Promise<string> => (uploadFolder ??= mkdtemp(path.join(os.tmpdir(), "luseen-plan-uploads-")));
   return {
-    prepare: async (options) => {
-      await checkPlanning(target, context);
+    prepare: async (options, { isNewProject }) => {
+      await checkPlanning(target, context, { isNewProject });
       const { model, effort } = await resolveModelAndEffort({ model: options.model, effort: options.effort }, context);
       const settings = {
         target,
@@ -156,6 +179,20 @@ function plannerPorts(
       };
       return (signal) =>
         turnPorts(settings, records, { ...context, signal: AbortSignal.any([context.signal, signal]) });
+    },
+    isEmptyProject: () => isEmptyProject(target),
+    project: (options) => {
+      const settings = async () => resolveModelAndEffort({ model: options().model, effort: options().effort }, context);
+      return projectPorts(target, records, {
+        writeSpecs: async () => {
+          const { model, effort } = await settings();
+          await runSessionJob(jobs, { command: "project-specs", model, effort }, "Writing the specs");
+        },
+        writeDesign: async () => {
+          const { model, effort } = await settings();
+          await runSessionJob(jobs, { command: "project-design", model, effort }, "The design step");
+        },
+      });
     },
     records,
     decisions: decisionPorts(target, records),
@@ -237,7 +274,7 @@ export async function runGuiCommand(
     // FR-GUI-003: a new token each time the GUI starts, never saved anywhere.
     const token = randomBytes(GUI_TOKEN_BYTES).toString("base64url");
     let port = 0;
-    const planner = createPlanner(plannerPorts(target, context, dependencies.every ?? every));
+    const planner = createPlanner(plannerPorts(target, context, dependencies.every ?? every, jobs));
     const handle = createGuiHandler({
       get port() {
         return port;
@@ -248,6 +285,19 @@ export async function runGuiCommand(
         folder: target,
         hasDocuments: documentsCheck(target),
         readMcpConfig: () => readMcpConfig(target),
+        isEmpty: () => isEmptyProject(target),
+        newProject: async () => {
+          const open = await openNewProjectSession(planStoreFor(target));
+          return open?.project === undefined || open.project === null
+            ? null
+            : { planId: open.id, phase: open.project.phase };
+        },
+        readStyleGuide: () =>
+          readFile(path.join(target, STYLE_GUIDE_PATH), "utf8").catch((error: unknown) => {
+            // No style guide yet is "not found"; anything else, such as no permission, is a real error.
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+            throw error;
+          }),
       },
       jobs,
       readAsset: createAssetReader(),

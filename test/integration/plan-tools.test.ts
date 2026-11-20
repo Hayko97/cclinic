@@ -14,7 +14,7 @@ import { createProjectServer, runApproveCommand, runSessionLink } from "../../sr
 import { decisionPorts } from "../../src/cli/planning-ports.js";
 import { createReporter } from "../../src/cli/reporter.js";
 import { UsageError } from "../../src/core/errors.js";
-import { newPlanSession, type PlanTarget, type RoadmapProposal } from "../../src/core/planning.js";
+import { newPlanSession, roadmapRequest, type PlanTarget, type RoadmapProposal } from "../../src/core/planning.js";
 import { makeTempFolder, writeProject } from "../support/helpers.js";
 
 vi.mock("@inquirer/prompts", () => ({ confirm: vi.fn(), select: vi.fn(), input: vi.fn() }));
@@ -399,5 +399,127 @@ describe("approving when the record can't be written", () => {
     expect(String(error)).toContain("Saved roadmap #2");
     expect(String(error)).toContain("don't approve it again");
     expect((await real.read(session.id))?.status).toBe("open");
+  });
+});
+
+describe("a new project's brief", () => {
+  const brief = [
+    "# Clinic booking",
+    "## What it is",
+    "A web app where patients book visits with a clinic's doctors, and doctors manage their day.",
+    "## Who uses it",
+    "- Patient: books visits",
+    "## Main features",
+    "### Booking",
+    "- A visit is 30 minutes",
+    "## Stack",
+    "React with TypeScript.",
+    "## How we write code",
+    "Tests for every rule.",
+    "## Out of scope for now",
+    "Payments.",
+  ].join("\n");
+
+  it("TC-MCP-080: only a new project's server offers brief_propose, which records the brief and writes no file", async () => {
+    const empty = makeTempFolder();
+    const session = await drivenSession(empty, { kind: "new-project" });
+    const { client, call } = await connect(empty, { plan: session.id });
+    expect((await client.listTools()).tools.map((tool) => tool.name)).toContain("brief_propose");
+    const accepted = await call("brief_propose", { planId: session.id, markdown: brief, hasScreens: true });
+    expect(accepted).toMatchObject({ status: "shown", isError: false });
+    expect((await openPlanStore(empty).read(session.id))?.project?.brief?.markdown).toBe(brief);
+    expect(readdirSync(empty).filter((name) => name !== ".luseen")).toEqual([]);
+    const refused = await call("brief_propose", {
+      planId: session.id,
+      markdown: brief.replace("## Stack\nReact with TypeScript.\n", ""),
+      hasScreens: true,
+    });
+    expect(refused.isError).toBe(true);
+    expect(String(refused["message"])).toContain('"## Stack" is missing');
+
+    const root = project();
+    const roadmapSession = await drivenSession(root);
+    const roadmapServer = await connect(root, { plan: roadmapSession.id });
+    expect((await roadmapServer.client.listTools()).tools.map((tool) => tool.name)).not.toContain("brief_propose");
+  });
+
+  it("TC-MCP-080 (QA): Claude Code's own server never offers brief_propose", async () => {
+    const { client } = await connect(project());
+    expect((await client.listTools()).tools.map((tool) => tool.name)).not.toContain("brief_propose");
+  });
+
+  it("TC-MCP-080 (QA): brief_propose is refused after the brief; plan_propose is refused before the roadmap", async () => {
+    const empty = makeTempFolder();
+    const session = await drivenSession(empty, { kind: "new-project" });
+    const { call } = await connect(empty, { plan: session.id });
+    const proposal: RoadmapProposal = {
+      roadmap: { title: "First", goal: "Ship" },
+      milestones: [{ title: "Foundation", goal: "Shell", tasks: [planned("a")] }],
+      openQuestions: [],
+    };
+    const early = await call("plan_propose", { planId: session.id, proposal });
+    expect(early.isError).toBe(true);
+    expect(String(early["message"])).toContain("brief_propose");
+    expect((await openPlanStore(empty).read(session.id))?.proposal).toBeNull();
+
+    await openPlanStore(empty).update(session.id, (current) => {
+      const next = {
+        ...current,
+        project: current.project === null ? null : { ...current.project, phase: "roadmap" as const },
+      };
+      return { save: next, value: undefined };
+    });
+    const late = await call("brief_propose", { planId: session.id, markdown: brief, hasScreens: false });
+    expect(late.isError).toBe(true);
+    expect((await openPlanStore(empty).read(session.id))?.project?.brief).toBeNull();
+    expect(readdirSync(empty).filter((name) => name !== ".luseen")).toEqual([]);
+  });
+
+  it("TC-MCP-080 (QA): a brief without hasScreens or a too-short brief is refused", async () => {
+    const empty = makeTempFolder();
+    const session = await drivenSession(empty, { kind: "new-project" });
+    const { call } = await connect(empty, { plan: session.id });
+    const noScreens = await call("brief_propose", { planId: session.id, markdown: brief }).catch((error: unknown) => ({
+      isError: true,
+      message: String(error),
+    }));
+    expect(noScreens.isError).toBe(true);
+    const short = await call("brief_propose", {
+      planId: session.id,
+      markdown: "# A\n## What it is\nx",
+      hasScreens: true,
+    });
+    expect(short.isError).toBe(true);
+    expect((await openPlanStore(empty).read(session.id))?.project?.brief).toBeNull();
+  });
+
+  it("TC-MCP-080 (QA run 3): plan_propose at the design says the first roadmap is already saved, and changes nothing", async () => {
+    const empty = makeTempFolder();
+    const session = await drivenSession(empty, { kind: "new-project" });
+    await openPlanStore(empty).update(session.id, (current) => {
+      const next = {
+        ...current,
+        project: current.project === null ? null : { ...current.project, phase: "design" as const, hasScreens: true },
+      };
+      return { save: next, value: undefined };
+    });
+    const { call } = await connect(empty, { plan: session.id });
+    const proposal: RoadmapProposal = {
+      roadmap: { title: "Second", goal: "Ship" },
+      milestones: [{ title: "Foundation", goal: "Shell", tasks: [planned("a")] }],
+      openQuestions: [],
+    };
+    const refused = await call("plan_propose", { planId: session.id, proposal });
+    expect(refused.isError).toBe(true);
+    expect(String(refused["message"])).toContain("The first roadmap is already saved");
+    expect(await openPlanStore(empty).read(session.id)).toMatchObject({ proposal: null, project: { phase: "design" } });
+  });
+
+  it("FR-PLAN-053 (QA run 3): the first roadmap's request gives the PM the proposal's shape", () => {
+    const request = roadmapRequest(".luseen/sdd", ["booking", "accounts"]);
+    expect(request).toContain("The specs are: booking, accounts.");
+    expect(request).toContain('The proposal\'s shape: { "roadmap": { "title", "goal" }');
+    expect(request).toContain('"milestones": [{ "title", "goal", "tasks": [{ "key", "title", "description", "spec"');
+    expect(request).not.toContain('"task": {');
   });
 });

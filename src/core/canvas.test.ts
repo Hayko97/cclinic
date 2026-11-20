@@ -133,6 +133,16 @@ describe("next step and card order", () => {
     expect(nextStep(running, true)).toEqual({ kind: "open-run", roadmapId: 1, runId: "20261111-110000" });
   });
 
+  it("TC-GUI-090: an empty folder suggests a new project, and a finished setup its first task", () => {
+    expect(nextStep(buildCanvas(sources({}), NOW), false, { isEmpty: true, firstTaskId: null })).toEqual({
+      kind: "new-project",
+    });
+    expect(nextStep(withRoadmap([task(1, 1)]), true, { isEmpty: false, firstTaskId: 1 })).toEqual({
+      kind: "first-task",
+      taskId: 1,
+    });
+  });
+
   it("TC-GUI-073: suggests nothing once every roadmap is done and no run is going", () => {
     expect(nextStep(withRoadmap([task(1, 1, { status: "done" })]), true)).toBeNull();
   });

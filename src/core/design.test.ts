@@ -10,7 +10,7 @@ import {
   DESIGNER_AGENT_TOOLS,
 } from "./constants/design.js";
 import { SECRET_FILES } from "./constants/environment.js";
-import { checkDesignSystem, checkTokens, hasUserInterface, UI_DESIGN_SKILL } from "./design.js";
+import { checkDesignSystem, checkTokens, hasUserInterface, UI_DESIGN_SKILL, withDesignStatus } from "./design.js";
 import type { EnvironmentFile } from "./environment.js";
 
 const body = UI_DESIGN_SKILL.body;
@@ -390,5 +390,16 @@ describe("design system checks: QA run 2", () => {
     expect(problemsOf({ designSystem: indented })).toEqual(['design-system.md: the "Templates" section is missing']);
     const nested = VALID_MARKDOWN.replace("## Templates\n", "````\n```\n## Templates\n```\n````\n");
     expect(problemsOf({ designSystem: nested })).toEqual(['design-system.md: the "Templates" section is missing']);
+  });
+});
+
+describe("approving a draft design system", () => {
+  it("TC-DSGN-067: only the Status section's first line changes", () => {
+    const draft =
+      "# Design system\n\n## Status\n\n**draft**\n\nA draft, see open questions.\n\n## Principles\n\nDraft ideas stay.\n";
+    const approved = withDesignStatus(draft, "approved");
+    expect(approved).toBe(draft.replace("**draft**", "**approved**"));
+    expect(approved).toContain("A draft, see open questions.");
+    expect(approved).toContain("Draft ideas stay.");
   });
 });

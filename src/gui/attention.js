@@ -1,5 +1,5 @@
 // FR-GUI-052 and FR-GUI-053: what's waiting for the user, and the one step the canvas suggests next.
-import { element } from "./api.js";
+import { element, notify } from "./api.js";
 import { openAutoDialog } from "./auto.js";
 import { zoomToFrame } from "./canvas.js";
 
@@ -125,6 +125,23 @@ function drawNeeds(canvas) {
 /** FR-GUI-053: the banner's words, and its one action. */
 function bannerOf(step, canvas) {
   const roadmap = step.roadmapId === undefined ? undefined : canvas.roadmaps.find((item) => item.id === step.roadmapId);
+  if (step.kind === "new-project")
+    return {
+      text: "This folder is empty. Start a new project: the PM interviews you, then luseen writes the specs and the first roadmap.",
+      button: { label: "Start a new project", run: () => void state.openPlan({ kind: "new-project" }) },
+    };
+  if (step.kind === "first-task")
+    return {
+      text: `The project is set up. Open a coding agent in this folder, such as Claude Code, and say "work on task ${step.taskId}".`,
+      button: {
+        label: "Copy",
+        run: () =>
+          void navigator.clipboard?.writeText(`work on task ${step.taskId}`).then(
+            () => notify("Copied."),
+            () => notify("Couldn't copy. Select the text instead.", true),
+          ),
+      },
+    };
   if (step.kind === "generate")
     return {
       text: "This project has no spec-driven documents yet. Generating them is the first step.",

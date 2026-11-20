@@ -166,7 +166,19 @@ function buildProgram(context: CommandContext, setExit: (code: number) => void):
         (process.argv.includes("--no-design") || process.argv.includes("--no-skills"))
       )
         throw new UsageError("--design can't be used with --no-design or --no-skills.");
-      await runGenerate(given, options, context);
+      // FR-CLI-040, FR-PLAN-048: an empty folder starts a new project with the PM, or continues its setup.
+      await runGenerate(given, options, context, (target, resume) =>
+        runPlanCommand(
+          {
+            dir: target,
+            ...(resume === undefined ? {} : { resume }),
+            ...(options.model === undefined ? {} : { model: options.model }),
+            ...(options.effort === undefined ? {} : { effort: options.effort }),
+            timeoutMinutes: options.timeoutMinutes,
+          },
+          context,
+        ),
+      );
     });
 
   program

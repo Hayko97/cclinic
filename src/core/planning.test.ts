@@ -31,6 +31,10 @@ import {
   repeatedMessageOf,
   shownUserMessage,
   PROPOSE_NOW_MESSAGE,
+  briefProposeInputSchema,
+  checkBrief,
+  roadmapRequest,
+  type PlanTarget,
 } from "./planning.js";
 import type { RoadmapOverview, Task } from "./tasks.js";
 
@@ -520,5 +524,104 @@ describe("answered turns", () => {
     // A finished reply after it means the waiting message is a new one with the same text.
     expect(isWaitingMessageWritten(before, null, "Yes")).toBe(false);
     expect(isWaitingMessageWritten(before, null, "Patients")).toBe(false);
+  });
+});
+
+describe("a new project", () => {
+  const brief = (markdown: string) => ({ markdown, hasScreens: true });
+  const VALID = [
+    "# Clinic booking",
+    "## What it is",
+    "A web app where patients book visits with a clinic's doctors, and doctors manage their day.",
+    "## Who uses it",
+    "- Patient: books, moves and cancels visits",
+    "- Doctor: sees the day's visits",
+    "## Main features",
+    "### Booking",
+    "- A visit is 30 minutes",
+    "- Cancel up to 2 hours before",
+    "## Stack",
+    "React with TypeScript, Vitest.",
+    "## How we write code",
+    "ESLint, Prettier, tests for every rule.",
+    "## Out of scope for now",
+    "Payments.",
+  ].join("\n");
+
+  it("TC-PLAN-081: the first prompt says the folder is empty and asks for an interview, with no specs or roadmaps", () => {
+    const prompt = buildFirstTurnPrompt({
+      planId: "plan-1",
+      target: { kind: "new-project" },
+      overview: { roadmaps: [], unassigned: [] },
+      overviewPath: ".luseen/sdd/overview.md",
+      specsListPath: ".luseen/sdd/README.md",
+      skill: "pm",
+      message: "A booking app",
+    });
+    expect(prompt).toContain("empty folder");
+    expect(prompt).toContain("Interview the user first");
+    for (const topic of [
+      "what the project is",
+      "who uses it",
+      "concrete rules",
+      "the stack",
+      "written and tested",
+      "out of scope",
+      "has screens",
+    ])
+      expect(prompt).toContain(topic);
+    expect(prompt).toContain("brief_propose");
+    expect(prompt).not.toContain(".luseen/sdd/overview.md");
+    expect(prompt).not.toContain("Existing roadmaps");
+  });
+
+  it("TC-PLAN-082: a brief needs its sections in order, a feature area, and a sensible length", () => {
+    expect(checkBrief(brief(VALID))).toEqual([]);
+    expect(checkBrief(brief(VALID.replace("## Stack\n", "")))).toEqual([
+      expect.stringContaining('"## Stack" is missing'),
+    ]);
+    const swapped = VALID.replace("## Who uses it", "## TEMP")
+      .replace("## Stack", "## Who uses it")
+      .replace("## TEMP", "## Stack");
+    expect(checkBrief(brief(swapped)).join(" ")).toContain("out of order");
+    expect(checkBrief(brief(VALID.replace("### Booking\n", "")))).toEqual([expect.stringContaining("`###` heading")]);
+    expect(checkBrief(brief("# Tiny\n## What it is\nx")).join(" ")).toContain("200 to 20000 characters");
+    expect(checkBrief(brief(VALID.replace("# Clinic booking\n", "")))).toContain(
+      "The brief must start with `# <project name>`.",
+    );
+    expect(briefProposeInputSchema.safeParse({ planId: "plan-1", markdown: VALID }).success).toBe(false);
+  });
+
+  it("TC-PLAN-086: the first roadmap's request lists the specs, asks for Foundation first, and isn't shown as the user's", () => {
+    const request = roadmapRequest(".luseen/sdd", ["accounts", "booking"]);
+    expect(request).toContain("accounts, booking");
+    expect(request).toContain("Foundation");
+    expect(request).toContain("plan_propose");
+    expect(shownUserMessage(request)).toBeNull();
+  });
+
+  it("TC-PLAN-048: a new project's session starts at its brief; other sessions have no project", () => {
+    const made = (target: PlanTarget) =>
+      newPlanSession({
+        id: "plan-1",
+        target,
+        summary: "x",
+        holder: { place: "terminal", pid: 1 },
+        claudeSessionId: null,
+        transcriptPath: null,
+        now: TIME,
+      }).project;
+    expect(made({ kind: "new-project" })).toEqual({
+      phase: "brief",
+      brief: null,
+      hasScreens: null,
+      isRoadmapAsked: false,
+      files: [],
+    });
+    expect(made({ kind: "new-roadmap" })).toBeNull();
+    // A new project's roadmap is a new one, so it needs a title and goal.
+    expect(parseProposal({ roadmap: null, milestones: [], openQuestions: [] }, { kind: "new-project" })).toContain(
+      "a new roadmap needs a title and goal",
+    );
   });
 });

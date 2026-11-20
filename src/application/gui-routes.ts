@@ -6,6 +6,9 @@ import {
   jobRequestSchema,
   matchRoute,
   planDecisionSchema,
+  planDesignSchema,
+  SESSION_JOBS,
+  STYLE_GUIDE_HEADERS,
   planMessageSchema,
   planOpenSchema,
   planRequestSchema,
@@ -46,6 +49,11 @@ export interface GuiProject {
   readonly hasDocuments: () => boolean;
   /** FR-GUI-018: the project's `.mcp.json`, if any. */
   readonly readMcpConfig: () => Promise<McpFile>;
+  /** FR-GUI-085: an empty folder, which starts a new project, and the phase of a new project's open session. */
+  readonly isEmpty: () => Promise<boolean>;
+  readonly newProject: () => Promise<{ readonly planId: string; readonly phase: string } | null>;
+  /** FR-GUI-089: the design system's style guide, or undefined when there's none. */
+  readonly readStyleGuide: () => Promise<string | undefined>;
 }
 
 export interface GuiPorts {
@@ -173,6 +181,8 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
         // FR-GUI-014, FR-GUI-017, FR-GUI-018: what Setup shows besides its jobs.
         return json(HTTP_STATUS.ok, {
           hasDocuments: ports.project.hasDocuments(),
+          isEmpty: await ports.project.isEmpty(),
+          newProject: await ports.project.newProject(),
           environmentConsent: ENVIRONMENT_CONSENT_MESSAGE,
           mcp: mcpInfo(await ports.project.readMcpConfig()),
           // The CLI's own defaults and choices, so the page never keeps a copy that goes stale.
@@ -194,6 +204,9 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
             issues: parsed.error.issues,
           });
         }
+        // FR-GUI-088: a new project's own jobs start only from its planning session.
+        if (SESSION_JOBS.has(parsed.data.command))
+          return json(HTTP_STATUS.badRequest, { error: "That isn't a command the GUI can run." });
         try {
           // FR-GUI-016: unanswered, generate gets the CLI's questions back, and no generate job starts.
           if (parsed.data.command === "generate" && !parsed.data.confirmed)
@@ -341,6 +354,20 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
             route.name === "plan-approve" ? await ports.planner.approve(planId) : await ports.planner.cancel(planId);
           return { status: HTTP_STATUS.ok, data: { message, plan: await ports.planner.view() } };
         });
+      }
+      case "plan-design": {
+        const parsed = planDesignSchema.safeParse(await request.readBody());
+        if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
+        const { planId, isApproved } = parsed.data;
+        return refusedAsConflict(async () => ({
+          status: HTTP_STATUS.ok,
+          data: { message: await ports.planner.finishDesign(planId, isApproved), plan: await ports.planner.view() },
+        }));
+      }
+      case "style-guide": {
+        const page = await ports.project.readStyleGuide();
+        if (page === undefined) return json(HTTP_STATUS.notFound, NOT_FOUND);
+        return { kind: "body", status: HTTP_STATUS.ok, headers: STYLE_GUIDE_HEADERS, body: page };
       }
       case "plan-upload": {
         const parsed = planUploadSchema.safeParse(await request.readBody(GUI_MAX_UPLOAD_BODY_BYTES));

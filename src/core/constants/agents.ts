@@ -60,6 +60,22 @@ export const PLAN_ID_SOURCE = "plan-[1-9]\\d{0,8}";
 export const PLAN_ID_PATTERN = new RegExp(`^${PLAN_ID_SOURCE}$`);
 /** FR-PLAN-005, FR-MCP-046: the planning tools a PM turn luseen drives may call. */
 export const PLAN_DRIVEN_TOOL_NAMES = ["plan_status", "plan_suggest", "plan_propose"] as const;
+/** FR-MCP-048: offered only to a new-project session. */
+export const BRIEF_TOOL_NAME = "brief_propose";
+
+/** FR-PLAN-050, FR-PLAN-051: the brief a new-project session writes, and where. */
+export const BRIEF_LIMITS = { minChars: 200, maxChars: 20_000 } as const;
+export const BRIEF_FILE = "README.md";
+export const PROJECT_DOCS_FOLDER = "docs";
+/** FR-PLAN-050: the brief's `##` sections, in order. */
+export const BRIEF_SECTIONS: readonly string[] = [
+  "What it is",
+  "Who uses it",
+  "Main features",
+  "Stack",
+  "How we write code",
+  "Out of scope for now",
+];
 
 export const AUTO_LIMITS = {
   developers: { minimum: 1, maximum: 8, default: 2 },

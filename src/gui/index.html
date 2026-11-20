@@ -100,7 +100,28 @@
         <h1 id="setup-title">Setup</h1>
         <p id="setup-status" class="muted">Check that luseen can run in this project.</p>
         <div class="setup-grid">
-          <article class="setup-card setup-wide" aria-labelledby="generate-title">
+          <article id="new-project-card" class="setup-card setup-wide" aria-labelledby="new-project-title" hidden>
+            <h2 id="new-project-title">Start a new project</h2>
+            <p class="muted">
+              This folder is empty. The PM interviews you about what you're building and reads the documents you attach,
+              then writes the brief. luseen then writes the specs and the first roadmap, and for a project with screens,
+              a draft design system.
+            </p>
+            <div class="field-row">
+              <label
+                >Model
+                <select id="new-project-model" data-models></select
+              ></label>
+              <label
+                >Reasoning
+                <select id="new-project-effort" data-efforts></select
+              ></label>
+            </div>
+            <div class="actions">
+              <button id="new-project-start" type="button" class="primary" data-new-project>Start a new project</button>
+            </div>
+          </article>
+          <article id="generate-card" class="setup-card setup-wide" aria-labelledby="generate-title">
             <h2 id="generate-title">Generate documents</h2>
             <p class="muted">Analyse the project with Claude and write the specs and documents in .luseen/sdd.</p>
             <form id="generate-form" novalidate>
@@ -377,6 +398,7 @@
         </button>
       </div>
       <div id="plan-banner" class="plan-banner" role="status" hidden></div>
+      <ol id="plan-progress" class="plan-progress" aria-label="New project setup" hidden></ol>
       <div id="plan-log" class="plan-log" role="log" aria-live="polite" aria-label="Conversation with the PM"></div>
       <div id="plan-suggestions" class="plan-suggestions" hidden></div>
       <form id="plan-composer" class="plan-composer" novalidate>

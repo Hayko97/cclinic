@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { JobProcess } from "../../src/application/gui-jobs.js";
-import { makeTempFolder } from "../support/helpers.js";
+import { makeTempFolder, writeProject } from "../support/helpers.js";
 import { sendTo, startTestGui, type TestGui } from "../support/gui.js";
 
 const running: TestGui[] = [];
@@ -173,7 +173,10 @@ describe("Setup through the API", () => {
   });
 
   it("TC-GUI-020: a project that isn't set up says so, and the canvas suggests generating instead of failing", async () => {
-    const gui = await open(makeTempFolder());
+    // A folder with a file to analyse; an empty one starts a new project instead (TC-GUI-137).
+    const root = makeTempFolder();
+    writeProject(root, { "README.md": "# Shop\n" });
+    const gui = await open(root);
     expect((JSON.parse((await sendTo(gui, "GET", "/api/setup")).body) as { hasDocuments: boolean }).hasDocuments).toBe(
       false,
     );

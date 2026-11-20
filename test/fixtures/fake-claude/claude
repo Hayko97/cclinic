@@ -50,7 +50,8 @@ if (record) {
 const emit = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
 
 const scriptFile = process.env.FAKE_CLAUDE_SCRIPT;
-if (scriptFile) {
+// FAKE_CLAUDE_FALLBACK: a call no rule matches, such as generation's, gets the default behaviour below instead.
+script: if (scriptFile) {
   const pause = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
   const lock = `${scriptFile}.lock`;
   for (;;) {
@@ -73,6 +74,7 @@ if (scriptFile) {
   fs.writeFileSync(stateFile, JSON.stringify(used));
   fs.rmdirSync(lock);
   const rule = rules[index];
+  if (rule === undefined && process.env.FAKE_CLAUDE_FALLBACK) break script;
   if (rule === undefined) {
     emit({ type: "result", is_error: true, subtype: "success", result: "No script rule matched this prompt." });
     process.exit(1);

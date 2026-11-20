@@ -9,7 +9,9 @@ flowchart LR
     S1[1. Install] --> S2[2. Folder +<br/>brief] --> S3[3. luseen] --> S4[4. Review +<br/>commit] --> S5[5. luseen plan] --> S6[6. Build tasks<br/>with your agent] --> S7[7. Preview +<br/>design] --> S8[8. luseen auto]
 ```
 
-> **Order matters.** `luseen plan` needs `.luseen/sdd/`, and `luseen` needs at least one file to read. So: brief first, then `luseen`, then `luseen plan`.
+> **The quick way: let the PM set it up.** In an empty folder, run `luseen` in a terminal, or `luseen gui` and click **Start a new project**. The PM interviews you, reads the files you attach, and writes the brief (step 2) as `README.md` once you approve it. luseen then writes the specs and the agent setup (step 3), the PM proposes the first roadmap (step 5), and a project with screens gets a draft design system (step 7). You approve each one. Then go on from step 4 (review and commit) and step 6.
+>
+> **Doing it by hand?** Order matters: `luseen plan` needs `.luseen/sdd/`, and `luseen` needs at least one file to read. So: brief first, then `luseen`, then `luseen plan`.
 
 ---
 
@@ -307,13 +309,13 @@ luseen skills                   # updates the skills and AGENTS.md section. No C
 
 ## When something goes wrong
 
-| You see                                        | Do                                                           |
-| ---------------------------------------------- | ------------------------------------------------------------ |
-| `luseen plan`: `.luseen/sdd` doesn't exist     | Run `luseen` first (step 3)                                  |
-| `luseen`: "No files to analyse remain…"        | Write `README.md` first (step 2)                             |
-| `luseen plan` exits 2 about Claude or `claude` | `claude auth login`                                          |
-| Exit 4, usage limit                            | Wait for the reset, run the same command again               |
-| `luseen auto` refuses to start                 | Commit everything, then `luseen auto --dry-run` to see why   |
-| The agent skips the steps                      | `luseen skills`, and check `CLAUDE.md` contains `@AGENTS.md` |
-| `luseen: command not found`                    | Use `npx luseen`, or add npm's global bin to `PATH`          |
-| Anything else                                  | `luseen doctor`, or `luseen guide`                           |
+| You see                                        | Do                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `luseen plan`: `.luseen/sdd` doesn't exist     | Run `luseen` first (step 3)                                                                      |
+| `luseen`: "Nothing to analyse in …"            | Run `luseen` in a terminal, or `luseen gui`, to start with the PM; or write `README.md` (step 2) |
+| `luseen plan` exits 2 about Claude or `claude` | `claude auth login`                                                                              |
+| Exit 4, usage limit                            | Wait for the reset, run the same command again                                                   |
+| `luseen auto` refuses to start                 | Commit everything, then `luseen auto --dry-run` to see why                                       |
+| The agent skips the steps                      | `luseen skills`, and check `CLAUDE.md` contains `@AGENTS.md`                                     |
+| `luseen: command not found`                    | Use `npx luseen`, or add npm's global bin to `PATH`                                              |
+| Anything else                                  | `luseen doctor`, or `luseen guide`                                                               |

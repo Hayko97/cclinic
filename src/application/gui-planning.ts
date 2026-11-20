@@ -37,10 +37,20 @@ import {
   type HolderPlace,
   type PlanSession,
   type PlanTarget,
+  type ProjectPhase,
   type StoredAttachment,
   type WaitingProposal,
 } from "../core/planning.js";
 import { redact } from "../core/redaction.js";
+import {
+  approveBrief,
+  finishDesign,
+  projectSummary,
+  takeRoadmapRequest,
+  writeProjectDesign,
+  writeProjectSpecs,
+  type ProjectPorts,
+} from "./new-project.js";
 import {
   approveProposal,
   cancelSession,
@@ -62,8 +72,15 @@ import {
 export type TurnMaker = (signal: AbortSignal) => TurnPorts;
 
 export interface PlannerPorts {
-  /** Makes `luseen plan`'s checks and resolves the model and effort (FR-GUI-023). Throws what the CLI refuses. */
-  prepare(options: PlanOptionsRequest): Promise<TurnMaker>;
+  /**
+   * Makes `luseen plan`'s checks and resolves the model and effort (FR-GUI-023). Throws what the CLI refuses. A new
+   * project has no documents to check (FR-PLAN-047).
+   */
+  prepare(options: PlanOptionsRequest, settings: { readonly isNewProject: boolean }): Promise<TurnMaker>;
+  /** FR-PLAN-047: whether the folder is empty, so a new project may start. */
+  isEmptyProject(): Promise<boolean>;
+  /** FR-GUI-088, FR-GUI-089: a new project's steps, whose jobs use the options the session was opened with. */
+  project(options: () => PlanOptionsRequest): ProjectPorts;
   readonly records: PlanRecords & {
     copyAttachments(id: string, files: readonly { file: string; name: string }[]): Promise<StoredAttachment[]>;
   };
@@ -139,6 +156,16 @@ export type ProposalView =
       readonly openQuestions: readonly string[];
     };
 
+/** FR-GUI-086, FR-GUI-087: where a new project's setup is, its waiting brief, and what it made once done. */
+export interface ProjectView {
+  readonly phase: ProjectPhase;
+  readonly hasScreens: boolean | null;
+  readonly brief: { readonly markdown: string; readonly files: readonly string[] } | null;
+  /** FR-GUI-089: whether a draft design system is there to approve. */
+  readonly hasDesign: boolean;
+  readonly summary: string | null;
+}
+
 export interface OpenSessionView extends SessionItem {
   readonly status: PlanSession["status"];
   readonly suggestions: readonly string[];
@@ -152,6 +179,7 @@ export interface OpenSessionView extends SessionItem {
   readonly unanswered: PlanChatItem | null;
   /** Why it can't continue here, such as its Claude conversation being gone; it can only be cancelled. */
   readonly unavailable: string | null;
+  readonly project: ProjectView | null;
 }
 
 /** FR-PLAN-041: a problem shown in the conversation, with the one action that helps. */
@@ -165,6 +193,8 @@ export interface PlanPanelView {
   readonly sessions: readonly SessionItem[];
   /** FR-PLAN-038: the turn the GUI is running, if any. */
   readonly turn: { readonly startedAt: string } | null;
+  /** FR-GUI-088, FR-GUI-089: a new project's step the GUI is running, if any. */
+  readonly step: { readonly kind: "specs" | "design"; readonly startedAt: string } | null;
   readonly notice: PlanNotice | null;
   /**
    * Counts up with each view made, so a page keeps the newest it has seen when an action's reply arrives after a
@@ -192,8 +222,11 @@ export interface Planner {
   proposeNow(): Promise<void>;
   stop(): void;
   retry(): Promise<void>;
+  /** Approves the waiting proposal, or a new project's waiting brief (FR-PLAN-051). */
   approve(planId: string): Promise<string>;
   cancel(planId: string): Promise<string>;
+  /** FR-GUI-089: approves or skips a new project's draft design system, which finishes its setup. */
+  finishDesign(planId: string, isApproved: boolean): Promise<string>;
   /** `pageId` is the page that holds it, so a page counts only its own files (FR-PLAN-022). */
   upload(name: string, contentBase64: string, pageId: string): Promise<UploadView>;
   removeUpload(id: string): Promise<void>;
@@ -288,6 +321,8 @@ function createPlannerCore(ports: PlannerPorts): Planner {
   let turn: { readonly controller: AbortController; readonly startedAt: string; readonly done: Promise<void> } | null =
     null;
   let notice: PlanNotice | null = null;
+  let step: { readonly kind: "specs" | "design"; readonly startedAt: string } | null = null;
+  const project = ports.project(() => options);
 
   const changed = (): void => {
     for (const listener of listeners) listener();
@@ -380,6 +415,7 @@ function createPlannerCore(ports: PlannerPorts): Planner {
   const requireNoStart = (): void => {
     if (turn !== null || isStarting)
       throw new UsageError("The PM is still working. Wait for its reply, or press Stop.");
+    if (step !== null) throw new UsageError("luseen is still setting up the project. Wait for it to finish.");
   };
   const requireIdle = (): void => {
     requireNoStart();
@@ -431,6 +467,54 @@ function createPlannerCore(ports: PlannerPorts): Planner {
     };
     changed();
     void run().finally(finished);
+  };
+
+  /** A session's turns; a new project's are made without the documents it doesn't have yet (FR-PLAN-047). */
+  const prepareFor = async (id: string): Promise<TurnMaker> => {
+    const session = await ports.records.read(id);
+    return ports.prepare(options, { isNewProject: session?.target.kind === "new-project" });
+  };
+
+  /** FR-GUI-088, FR-GUI-089: runs a new project's step in the background; a failure is shown with Retry. */
+  const runStep = (kind: "specs" | "design", work: () => Promise<void>): void => {
+    step = { kind, startedAt: ports.now() };
+    notice = null;
+    changed();
+    void work()
+      .catch((error: unknown) => {
+        notice = { message: messageOf(error), action: "retry" };
+      })
+      .finally(() => {
+        step = null;
+        changed();
+      });
+  };
+
+  /**
+   * FR-PLAN-048, FR-PLAN-052 to FR-PLAN-054: takes a new project on from where it is: its specs, then the request for
+   * its first roadmap, or its design step. Nothing happens at its brief, or while the PM waits for the user.
+   */
+  const advanceProject = async (id: string): Promise<void> => {
+    const session = await ports.records.read(id);
+    const phase = session?.status === "open" ? session.project?.phase : undefined;
+    const askRoadmap = async (): Promise<void> => {
+      const request = await takeRoadmapRequest(project, id);
+      if (request === undefined) return;
+      makeTurns ??= await prepareFor(id);
+      runInBackground(id, request);
+    };
+    if (phase === "specs") {
+      runStep("specs", async () => {
+        await writeProjectSpecs(project, id);
+        await askRoadmap();
+      });
+    } else if (phase === "roadmap") {
+      await askRoadmap();
+    } else if (phase === "design") {
+      runStep("design", async () => {
+        await writeProjectDesign(project, id);
+      });
+    }
   };
 
   /** FR-PLAN-022: the uploads a message names, or a refusal when one isn't there or there are too many. */
@@ -503,6 +587,22 @@ function createPlannerCore(ports: PlannerPorts): Planner {
               // FR-PLAN-038: the message the PM hasn't answered, shown until the transcript has it.
               unanswered: isAnsweredElsewhere ? null : unansweredItem(session),
               unavailable: unavailable(session),
+              project:
+                session.project === null
+                  ? null
+                  : {
+                      phase: session.project.phase,
+                      hasScreens: session.project.hasScreens,
+                      brief:
+                        session.project.brief === null
+                          ? null
+                          : {
+                              markdown: session.project.brief.markdown,
+                              files: session.attachments.map((item) => item.name),
+                            },
+                      hasDesign: project.hasDesign(),
+                      summary: session.project.phase === "done" ? projectSummary(project, session) : null,
+                    },
             };
       // Counted when the view is made, after its reads, so a later view always has a higher number.
       version += 1;
@@ -511,6 +611,7 @@ function createPlannerCore(ports: PlannerPorts): Planner {
           open: openView,
           sessions: open,
           turn: turn === null ? null : { startedAt: turn.startedAt },
+          step,
           // A Retry is offered only while the turn still waits for its answer.
           notice: isAnsweredElsewhere && notice?.action === "retry" ? null : notice,
         }),
@@ -524,7 +625,13 @@ function createPlannerCore(ports: PlannerPorts): Planner {
     start: (request) =>
       whileIdle(async () => {
         checkMessage(request);
-        const turns = await ports.prepare(request);
+        const isNewProject = request.target.kind === "new-project";
+        // FR-GUI-085: a new project starts only in an empty folder.
+        if (isNewProject && !(await ports.isEmptyProject()))
+          throw new UsageError(
+            "This folder isn't empty, so it can't start a new project. Generate its documents instead.",
+          );
+        const turns = await ports.prepare(request, { isNewProject });
         const { overview } = ports.decisions.readContext();
         const missing = missingTarget(request.target, overview);
         if (missing !== undefined) throw new UsageError(missing);
@@ -596,12 +703,14 @@ function createPlannerCore(ports: PlannerPorts): Planner {
         }
         await holdOf(planId);
         if (!(await isStillChosen())) return;
-        const turns = await ports.prepare(given);
+        const turns = await ports.prepare(given, { isNewProject: session.target.kind === "new-project" });
         if (!(await isStillChosen())) return;
         makeTurns = turns;
         const first = await resumeWith(planId);
         if (!(await isStillChosen())) return;
         if (first !== undefined && turn === null) runInBackground(planId, first);
+        // FR-PLAN-048: a new project continues from the step it stopped at.
+        else if (session.project !== null && turn === null && step === null) await advanceProject(planId);
         else changed();
       } finally {
         opening -= 1;
@@ -620,7 +729,7 @@ function createPlannerCore(ports: PlannerPorts): Planner {
       whileIdle(async () => {
         checkMessage(message);
         const session = await hold();
-        makeTurns ??= await ports.prepare(options);
+        makeTurns ??= await prepareFor(session.id);
         // FR-PLAN-014: the first message goes to Claude before anything else.
         if (!isStarted(session) && session.pendingFirstMessage !== null)
           throw new UsageError("Your first message hasn't reached the PM yet. Press Retry to send it.");
@@ -630,7 +739,7 @@ function createPlannerCore(ports: PlannerPorts): Planner {
     proposeNow: () =>
       whileIdle(async () => {
         const session = await hold();
-        makeTurns ??= await ports.prepare(options);
+        makeTurns ??= await prepareFor(session.id);
         runInBackground(session.id, PROPOSE_NOW_MESSAGE);
       }),
     stop: () => {
@@ -640,25 +749,49 @@ function createPlannerCore(ports: PlannerPorts): Planner {
     retry: () =>
       whileIdle(async () => {
         const session = await hold();
-        makeTurns ??= await ports.prepare(options);
+        makeTurns ??= await prepareFor(session.id);
         // FR-PLAN-015: replying after a limit starts the count again.
         count = newTurnCount();
         // FR-PLAN-014: asks the PM to answer the stopped turn; a message answered elsewhere meanwhile, such as in
         // Claude Code, isn't asked about again.
         const first = await resumeWith(session.id);
         if (first !== undefined) runInBackground(session.id, first);
-        else {
+        else if (session.project !== null) {
+          // FR-GUI-088, FR-GUI-089: a new project's failed step is run again.
+          notice = null;
+          await advanceProject(session.id);
+          changed();
+        } else {
           notice = null;
           changed();
         }
       }),
     approve: async (planId) => {
-      if (turn !== null && planId === openId) requireIdle();
+      if ((turn !== null || step !== null) && planId === openId) requireIdle();
+      const session = await ports.records.read(planId);
+      if ((session?.project?.brief ?? null) !== null) {
+        // FR-PLAN-051, FR-GUI-088: the brief is written, then the specs are made.
+        const message = await approveBrief(project, planId);
+        // The panel runs the open session's steps; another goes on when it's opened (FR-PLAN-048).
+        if (planId === openId) await advanceProject(planId);
+        changed();
+        return message;
+      }
       const decided = await approveProposal(ports.decisions, planId);
+      if (decided.session.project !== null && planId === openId) await advanceProject(planId);
       changed();
       return decided.message;
     },
+    finishDesign: async (planId, isApproved) => {
+      if (planId === openId) requireIdle();
+      const message = await finishDesign(project, planId, isApproved);
+      changed();
+      return message;
+    },
     cancel: async (planId) => {
+      // FR-PLAN-056: a step that's writing files finishes first, so a cancel never leaves half of them.
+      if (step !== null && planId === openId)
+        throw new UsageError("luseen is still setting up the project. Cancel once this step finishes.");
       if (turn !== null && planId === openId) {
         turn.controller.abort();
         await turn.done;

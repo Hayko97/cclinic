@@ -10,7 +10,7 @@ import type { JobProcess } from "../../src/application/gui-jobs.js";
 import type { Layout } from "../../src/core/canvas.js";
 import { ENVIRONMENT_CONSENT_MESSAGE } from "../../src/core/environment.js";
 import { beginChange, linkSession, stateKey, withPending } from "../../src/core/workflow.js";
-import { makeTempFolder } from "../support/helpers.js";
+import { makeTempFolder, writeProject } from "../support/helpers.js";
 import { startTestGui, type TestGui } from "../support/gui.js";
 
 const SESSION_LIVE = "5e550000-0000-4000-8000-000000000001";
@@ -149,6 +149,8 @@ async function open(
   const root = options.root ?? project();
   // A set-up project opens on the canvas; one with no documents opens on Setup (FR-GUI-014).
   if (options.isSetUp !== false) mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
+  // Not set up, it still has a file to analyse, so it isn't an empty folder, which starts a new project (FR-GUI-085).
+  else writeProject(root, { "README.md": "# Shop\n" });
   const home = options.home ?? makeTempFolder();
   if (options.withSessions === true) await withSessions(root, home);
   const jobs = fakeJobs();
@@ -2190,6 +2192,8 @@ async function openWatched(
   const root = options.root ?? project();
   // A set-up project opens on the canvas; one with no documents opens on Setup (FR-GUI-014).
   if (options.isSetUp !== false) mkdirSync(path.join(root, ".luseen/sdd"), { recursive: true });
+  // Not set up, it still has a file to analyse, so it isn't an empty folder, which starts a new project (FR-GUI-085).
+  else writeProject(root, { "README.md": "# Shop\n" });
   const home = makeTempFolder();
   if (options.withSessions === true) await withSessions(root, home);
   const jobs = fakeJobs();

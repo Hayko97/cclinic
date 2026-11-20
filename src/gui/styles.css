@@ -2946,3 +2946,48 @@ p.plan-activity > span:last-child {
   font-weight: 600;
   pointer-events: none;
 }
+
+/* FR-GUI-086: a new project's setup steps, told apart by mark and text, not colour alone. */
+.plan-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-m);
+  margin: 0;
+  padding: var(--space-m) var(--space-4xl);
+  border-bottom: 1px solid var(--line);
+  list-style: none;
+  font-size: var(--text-s);
+}
+
+.plan-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--muted);
+}
+
+.plan-step-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+}
+
+.plan-step.is-current {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.plan-step.is-current .plan-step-mark {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.plan-step.is-done .plan-step-mark {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}

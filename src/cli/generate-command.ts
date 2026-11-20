@@ -1,4 +1,5 @@
 /** The main command: scan, summarise, confirm, then generate. */
+import { existsSync } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -17,6 +18,7 @@ import {
   recoverInterruptedWrite,
   sha256,
 } from "../adapters/storage/document-store.js";
+import { openPlanStore } from "../adapters/storage/plan-store.js";
 import { installSkills, summarizeInstall, type SkillInstallEntry } from "../adapters/storage/skill-installer.js";
 import {
   generateDocuments,
@@ -58,6 +60,7 @@ import { formatDesignOutcome, setUpDesignAfterGenerate } from "./design-step.js"
 import { formatEnvironmentOutcome, setUpAfterGenerate } from "./environment-step.js";
 import { NEXT_STEPS } from "./guide.js";
 import { askToConfirm, chooseEffort, chooseModel, isInteractive } from "./menus.js";
+import { openNewProjectSession } from "./new-project-ports.js";
 import { closestCommand, oneOf, requireEffort, requireModel } from "./options.js";
 import type { Reporter } from "./reporter.js";
 
@@ -294,10 +297,61 @@ function limitMessage(what: string, actual: number, limit: number, flag: string)
   return `This project has ${actual.toLocaleString("en-US")} ${what}, which is above the limit of ${limit.toLocaleString("en-US")}. Use ${flag} to raise the limit, or exclude files with --exclude or .luseenignore.`;
 }
 
+/** Starts a new project's setup in the folder, or continues the open one (roadmap-planning FR-PLAN-047, FR-PLAN-048). */
+export type NewProjectStarter = (target: string, resume: string | undefined) => Promise<void>;
+
+/** FR-CLI-040: an empty folder offers a new project, previews as empty, or stops saying how to start one. */
+async function handleEmptyFolder(
+  options: GenerateOptions,
+  context: CommandContext,
+  run: {
+    readonly preview: Record<string, unknown> & { readonly target: string };
+    readonly startNewProject: NewProjectStarter | undefined;
+  },
+): Promise<void> {
+  const { target } = run.preview;
+  const { startNewProject } = run;
+  if (options.dryRun === true && options.json === true) {
+    context.reporter.result(
+      JSON.stringify({
+        status: "dry-run",
+        empty: true,
+        ...run.preview,
+        estimatedTokens: 0,
+        estimatedCostUsd: null,
+        included: [],
+      }),
+    );
+    return;
+  }
+  if (startNewProject !== undefined && canAsk(options)) {
+    if (!(await askToConfirm("This folder is empty. Start a new project with the PM?", true))) {
+      context.reporter.result("Nothing was written.");
+      return;
+    }
+    await startNewProject(target, undefined);
+    return;
+  }
+  throw new UsageError(
+    `Nothing to analyse in ${target}. Run \`luseen\` in a terminal or \`luseen gui\` to start a new project with the PM, or write a README.md that describes the project.`,
+  );
+}
+
+function canAsk(options: GenerateOptions): boolean {
+  return (
+    isInteractive() &&
+    options.yes !== true &&
+    options.json !== true &&
+    options.quiet !== true &&
+    options.dryRun !== true
+  );
+}
+
 export async function runGenerate(
   given: string | undefined,
   options: GenerateOptions,
   context: CommandContext,
+  startNewProject?: NewProjectStarter,
 ): Promise<void> {
   const { reporter, environment, signal } = context;
   const ambiguous = await resolveAmbiguousValues(given, options);
@@ -305,6 +359,15 @@ export async function runGenerate(
   const { model, effort } = await resolveModelAndEffort(ambiguous, context);
   const paths = projectPaths(target, options.out);
   const isDryRun = options.dryRun === true;
+  // FR-PLAN-048: running luseen again continues a new project's setup, at whichever step it stopped.
+  if (startNewProject !== undefined && canAsk(options)) {
+    const open = (await openNewProjectSession(openPlanStore(target)))?.id;
+    if (open !== undefined) {
+      reporter.notice(`Continuing the new project's setup (${open}).`);
+      await startNewProject(target, open);
+      return;
+    }
+  }
 
   const providerChoice = resolveProviderChoice(options.provider, environment);
   let provider: LlmProvider | undefined;
@@ -332,6 +395,20 @@ export async function runGenerate(
     exclude: options.exclude,
     maxFileSizeMib: options.maxFileSizeMib,
   });
+  if (scan.included.length === 0 && !existsSync(paths.out)) {
+    await handleEmptyFolder(options, context, {
+      preview: {
+        target,
+        provider: provider?.name ?? null,
+        model,
+        effort,
+        skipped: scan.skipped,
+        git: { status: gitStatus.kind, commitsUsed: 0 },
+      },
+      startNewProject,
+    });
+    return;
+  }
   if (scan.included.length === 0) {
     throw new UsageError(
       "No files to analyse remain after the exclusion rules. Use --dry-run --json to see what was skipped.",

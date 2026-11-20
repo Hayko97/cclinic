@@ -8,6 +8,15 @@ import type { PlanStore } from "../adapters/storage/plan-store.js";
 import { claudeTranscriptPath } from "../adapters/llm/agent-process.js";
 import { isProcessRunning } from "../adapters/storage/file-lock.js";
 import {
+  approveBrief,
+  finishDesign,
+  projectSummary,
+  takeRoadmapRequest,
+  writeProjectDesign,
+  writeProjectSpecs,
+  type ProjectPorts,
+} from "../application/new-project.js";
+import {
   approveProposal,
   cancelSession,
   changeRecord,
@@ -37,6 +46,7 @@ import {
   parseChatInput,
   placeName,
   PROPOSE_NOW_MESSAGE,
+  renderWaitingBrief,
   renderWaitingProposal,
   shownUserMessage,
   resumeCommands,
@@ -50,6 +60,7 @@ import { requireClaudeCli, requireDocuments } from "./agent-checks.js";
 import type { CommandContext } from "./command-context.js";
 import { resolveModelAndEffort } from "./generate-command.js";
 import { askText, askToConfirm, chooseFrom, isInteractive } from "./menus.js";
+import { isEmptyProject, openNewProjectSession, projectPorts, terminalSteps } from "./new-project-ports.js";
 import {
   decisionPorts,
   documentPaths,
@@ -116,10 +127,17 @@ async function chooseTarget(options: PlanOptions, overview: RoadmapOverview): Pr
   return { kind: "extend-roadmap", roadmapId: Number(choice) };
 }
 
-/** The checks `luseen plan` makes before anything else: Claude Code and the documents (FR-PLAN-003). */
-export async function checkPlanning(target: string, context: CommandContext): Promise<void> {
+/**
+ * The checks `luseen plan` makes before anything else: Claude Code and the documents (FR-PLAN-003). A new project
+ * has no documents yet (FR-PLAN-047).
+ */
+export async function checkPlanning(
+  target: string,
+  context: CommandContext,
+  { isNewProject = false }: { readonly isNewProject?: boolean } = {},
+): Promise<void> {
   await requireClaudeCli("luseen plan", context);
-  requireDocuments(projectPaths(target, undefined).out);
+  if (!isNewProject) requireDocuments(projectPaths(target, undefined).out);
 }
 
 /** The PM's instructions, with the documents' folder filled in. */
@@ -179,6 +197,8 @@ interface ChatState {
   readonly turns: TurnPorts;
   readonly count: TurnCount;
   readonly context: CommandContext;
+  /** A new project's steps after its brief (FR-PLAN-047). */
+  readonly project: ProjectPorts;
   session: PlanSession;
 }
 
@@ -228,12 +248,15 @@ function showReply(state: ChatState, reply: string, previousProposal: string | n
   if (session.proposal !== null && session.proposal.proposedAt !== previousProposal) {
     lines.push("", renderWaitingProposal(session.proposal, session.target));
   }
-  if (session.proposal !== null) lines.push("", "/approve to save it, /cancel to drop it, or reply to change it.");
+  const brief = session.project?.brief ?? null;
+  if (brief !== null && brief.proposedAt !== previousProposal) lines.push("", renderWaitingBrief(brief.markdown));
+  if (session.proposal !== null || brief !== null)
+    lines.push("", "/approve to save it, /cancel to drop it, or reply to change it.");
   context.reporter.notice(`${lines.join("\n")}\n`);
 }
 
 async function sendTurn(state: ChatState, message: string): Promise<void> {
-  const previous = state.session.proposal?.proposedAt ?? null;
+  const previous = state.session.proposal?.proposedAt ?? state.session.project?.brief?.proposedAt ?? null;
   const { reply, session } = await runTurn(state.turns, state.session.id, message, state.count);
   state.session = session;
   showReply(state, reply, previous);
@@ -306,7 +329,20 @@ async function chatTurns(state: ChatState): Promise<void> {
       return;
     }
     if (typed.kind === "approve") {
-      if (await approve(state)) return;
+      if ((state.session.project?.brief ?? null) !== null) {
+        try {
+          state.context.reporter.result(await approveBrief(state.project, state.session.id));
+        } catch (error) {
+          // FR-PLAN-051: a refused brief stays waiting, so the user can fix what's in the way and approve again.
+          if (!(error instanceof UsageError)) throw error;
+          state.context.reporter.notice(error.message);
+          continue;
+        }
+        if (await driveProject(state)) return;
+        continue;
+      }
+      if (!(await approve(state))) continue;
+      if (state.session.project === null || (await driveProject(state))) return;
       continue;
     }
     if (typed.kind === "propose") {
@@ -330,6 +366,80 @@ async function chatTurns(state: ChatState): Promise<void> {
     }
     await sendTurn(state, buildUserMessage(message.text, notesOf(stored)));
   }
+}
+
+/**
+ * FR-PLAN-054: drafts the design system. A failed step keeps the session at its design and offers to retry or skip
+ * it; stopping instead keeps it for later. True when a draft waits, false when nothing was made.
+ */
+async function draftDesign(state: ChatState): Promise<boolean | "skipped"> {
+  const drafted = await retrying(state, "Drafting the design system", () =>
+    writeProjectDesign(state.project, state.session.id),
+  );
+  return drafted ?? "skipped";
+}
+
+/**
+ * FR-PLAN-052, FR-PLAN-054: runs a new project's step; when it fails, shows why and offers to retry it, or to stop
+ * and continue later, which keeps the session at that step. The design step can also be skipped: then this returns
+ * undefined.
+ */
+async function retrying<T>(state: ChatState, what: string, step: () => Promise<T>): Promise<T | undefined> {
+  const canSkip = state.session.project?.phase === "design";
+  for (;;) {
+    state.context.reporter.notice(`${what}...`);
+    try {
+      return await step();
+    } catch (error) {
+      if (!(error instanceof AgentSessionError)) throw error;
+      state.context.reporter.notice(error.message);
+      const next = await chooseFrom(`${what} didn't finish. What now?`, [
+        { value: "retry", name: "Retry it" },
+        ...(canSkip ? [{ value: "skip", name: "Skip the design system" }] : []),
+        { value: "later", name: "Stop, and continue later" },
+      ]);
+      if (next === "skip") return undefined;
+      if (next !== "retry") throw error;
+    }
+  }
+}
+
+/**
+ * FR-PLAN-048, FR-PLAN-052 to FR-PLAN-055: takes a new project as far as it goes without the user: the specs, the
+ * request for the first roadmap, and the design step. True when the setup is finished.
+ */
+async function driveProject(state: ChatState): Promise<boolean> {
+  const { project, context } = state;
+  const id = state.session.id;
+  const reread = async (): Promise<PlanSession> => (state.session = (await state.records.read(id)) ?? state.session);
+  let session = await reread();
+  if (session.project === null) return false;
+  if (session.project.phase === "specs") {
+    await retrying(state, "Writing the specs", () => writeProjectSpecs(project, id));
+    session = await reread();
+  }
+  if (session.project?.phase === "roadmap") {
+    const request = await takeRoadmapRequest(project, id);
+    if (request !== undefined) await sendTurn(state, request);
+    return false;
+  }
+  if (session.project?.phase === "design") {
+    // FR-DSGN-041: the designer may find no user interface, so there's nothing to approve.
+    const isDrafted = await draftDesign(state);
+    if (isDrafted === true) {
+      const isApproved = await chooseFrom("The design system is a draft. Approve it?", [
+        { value: true, name: "Approve the design system" },
+        { value: false, name: "Skip it, and remove the draft" },
+      ]);
+      context.reporter.result(await finishDesign(project, id, isApproved));
+    } else if (isDrafted === "skipped") {
+      context.reporter.result(await finishDesign(project, id, false));
+    }
+    session = await reread();
+  }
+  if (session.project?.phase !== "done") return false;
+  context.reporter.result(projectSummary(project, session));
+  return true;
 }
 
 function showActivity(context: CommandContext) {
@@ -427,6 +537,7 @@ async function chooseSession(records: PlanStore, given: string | true): Promise<
 
 function targetText(target: PlanTarget): string {
   if (target.kind === "new-roadmap") return "new roadmap";
+  if (target.kind === "new-project") return "new project";
   if (target.kind === "extend-roadmap") return `extend #${target.roadmapId}`;
   return target.roadmapId === null ? "standalone task" : `task in #${target.roadmapId}`;
 }
@@ -455,6 +566,10 @@ async function resumeSession(
   if (typeof session === "string") throw new UsageError(session);
   const state: ChatState = { ...base, session, turns };
   base.onStarted(state);
+  // FR-PLAN-048: a new project continues from the step it stopped at.
+  if (session.project !== null && session.project.phase !== "brief" && session.project.phase !== "roadmap") {
+    return (await driveProject(state)) ? undefined : state;
+  }
   // Checked first, so a message answered elsewhere since isn't shown as still waiting (FR-PLAN-014).
   const first = await resumeMessage(
     {
@@ -472,7 +587,12 @@ async function resumeSession(
     `Continuing ${session.id}. Continue it elsewhere with: ${resumeCommands(session).join("  or  ")}`,
   );
   if (first !== undefined) await sendTurn(state, first);
-  else if (state.session.proposal !== null) {
+  else if (state.session.project?.phase === "roadmap" && (await driveProject(state))) return undefined;
+  else if ((state.session.project?.brief ?? null) !== null) {
+    base.context.reporter.notice(
+      `${renderWaitingBrief(state.session.project?.brief?.markdown ?? "")}\n\n/approve to save it, /cancel to drop it, or reply to change it.\n`,
+    );
+  } else if (state.session.proposal !== null) {
     base.context.reporter.notice(
       `${renderWaitingProposal(state.session.proposal, state.session.target)}\n\n/approve to save it, /cancel to drop it, or reply to change it.\n`,
     );
@@ -488,7 +608,20 @@ function firstPromptContext(target: string) {
 export async function runPlanCommand(options: PlanOptions, context: CommandContext): Promise<void> {
   const target = await projectFolder(options.dir);
   await checkOptions(target, options);
-  await checkPlanning(target, context);
+  // FR-PLAN-047: an empty folder starts a new project, or continues the one already open there (FR-PLAN-048); a
+  // resumed session may be one that has no documents yet.
+  const isNewProject = options.resume === undefined && (await isEmptyProject(target));
+  if (isNewProject && options.roadmap === undefined && options.task !== true) {
+    const open = await openNewProjectSession(planStoreFor(target));
+    if (open !== undefined) {
+      // Files go with a new session's first message, so continuing one takes none (FR-PLAN-001).
+      return runPlanCommand({ ...options, attach: [], resume: open.id }, context);
+    }
+  }
+  if (isNewProject && (options.roadmap !== undefined || options.task === true)) {
+    throw new UsageError("This folder is empty, so luseen plan starts a new project. Leave out --roadmap and --task.");
+  }
+  await checkPlanning(target, context, { isNewProject: isNewProject || options.resume !== undefined });
   if (!isInteractive()) {
     throw new UsageError("luseen plan is a chat with the PM, so it needs an interactive terminal.");
   }
@@ -510,6 +643,7 @@ export async function runPlanCommand(options: PlanOptions, context: CommandConte
     records,
     count: newTurnCount(),
     context,
+    project: projectPorts(target, records, terminalSteps(target, { model, effort }, context)),
     onStarted: (started: ChatState) => {
       state = started;
     },
@@ -518,7 +652,9 @@ export async function runPlanCommand(options: PlanOptions, context: CommandConte
     const chatting =
       options.resume === undefined
         ? await startSession(base, {
-            planTarget: await chooseTarget(options, readPlanningContext(target).overview),
+            planTarget: isNewProject
+              ? { kind: "new-project" }
+              : await chooseTarget(options, readPlanningContext(target).overview),
             holder,
             attach: options.attach ?? [],
             makeTurns,

@@ -200,6 +200,15 @@ function readStatus(markdown: string): DesignStatus | undefined {
   return DESIGN_STATUSES.find((status) => status === word);
 }
 
+/** FR-DSGN-044: the design system with only its status changed, from the Status section's first line. */
+export function withDesignStatus(markdown: string, status: DesignStatus): string {
+  return markdown.replace(
+    /^(## +Status(?:[ \t]+#+)?[ \t]*\n(?:[ \t]*\n)*)([^\n]*)/m,
+    (_match, heading: string, line: string) =>
+      `${heading}${line.replace(new RegExp(DESIGN_STATUSES.join("|"), "i"), status)}`,
+  );
+}
+
 function isGroup(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
