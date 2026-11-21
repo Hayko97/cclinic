@@ -10,7 +10,10 @@
 // transcript under CLAUDE_CONFIG_DIR (or HOME/.claude). A rule can also set `toolUses` (tool calls written to the
 // stream and the transcript, such as Read) and `tools` (MCP tool calls made through the server in --mcp-config;
 // `planId` is filled in from its --plan argument). Their results go to FAKE_CLAUDE_RECORD + ".tools.jsonl".
-// The user's message is written when the turn starts, unless `beforeTranscript` is set.
+// The user's message is written when the turn starts, after FAKE_CLAUDE_STARTUP_MS (Claude Code's own start-up), unless
+// `beforeTranscript` is set. Like Claude Code 2.1.329, the turn first connects the server in --mcp-config and reports it
+// in a `system` `init` event with its tools, and --safe-mode connects no MCP server at all. A rule's `mcpStatus` (such
+// as "failed") or `hiddenTools` (tool names left out) changes what the server offers; a tool not offered isn't called.
 const fs = require("node:fs");
 
 const args = process.argv.slice(2);
@@ -18,6 +21,8 @@ const mode = process.env.FAKE_CLAUDE_MODE ?? "ok";
 const record = process.env.FAKE_CLAUDE_RECORD;
 
 if (args[0] === "--version") {
+  // FAKE_CLAUDE_PREPARE_MS: luseen's checks before a session starts are this slow (FR-PLAN-060).
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Number(process.env.FAKE_CLAUDE_PREPARE_MS ?? 0));
   console.log(process.env.FAKE_CLAUDE_VERSION ?? "2.1.319 (Claude Code)");
   process.exit(0);
 }
@@ -91,22 +96,17 @@ script: if (scriptFile) {
     const file = nodePath.join(folder, `${sessionId}.jsonl`);
     fs.appendFileSync(file, `${JSON.stringify({ type, timestamp: new Date().toISOString(), sessionId, message: { role: type, content } })}\n`);
   };
-  // `beforeTranscript`: the turn is stopped before Claude Code wrote anything, such as while it starts up.
-  if (!rule.beforeTranscript) line("user", prompt);
-  if (rule.hang) {
-    setInterval(() => {}, 1000);
-    return;
-  }
   const transcript = () => {
     for (const use of rule.toolUses ?? []) line("assistant", [{ type: "tool_use", id: "t", name: use.name, input: use.input ?? {} }]);
     for (const call of rule.tools ?? []) line("assistant", [{ type: "tool_use", id: "m", name: `mcp__luseen__${call.name}`, input: call.input ?? {} }]);
     if (rule.message !== undefined && rule.message !== "") line("assistant", [{ type: "text", text: rule.message }]);
   };
-  /** Calls the scripted MCP tools through the server in --mcp-config, over newline-delimited JSON-RPC. */
-  const callTools = async () => {
-    if (!rule.tools || !args.includes("--mcp-config")) return;
+  /** Connects the server in --mcp-config over newline-delimited JSON-RPC, and lists its tools. */
+  const connect = async () => {
+    if (!args.includes("--mcp-config") || args.includes("--safe-mode")) return null;
     const config = JSON.parse(args[args.indexOf("--mcp-config") + 1]);
-    const server = Object.values(config.mcpServers)[0];
+    const [name, server] = Object.entries(config.mcpServers)[0];
+    if (rule.mcpStatus !== undefined) return { name, status: rule.mcpStatus, tools: [] };
     const planId = server.args[server.args.indexOf("--plan") + 1];
     const child = require("node:child_process").spawn(server.command, server.args, { stdio: ["pipe", "pipe", "inherit"] });
     let buffer = "";
@@ -126,19 +126,31 @@ script: if (scriptFile) {
         waiting.set(id, resolve);
         child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
       });
-    await request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "fake-claude", version: "1" } });
+    const initialized = await request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "fake-claude", version: "1" } });
+    if (initialized.error !== undefined) {
+      child.kill();
+      return { name, status: "failed", tools: [] };
+    }
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
-    for (const call of rule.tools) {
+    const listed = await request("tools/list", {});
+    const hidden = rule.hiddenTools ?? [];
+    const tools = (listed.result?.tools ?? []).map((tool) => tool.name).filter((tool) => !hidden.includes(tool));
+    return { name, status: "connected", tools, planId, child, request };
+  };
+  /** Calls the scripted MCP tools through the connected server; one it doesn't offer fails, as in Claude Code. */
+  const callTools = async (server) => {
+    for (const call of rule.tools ?? []) {
       emit({ type: "assistant", message: { content: [{ type: "tool_use", name: `mcp__luseen__${call.name}`, input: call.input ?? {} }] } });
-      const answer = await request("tools/call", { name: call.name, arguments: { planId, ...(call.input ?? {}) } });
+      const answer = server?.tools.includes(call.name)
+        ? await server.request("tools/call", { name: call.name, arguments: { planId: server.planId, ...(call.input ?? {}) } })
+        : { error: { message: `No such tool available: mcp__luseen__${call.name}` } };
       if (record) fs.appendFileSync(`${record}.tools.jsonl`, `${JSON.stringify({ name: call.name, result: answer.result ?? answer.error })}\n`);
     }
-    child.stdin.end();
-    child.kill();
   };
-  const respond = async () => {
+  const respond = async (server) => {
     for (const use of rule.toolUses ?? []) emit({ type: "assistant", message: { content: [{ type: "tool_use", name: use.name, input: use.input ?? {} }] } });
-    await callTools();
+    await callTools(server);
+    server?.child?.kill();
     transcript();
     for (const [file, content] of Object.entries(rule.write ?? {})) {
       fs.mkdirSync(require("node:path").dirname(file), { recursive: true });
@@ -158,8 +170,25 @@ script: if (scriptFile) {
     });
     process.exit(rule.exitCode ?? 0);
   };
-  if (rule.delayMs) setTimeout(() => void respond(), rule.delayMs);
-  else void respond();
+  const start = async () => {
+    await new Promise((resolve) => setTimeout(resolve, Number(process.env.FAKE_CLAUDE_STARTUP_MS ?? 0)));
+    // `beforeTranscript`: the turn is stopped before Claude Code wrote anything, such as while it starts up.
+    if (!rule.beforeTranscript) line("user", prompt);
+    const server = await connect();
+    const toolsAt = args.indexOf("--tools");
+    const builtIn = toolsAt === -1 ? [] : args.slice(toolsAt + 1, args.findIndex((arg, at) => at > toolsAt && arg.startsWith("--")));
+    const offered = server?.status === "connected" ? server.tools.map((tool) => `mcp__${server.name}__${tool}`) : [];
+    emit({ type: "system", subtype: "init", tools: [...builtIn, ...offered], mcp_servers: server === null ? [] : [{ name: server.name, status: server.status }] });
+    // Claude Code replies only after its API call, so a turn without its tools can be stopped first.
+    if (rule.mcpStatus !== undefined || rule.hiddenTools !== undefined) await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (rule.hang) {
+      setInterval(() => {}, 1000);
+      return;
+    }
+    if (rule.delayMs) setTimeout(() => void respond(server), rule.delayMs);
+    else void respond(server);
+  };
+  void start();
   return;
 }
 const fail = (fields, code = 1) => {

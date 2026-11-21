@@ -34,6 +34,8 @@ export class SessionClosedError extends UsageError {
 }
 /** A PM, developer or QA session stopped at a limit or on unusable replies. Re-running starts it again. */
 export class AgentSessionError extends LuseenError {}
+/** A PM turn stopped because luseen's planning tools weren't offered to it; trying again may work (FR-PLAN-058). */
+export class PlanningToolsError extends AgentSessionError {}
 
 export class LlmError extends LuseenError {}
 export class AuthError extends LlmError {}

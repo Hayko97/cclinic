@@ -223,7 +223,7 @@ describe("--plugin", () => {
     expect(result.code).toBe(0);
     for (const folder of [".agents/skills", ".claude/skills"])
       expect(readdirSync(path.join(root, folder)).sort()).toHaveLength(10);
-    expect(readdirSync(path.join(root, ".claude/agents"))).toEqual(["designer.md"]);
+    expect(readdirSync(path.join(root, ".claude/agents")).sort()).toEqual(["designer.md", "pm.md"]);
     expect(readFileSync(path.join(root, "AGENTS.md"), "utf8")).toContain(".agents/skills/");
     expect(readFileSync(path.join(root, "CLAUDE.md"), "utf8")).toContain("@AGENTS.md");
     expectServerAndHook(root);

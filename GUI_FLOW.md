@@ -92,12 +92,13 @@ When the project has no `.luseen/sdd`, the GUI opens on Setup and says generatin
 
 ```mermaid
 flowchart LR
-    S[Start a new project] --> B[Brief<br/>PM interview, brief card] --> P[Specs<br/>job: luseen --yes --no-design] --> R[Roadmap<br/>PM proposes, you approve] --> D[Design<br/>job: luseen design, approve or skip] --> Y([Ready:<br/>work on task N])
+    S[Start a new project] --> B[Brief<br/>PM interview, brief card] --> P[Specs<br/>job: luseen --yes --no-design] --> R[Roadmap<br/>PM proposes, luseen saves it] --> D[Design<br/>job: luseen design, approved by itself] --> Y([Ready:<br/>work on task N])
 ```
 
 - The Plan panel shows a progress strip: Brief, Specs, Roadmap, Design (with screens) and Ready.
-- Approving the brief writes `README.md` and copies your attached files to `docs/`. The specs and the design step run as jobs you can watch in Jobs.
-- A failed step shows its message with Retry, and the setup waits at that step. Reopening the session continues it.
+- Your message shows the moment you press Enter, with a Starting the PM row until the PM replies.
+- **Approve and set up** on the brief is the only click. It writes `README.md` and copies your attached files to `docs/`; then the specs, the agent setup, the first roadmap and the design system follow by themselves in the same chat. The specs and the design step run as jobs you can watch in Jobs.
+- A failed step shows its message with Retry (and, for the design, Continue without design), and the setup waits at that step. Reopening the session continues it.
 - When it's done, the canvas banner says which task to start in your coding agent.
 
 For a folder that has files:

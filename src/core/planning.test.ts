@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { AGENT_SKILLS } from "./agent-skills.js";
 import {
   activitiesOfEvent,
   isTurnAnswered,
@@ -34,6 +35,8 @@ import {
   briefProposeInputSchema,
   checkBrief,
   roadmapRequest,
+  planningToolsProblem,
+  IN_CHAT_RULE,
   type PlanTarget,
 } from "./planning.js";
 import type { RoadmapOverview, Task } from "./tasks.js";
@@ -623,5 +626,63 @@ describe("a new project", () => {
     expect(parseProposal({ roadmap: null, milestones: [], openQuestions: [] }, { kind: "new-project" })).toContain(
       "a new roadmap needs a title and goal",
     );
+  });
+});
+
+describe("the PM's planning tools", () => {
+  const needed = ["plan_suggest", "plan_propose", "brief_propose"];
+  const init = (status: string, tools: readonly string[]) => ({
+    type: "system",
+    subtype: "init",
+    tools: ["Read", ...tools.map((tool) => `mcp__luseen__${tool}`)],
+    mcp_servers: [{ name: "luseen", status }],
+  });
+
+  it("TC-PLAN-092: a turn whose luseen server failed, isn't there, or lacks a tool can't go on", () => {
+    expect(planningToolsProblem(init("connected", needed), needed)).toBeUndefined();
+    expect(planningToolsProblem(init("failed", []), needed)).toBe(
+      "The PM can't reach luseen's planning tools: the luseen server is failed.",
+    );
+    expect(planningToolsProblem({ type: "system", subtype: "init", tools: ["Read"], mcp_servers: [] }, needed)).toBe(
+      "The PM can't reach luseen's planning tools: the luseen server isn't running.",
+    );
+    expect(planningToolsProblem(init("connected", ["plan_suggest", "plan_propose"]), needed)).toBe(
+      "The PM can't reach luseen's planning tools: brief_propose is missing.",
+    );
+  });
+
+  it("TC-PLAN-092: any other event says nothing", () => {
+    expect(planningToolsProblem({ type: "assistant", message: {} }, needed)).toBeUndefined();
+    expect(planningToolsProblem("text", needed)).toBeUndefined();
+  });
+});
+
+describe("the PM stays in the chat", () => {
+  it("TC-PLAN-093: every prompt of a driven session, and the PM skill, keep the whole session in the conversation", () => {
+    const base = {
+      planId: "plan-1",
+      overview: { roadmaps: [], unassigned: [] },
+      overviewPath: ".luseen/sdd/overview.md",
+      specsListPath: ".luseen/sdd/README.md",
+      skill: "pm",
+      message: "An app",
+    };
+    const prompts = [
+      buildFirstTurnPrompt({ ...base, target: { kind: "new-project" } }),
+      buildFirstTurnPrompt({ ...base, target: { kind: "new-roadmap" } }),
+      roadmapRequest(".luseen/sdd", ["booking"]),
+      answerLastMessage("An app"),
+    ];
+    for (const prompt of prompts) {
+      expect(prompt).toContain(IN_CHAT_RULE);
+      expect(prompt).not.toMatch(/\bluseen plan\b/);
+    }
+    expect(IN_CHAT_RULE).toContain(
+      "Never tell the user to run a command, use another tool or a terminal, or copy or paste",
+    );
+    const skill = AGENT_SKILLS.find((item) => item.name === "product-engineer")?.body ?? "";
+    const started = skill.split("\n").find((line) => line.startsWith("- **Started by luseen**")) ?? "";
+    expect(started).toContain("never tell the user to run a command, use another tool or a terminal, or copy or paste");
+    expect(skill).toContain("never when luseen started this session");
   });
 });

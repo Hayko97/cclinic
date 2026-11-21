@@ -3,8 +3,9 @@ import { UsageError } from "../core/errors.js";
 import { newPlanSession, type PlanSession, type ProjectState, type RoadmapProposal } from "../core/planning.js";
 import {
   approveBrief,
-  finishDesign,
+  continueWithoutDesign,
   projectSummary,
+  saveProjectRoadmap,
   takeRoadmapRequest,
   writeProjectDesign,
   writeProjectSpecs,
@@ -61,6 +62,8 @@ interface FakeProject extends ProjectPorts {
   /** What the design step leaves: a draft, or nothing when it finds no user interface. */
   draftsDesign: boolean;
   designExists: boolean;
+  /** Whether the draft fails the checks of FR-DSGN-030, so approving it is refused. */
+  isDesignInvalid: boolean;
 }
 
 function fakeProject(records: PlanRecords): FakeProject {
@@ -72,6 +75,7 @@ function fakeProject(records: PlanRecords): FakeProject {
     readmeExists: false,
     draftsDesign: true,
     designExists: false,
+    isDesignInvalid: false,
     records,
     now: () => NOW,
     writeBrief: (markdown, attachments) => {
@@ -95,6 +99,7 @@ function fakeProject(records: PlanRecords): FakeProject {
     hasDesign: () => fake.designExists,
     approveDesign: () => {
       calls.push("approve-design");
+      if (fake.isDesignInvalid) return Promise.reject(new UsageError("Missing ## Color."));
       return Promise.resolve("Approved the design system.");
     },
     discardDesign: () => {
@@ -194,6 +199,63 @@ describe("a new project's specs and roadmap", () => {
     expect(await takeRoadmapRequest(project, "plan-1")).toBeUndefined();
   });
 
+  it("TC-PLAN-086: the roadmap the PM proposed is saved with no approval asked, and goes on", async () => {
+    for (const [hasScreens, phase, status] of [
+      [true, "design", "open"],
+      [false, "done", "approved"],
+    ] as const) {
+      const records = memoryRecords(
+        projectSession(
+          { phase: "roadmap", hasScreens, isRoadmapAsked: true },
+          { proposal: { kind: "roadmap", proposal: roadmap, proposedAt: NOW } },
+        ),
+      );
+      expect(await saveProjectRoadmap(fakeProject(records), decisions(records), "plan-1")).toBe(
+        "Saved roadmap #1. Run it with: luseen auto --roadmap 1",
+      );
+      expect(await records.read("plan-1")).toMatchObject({ status, proposal: null, project: { phase } });
+    }
+  });
+
+  it("TC-PLAN-086: a roadmap turn that proposed nothing saves nothing, and Retry asks for it again", async () => {
+    const records = memoryRecords(projectSession({ phase: "roadmap", isRoadmapAsked: true }));
+    const project = fakeProject(records);
+    project.hasSpecs = true;
+    await expect(saveProjectRoadmap(project, decisions(records), "plan-1")).rejects.toThrow(
+      "The PM ended without proposing the roadmap",
+    );
+    expect((await records.read("plan-1"))?.project?.phase).toBe("roadmap");
+    expect(await takeRoadmapRequest(project, "plan-1")).toContain("accounts, booking");
+  });
+
+  it("TC-PLAN-086: a roadmap that no longer fits isn't saved, and Retry asks the PM for a new one", async () => {
+    const stale: RoadmapProposal = {
+      ...roadmap,
+      milestones: [
+        {
+          title: "Foundation",
+          goal: "App shell",
+          tasks: [{ key: "shell", title: "Scaffold", description: "Vite app", spec: "booking", dependsOn: [99] }],
+        },
+      ],
+    };
+    const records = memoryRecords(
+      projectSession(
+        { phase: "roadmap", hasScreens: true, isRoadmapAsked: true },
+        { proposal: { kind: "roadmap", proposal: stale, proposedAt: NOW } },
+      ),
+    );
+    const project = fakeProject(records);
+    project.hasSpecs = true;
+    await expect(saveProjectRoadmap(project, decisions(records), "plan-1")).rejects.toThrow("Retry asks the PM again.");
+    expect(await records.read("plan-1")).toMatchObject({
+      status: "open",
+      proposal: null,
+      project: { phase: "roadmap" },
+    });
+    expect(await takeRoadmapRequest(project, "plan-1")).toContain("accounts, booking");
+  });
+
   it("TC-PLAN-086: an approved roadmap goes on to the design with screens, or finishes without", async () => {
     for (const [hasScreens, phase, status] of [
       [true, "design", "open"],
@@ -215,26 +277,30 @@ describe("a new project's specs and roadmap", () => {
 });
 
 describe("a new project's design and end", () => {
-  it("TC-PLAN-087: approving or skipping the design finishes the setup", async () => {
-    for (const isApproved of [true, false]) {
-      const records = memoryRecords(projectSession({ phase: "design", hasScreens: true }));
-      const project = fakeProject(records);
-      const said = await finishDesign(project, "plan-1", isApproved);
-      expect(said).toBe(isApproved ? "Approved the design system." : "Skipped the design system.");
-      expect(project.calls).toEqual(isApproved ? ["approve-design"] : ["discard-design"]);
-      const session = await records.read("plan-1");
-      expect(session).toMatchObject({ status: "approved", project: { phase: "done" } });
-    }
+  it("TC-PLAN-087: the design system is made and approved with no user action, which finishes the setup", async () => {
+    const records = memoryRecords(projectSession({ phase: "design", hasScreens: true }));
+    const project = fakeProject(records);
+    expect(await writeProjectDesign(project, "plan-1")).toBe("Approved the design system.");
+    expect(project.calls).toEqual(["design", "approve-design"]);
+    expect(await records.read("plan-1")).toMatchObject({ status: "approved", project: { phase: "done" } });
   });
 
-  it("TC-PLAN-087: a draft waits for the user; no design system at all finishes the setup", async () => {
-    const drafted = memoryRecords(projectSession({ phase: "design", hasScreens: true }));
-    expect(await writeProjectDesign(fakeProject(drafted), "plan-1")).toBe(true);
-    expect((await drafted.read("plan-1"))?.project?.phase).toBe("design");
+  it("TC-PLAN-087: a draft failing the checks is removed and keeps the design step; continuing finishes", async () => {
+    const records = memoryRecords(projectSession({ phase: "design", hasScreens: true }));
+    const project = fakeProject(records);
+    project.isDesignInvalid = true;
+    await expect(writeProjectDesign(project, "plan-1")).rejects.toThrow("didn't pass its checks");
+    expect(project.designExists).toBe(false);
+    expect(await records.read("plan-1")).toMatchObject({ status: "open", project: { phase: "design" } });
+    expect(await continueWithoutDesign(project, "plan-1")).toBe("Continued without a design system.");
+    expect(await records.read("plan-1")).toMatchObject({ status: "approved", project: { phase: "done" } });
+  });
+
+  it("TC-PLAN-087: no design system at all finishes the setup", async () => {
     const none = memoryRecords(projectSession({ phase: "design", hasScreens: true }));
     const project = fakeProject(none);
     project.draftsDesign = false;
-    expect(await writeProjectDesign(project, "plan-1")).toBe(false);
+    expect(await writeProjectDesign(project, "plan-1")).toBe("Continued without a design system.");
     expect(await none.read("plan-1")).toMatchObject({ status: "approved", project: { phase: "done" } });
     // The summary names a design system only when one was kept.
     expect(projectSummary(project, projectSession({ phase: "done", hasScreens: true }))).not.toContain(
@@ -242,12 +308,12 @@ describe("a new project's design and end", () => {
     );
   });
 
-  it("TC-PLAN-089: a draft already waiting isn't made again when the session is continued", async () => {
+  it("TC-PLAN-089: a draft already made isn't made again when the session is continued", async () => {
     const records = memoryRecords(projectSession({ phase: "design", hasScreens: true }));
     const project = fakeProject(records);
     project.designExists = true;
-    expect(await writeProjectDesign(project, "plan-1")).toBe(true);
-    expect(project.calls).toEqual([]);
+    await writeProjectDesign(project, "plan-1");
+    expect(project.calls).toEqual(["approve-design"]);
   });
 
   it("TC-PLAN-088: a step that ends after a cancel never moves the cancelled session on", async () => {

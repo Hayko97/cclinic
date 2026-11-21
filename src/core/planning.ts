@@ -14,6 +14,7 @@ import {
   PLAN_ID_SOURCE,
   PLAN_LIMITS,
 } from "./constants/agents.js";
+import { MCP_SERVER_NAME } from "./constants/workflow.js";
 import {
   dependencyEdges,
   findCycle,
@@ -192,7 +193,7 @@ function targetInstruction(target: PlanTarget): string {
         "This is a NEW PROJECT in an empty folder: there's no code, no documents and no specs yet, so don't look for them.",
         "Interview the user first, a few questions at a time, until you know: what the project is; who uses it and what each user does; the main features with their concrete rules (with numbers where they apply); the stack, or the one you recommend; how the code is written and tested; what's out of scope for now; and whether it has screens.",
         "Read every file the user attaches. Play back what you understood, then call `brief_propose` with the brief.",
-        "Don't call `plan_propose` until luseen tells you the specs are written.",
+        "Don't call `plan_propose` until luseen tells you the specs are written. Once the user approves the brief, luseen sets up the rest by itself: it writes the specs and the agent setup, saves the roadmap you then propose without asking the user again, and makes the design system.",
       ].join("\n");
     case "extend-roadmap":
       return `EXTEND roadmap ${target.roadmapId}. Set \`roadmap\` to null, and propose only new milestones, which go after its existing ones.`;
@@ -231,6 +232,8 @@ function renderProjectContext(input: PlanContextInput): string {
     `- \`brief_propose\`: the brief, as { "markdown", "hasScreens": true or false }. The Markdown starts with \`# <project name>\` and has these \`##\` sections in this order: ${BRIEF_SECTIONS.join(", ")}. Main features has a \`###\` heading for each feature area, with its rules as a list. If it returns problems, fix them and call it again in the same turn.`,
     "",
     "Reply to the user in plain Markdown text. Never invent an answer: write what the user couldn't answer in the brief as open questions.",
+    "",
+    IN_CHAT_RULE,
   ].join("\n");
 }
 
@@ -253,6 +256,8 @@ export function renderPlanContext(input: PlanContextInput): string {
     `- \`plan_propose\`: your proposal, as ${proposalShape(input.target)}. If it returns problems, fix them and call it again in the same turn.`,
     "",
     "Reply to the user in plain Markdown text. Never invent an answer: list what the user couldn't answer in openQuestions.",
+    "",
+    IN_CHAT_RULE,
   ].join("\n");
 }
 
@@ -311,6 +316,12 @@ export const PROPOSAL_NO_LONGER_FITS =
 /** FR-PLAN-024 */
 export const PROPOSE_NOW_MESSAGE =
   "Propose now from what you know: call plan_propose, and list everything still unclear as open questions.";
+/**
+ * FR-PLAN-059: in a session luseen drives, everything happens in its conversation, and a tool that fails is said
+ * plainly, so luseen can offer Retry.
+ */
+export const IN_CHAT_RULE =
+  "This whole session happens in this conversation: luseen saves what your tools propose, and shows the user each step. Never tell the user to run a command, use another tool or a terminal, or copy or paste your answer to save it. If a tool returns an error or isn't available, say so in one sentence and end your turn; luseen offers the user Retry.";
 /** FR-PLAN-014: a turn that was stopped is asked for again. */
 export const ANSWER_LAST_MESSAGE = "Your last turn was stopped. Answer my last message.";
 
@@ -320,8 +331,8 @@ export const ANSWER_LAST_MESSAGE = "Your last turn was stopped. Answer my last m
  */
 export function answerLastMessage(unanswered: string | null): string {
   return unanswered === null
-    ? ANSWER_LAST_MESSAGE
-    : `${ANSWER_LAST_MESSAGE} In case you didn't get it, it was:\n\n${unanswered}`;
+    ? `${ANSWER_LAST_MESSAGE} ${IN_CHAT_RULE}`
+    : `${ANSWER_LAST_MESSAGE} ${IN_CHAT_RULE} In case you didn't get it, it was:\n\n${unanswered}`;
 }
 
 /** FR-PLAN-014: the user's message a Retry request repeats, or null when it repeats none. */
@@ -343,10 +354,11 @@ export const ROADMAP_REQUEST_START = "The specs are written in";
 export function roadmapRequest(docsFolder: string, specNames: readonly string[]): string {
   return [
     `${ROADMAP_REQUEST_START} ${docsFolder}. The specs are: ${specNames.join(", ") || "none"}.`,
-    "Don't ask again what the brief already answers. Call plan_propose now with a NEW roadmap for the first release:",
+    "Don't ask again what the brief already answers, and don't ask the user anything now: luseen saves the roadmap you propose without asking. Call plan_propose now with a NEW roadmap for the first release:",
     "its first milestone is Foundation (scaffold, lint, tests and a runnable app shell), then one milestone per feature area, smallest first, with small tasks.",
     "Every task names its spec from the list above.",
     `The proposal's shape: ${proposalShape({ kind: "new-project" })}`,
+    IN_CHAT_RULE,
   ].join("\n");
 }
 
@@ -460,6 +472,29 @@ const projectStateSchema = z.strictObject({
 export type ProjectState = z.infer<typeof projectStateSchema>;
 
 export type AttachmentKind = "image" | "document";
+
+const initEventSchema = z.object({
+  type: z.literal("system"),
+  subtype: z.literal("init"),
+  tools: z.array(z.string()).default([]),
+  mcp_servers: z.array(z.object({ name: z.string(), status: z.string() })).default([]),
+});
+
+/**
+ * FR-PLAN-058: why a PM turn can't go on, from its `init` stream event: luseen's server isn't connected, or a planning
+ * tool the turn needs isn't offered. Undefined when it can, and for any other event.
+ */
+export function planningToolsProblem(event: unknown, needed: readonly string[]): string | undefined {
+  const parsed = initEventSchema.safeParse(event);
+  if (!parsed.success) return undefined;
+  const lead = "The PM can't reach luseen's planning tools:";
+  const server = parsed.data.mcp_servers.find((item) => item.name === MCP_SERVER_NAME);
+  if (server === undefined) return `${lead} the ${MCP_SERVER_NAME} server isn't running.`;
+  if (server.status !== "connected") return `${lead} the ${MCP_SERVER_NAME} server is ${server.status}.`;
+  const missing = needed.filter((tool) => !parsed.data.tools.includes(`mcp__${MCP_SERVER_NAME}__${tool}`));
+  if (missing.length === 0) return undefined;
+  return `${lead} ${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} missing.`;
+}
 
 /** FR-PLAN-022: an image or a document, by its extension. */
 export function attachmentKind(name: string): AttachmentKind | undefined {

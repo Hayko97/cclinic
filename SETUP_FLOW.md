@@ -39,7 +39,7 @@ flowchart TD
 | A working codebase, small or large             | B    | `luseen --dry-run`, then `luseen`               |
 | You only use Claude Code and want no CLI       | C    | `/plugin install …`, `/luseen:init`             |
 
-> **An empty folder starts with the PM.** luseen writes specs from what it reads, and an empty folder has nothing to read. So in an empty folder, `luseen` in a terminal, `luseen plan` and the GUI's **Start a new project** start a new-project session instead: the PM interviews you and reads the files you attach, writes the brief as `README.md` once you approve it, and luseen then writes the specs, sets up your coding agents, and has the PM propose the first roadmap. A project with screens also gets a draft design system to approve. In a script (`--yes`, `--json` or no terminal), `luseen` stops with exit code 2 and says so. You can still write the brief yourself first, as below.
+> **An empty folder starts with the PM.** luseen writes specs from what it reads, and an empty folder has nothing to read. So in an empty folder, `luseen` in a terminal, `luseen plan` and the GUI's **Start a new project** start a new-project session instead: the PM interviews you and reads the files you attach, writes the brief as `README.md`. Approving the brief is the only click: luseen then writes the specs, sets up your coding agents, saves the first roadmap the PM proposes, and makes the design system for a project with screens. In a script (`--yes`, `--json` or no terminal), `luseen` stops with exit code 2 and says so. You can still write the brief yourself first, as below.
 
 ---
 
@@ -527,20 +527,20 @@ flowchart TD
     DSN --> Done([Done. Exit 0])
 ```
 
-| Step        | What happens                                                                                              | Spec                                                                                                                       |
-| ----------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Check path  | Must be a folder. Home folder or `/` is refused unless `--allow-broad-target`.                            | [cli-commands](.luseen/sdd/specs/cli-commands/spec.md)                                                                     |
-| Pick model  | Option → env var → saved default → built-in (Sonnet, medium).                                             | [model-selection](.luseen/sdd/specs/model-selection/spec.md)                                                               |
-| Find Claude | Claude CLI if logged in, else `ANTHROPIC_API_KEY`, else exit 3.                                           | [llm-providers](.luseen/sdd/specs/llm-providers/spec.md)                                                                   |
-| Check Git   | Only looks. Never commits, stages or pushes.                                                              | [git-setup](.luseen/sdd/specs/git-setup/spec.md)                                                                           |
-| Scan        | Finds the project's own files. Every skipped file gets a reason.                                          | [file-discovery](.luseen/sdd/specs/file-discovery/spec.md)                                                                 |
-| Read        | Text from code, PDF, DOCX with line/page positions.                                                       | [content-extraction](.luseen/sdd/specs/content-extraction/spec.md)                                                         |
-| Confirm     | Shows a summary, then asks. No terminal and no `--yes` → exit 2.                                          | [cli-commands](.luseen/sdd/specs/cli-commands/spec.md)                                                                     |
-| Ask Claude  | The 3 LLM stages, below.                                                                                  | [spec-analysis](.luseen/sdd/specs/spec-analysis/spec.md)                                                                   |
-| Write       | Validate first, then write all at once.                                                                   | [spec-output](.luseen/sdd/specs/spec-output/spec.md)                                                                       |
-| Skills      | Ten skills, the `designer` agent, workflow sections, the `luseen mcp` entry and the session hook. No LLM. | [agent-skills](.luseen/sdd/specs/agent-skills/spec.md), [agent-instructions](.luseen/sdd/specs/agent-instructions/spec.md) |
-| Environment | Claude sets up `environment.json` with the `local-env` skill, only if you agree.                          | [local-environment](.luseen/sdd/specs/local-environment/spec.md)                                                           |
-| Design      | Claude writes a design system to `.luseen/design/`, only if you agree.                                    | [ui-design](.luseen/sdd/specs/ui-design/spec.md)                                                                           |
+| Step        | What happens                                                                                                        | Spec                                                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Check path  | Must be a folder. Home folder or `/` is refused unless `--allow-broad-target`.                                      | [cli-commands](.luseen/sdd/specs/cli-commands/spec.md)                                                                     |
+| Pick model  | Option → env var → saved default → built-in (Sonnet, medium).                                                       | [model-selection](.luseen/sdd/specs/model-selection/spec.md)                                                               |
+| Find Claude | Claude CLI if logged in, else `ANTHROPIC_API_KEY`, else exit 3.                                                     | [llm-providers](.luseen/sdd/specs/llm-providers/spec.md)                                                                   |
+| Check Git   | Only looks. Never commits, stages or pushes.                                                                        | [git-setup](.luseen/sdd/specs/git-setup/spec.md)                                                                           |
+| Scan        | Finds the project's own files. Every skipped file gets a reason.                                                    | [file-discovery](.luseen/sdd/specs/file-discovery/spec.md)                                                                 |
+| Read        | Text from code, PDF, DOCX with line/page positions.                                                                 | [content-extraction](.luseen/sdd/specs/content-extraction/spec.md)                                                         |
+| Confirm     | Shows a summary, then asks. No terminal and no `--yes` → exit 2.                                                    | [cli-commands](.luseen/sdd/specs/cli-commands/spec.md)                                                                     |
+| Ask Claude  | The 3 LLM stages, below.                                                                                            | [spec-analysis](.luseen/sdd/specs/spec-analysis/spec.md)                                                                   |
+| Write       | Validate first, then write all at once.                                                                             | [spec-output](.luseen/sdd/specs/spec-output/spec.md)                                                                       |
+| Skills      | Ten skills, the `pm` and `designer` agents, workflow sections, the `luseen mcp` entry and the session hook. No LLM. | [agent-skills](.luseen/sdd/specs/agent-skills/spec.md), [agent-instructions](.luseen/sdd/specs/agent-instructions/spec.md) |
+| Environment | Claude sets up `environment.json` with the `local-env` skill, only if you agree.                                    | [local-environment](.luseen/sdd/specs/local-environment/spec.md)                                                           |
+| Design      | Claude writes a design system to `.luseen/design/`, only if you agree.                                              | [ui-design](.luseen/sdd/specs/ui-design/spec.md)                                                                           |
 
 ### 9.3 What Claude does (the 3 LLM stages)
 
@@ -578,7 +578,7 @@ flowchart TD
     Root --> MC[.mcp.json<br/>runs npx luseen mcp]
     Root --> CS[.claude/settings.json<br/>hook: luseen session-link]
     Root --> Ag[.agents/skills/*/SKILL.md]
-    Root --> Cl[.claude/skills/*/SKILL.md<br/>.claude/agents/designer.md]
+    Root --> Cl[.claude/skills/*/SKILL.md<br/>.claude/agents/pm.md, designer.md]
     Root --> CC[.luseen/]
     CC --> SDD[sdd/]
     SDD --> R[README.md, overview.md,<br/>stack.md, architecture.md,<br/>developer-guidelines.md,<br/>open-questions.md, scan-report.md,<br/>manifest.json]

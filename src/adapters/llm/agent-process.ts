@@ -86,10 +86,12 @@ export function buildAgentArgs(
     "--permission-mode",
     "dontAsk",
     ...session,
-    ...(input.mcpConfig === undefined ? [] : ["--mcp-config", JSON.stringify(input.mcpConfig), "--strict-mcp-config"]),
-    // Keeps the login, and stops the project's own hooks and settings from running. No dollar limit is passed: the
-    // plan's own usage limits stop the work (FR-AUTO-025).
-    "--safe-mode",
+    // Both keep the login and stop the user's and the project's hooks, plugins and settings. Safe mode also turns off
+    // the servers given with --mcp-config, so a run with one loads no setting sources instead (FR-PLAN-005). No dollar
+    // limit is passed: the plan's own usage limits stop the work (FR-AUTO-025).
+    ...(input.mcpConfig === undefined
+      ? ["--safe-mode"]
+      : ["--mcp-config", JSON.stringify(input.mcpConfig), "--strict-mcp-config", "--setting-sources", ""]),
   ];
 }
 

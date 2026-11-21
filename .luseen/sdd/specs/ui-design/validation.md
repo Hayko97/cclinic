@@ -26,4 +26,4 @@ Acceptance criteria from the user's point of view.
 | VAL-DSGN-021 | FR-DSGN-040, FR-DSGN-042 | A failed or interrupted first try doesn't get in my way | After a failed first run, or with only system files such as `.DS_Store` in the design folder, the next run creates the design system without needing `--force` |
 | VAL-DSGN-022 | FR-DSGN-041 | I'm not shown an error when there's simply no UI | When Claude finds no screens to design for, I'm told the project has no user interface, and the command succeeds |
 | VAL-DSGN-020 | FR-DSGN-038, FR-DSGN-039 | I can hand design work to a specialist agent | Claude Code offers a `designer` agent, from the plugin or from my project, and my own edits to it are kept |
-| VAL-DSGN-023 | FR-DSGN-043, FR-DSGN-044 | A new project with screens gets a design system during setup | After I approve the roadmap, a draft design system is made without another question, and I can approve it with one click |
+| VAL-DSGN-023 | FR-DSGN-043, FR-DSGN-044 | A new project with screens gets a design system during setup | After I approve the brief, a design system is made and approved during setup without another question or click |

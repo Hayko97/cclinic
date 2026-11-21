@@ -3,7 +3,6 @@
  * it runs the `luseen` package at its own version, and its skills are the ones `luseen skills` installs.
  */
 import { z } from "zod";
-import { PM_TOOLS } from "./constants/agents.js";
 import { DESIGNER_AGENT_NAME } from "./constants/design.js";
 import { PRODUCT_NAME, SKILL_FILE } from "./constants/paths.js";
 import {
@@ -20,11 +19,17 @@ import {
   PACKAGE_RUNNER,
   PACKAGE_RUNNER_YES_FLAG,
   PM_AGENT_NAME,
-  PM_AGENT_PLAN_TOOL_NAMES,
 } from "./constants/plugin.js";
 import { JSON_INDENT } from "./constants/terminal.js";
 import { CLAUDE_SETTINGS_FILE, MCP_CONFIG_FILE, MCP_SERVER_NAME } from "./constants/workflow.js";
-import { AGENT_SKILLS, renderDesignerAgent, renderSkill, withoutStamp, type AgentSkill } from "./agent-skills.js";
+import {
+  AGENT_SKILLS,
+  renderDesignerAgent,
+  renderPmAgent,
+  renderSkill,
+  withoutStamp,
+  type AgentSkill,
+} from "./agent-skills.js";
 
 export const packageInfoSchema = z.object({
   version: z.string().min(1),
@@ -117,20 +122,6 @@ description: ${JSON.stringify(skill.description)}
 ${skill.body.replaceAll("{{RUN}}", pinnedRun(info).join(" "))}`;
 }
 
-/** FR-PLUG-011: the PM as an agent with the `product-engineer` instructions, that can't edit files or run commands. Its planning tools are the project server's, which `/luseen:init` adds. */
-function renderPmAgent(): string {
-  const productEngineer = AGENT_SKILLS.find((skill) => skill.name === "product-engineer");
-  if (productEngineer === undefined) throw new Error("The product-engineer skill is missing.");
-  const tools = [...PM_TOOLS, ...PM_AGENT_PLAN_TOOL_NAMES.map((name) => `mcp__${MCP_SERVER_NAME}__${name}`)];
-  return `---
-name: ${PM_AGENT_NAME}
-description: ${JSON.stringify(`${PRODUCT_NAME}'s PM. ${productEngineer.description}`)}
-tools: ${tools.join(", ")}
----
-
-${productEngineer.body.replaceAll("{{DOCS}}", PLUGIN_DOCS_PATH)}`;
-}
-
 /** The plugin's copies need no edit detection, so they carry no hash (FR-PLUG-016). */
 const NO_HASH = (): string => "";
 
@@ -171,7 +162,7 @@ export function renderClaudePlugin(info: PackageInfo): ReadonlyMap<string, strin
     );
   for (const skill of PLUGIN_SKILLS)
     add(`${PLUGIN_SKILLS_FOLDER}/${skill.name}/${SKILL_FILE}`, renderPluginSkill(skill, info));
-  add(`${PLUGIN_AGENTS_FOLDER}/${PM_AGENT_NAME}.md`, renderPmAgent());
+  add(`${PLUGIN_AGENTS_FOLDER}/${PM_AGENT_NAME}.md`, withoutStamp(renderPmAgent(PLUGIN_DOCS_PATH, NO_HASH)));
   add(
     `${PLUGIN_AGENTS_FOLDER}/${DESIGNER_AGENT_NAME}.md`,
     withoutStamp(renderDesignerAgent(PLUGIN_DOCS_PATH, NO_HASH)),

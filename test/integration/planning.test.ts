@@ -291,8 +291,9 @@ describe("luseen plan: the PM's Claude session", () => {
         for (const forbidden of ["Write", "Edit", "Bash", "--no-session-persistence"])
           expect(call.args).not.toContain(forbidden);
         expect(call.args).toEqual(
-          expect.arrayContaining(["--permission-mode", "dontAsk", "--safe-mode", "--strict-mcp-config"]),
+          expect.arrayContaining(["--permission-mode", "dontAsk", "--setting-sources", "", "--strict-mcp-config"]),
         );
+        expect(call.args).not.toContain("--safe-mode");
         const config = JSON.parse(call.args[call.args.indexOf("--mcp-config") + 1] ?? "{}") as {
           mcpServers: { luseen: { args: string[] } };
         };
@@ -401,6 +402,25 @@ describe("luseen plan: the PM's Claude session", () => {
       const store = openStore(second);
       expect(store.listRoadmaps()).toHaveLength(1);
       store.close();
+    },
+    SLOW,
+  );
+
+  it(
+    "TC-PLAN-092: in the terminal, a turn without luseen's planning tools stops before the PM replies, and keeps the session",
+    async () => {
+      for (const rule of [{ mcpStatus: "failed" }, { hiddenTools: ["plan_propose"] }]) {
+        const root = project();
+        const harness = agentHarness({ rules: [{ ...says("I can't save it. Run luseen plan."), ...rule }] });
+        typing("A portal");
+        const error = await plan(root, harness, { roadmap: 1 }).catch((caught: unknown) => caught);
+        expect(error).toBeInstanceOf(AgentSessionError);
+        expect((error as Error).message).toContain("The PM can't reach luseen's planning tools");
+        expect(harness.output.err).not.toContain("PM › I can't save it.");
+        const session = await only(root);
+        expect(session.status).toBe("open");
+        expect((error as Error).message).toContain(`luseen plan --resume ${session.id}`);
+      }
     },
     SLOW,
   );
@@ -910,7 +930,7 @@ describe("luseen plan: stopping and resuming", () => {
 
       typing("/cancel");
       await plan(root, resumed, { resume: "plan-2" });
-      expect(resumed.calls()[0]?.prompt).toBe("Your last turn was stopped. Answer my last message.");
+      expect(resumed.calls()[0]?.prompt).toBe(answerLastMessage(null));
       await expect(plan(root, resumed, { resume: "plan-1" })).rejects.toThrow("no open planning session plan-1");
       await expect(plan(root, resumed, { resume: "plan-9" })).rejects.toThrow("no open planning session plan-9");
       await expect(plan(project(), resumed, { resume: true })).rejects.toThrow(

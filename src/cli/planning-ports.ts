@@ -18,17 +18,19 @@ import {
   BRIEF_TOOL_NAME,
   PLAN_DRIVEN_TOOL_NAMES,
   PLAN_LIMITS,
+  PLAN_TURN_TOOL_NAMES,
   PM_TOOLS,
 } from "../core/constants/agents.js";
 import { parseTranscriptLine, type TranscriptEntry } from "../core/canvas.js";
 import { MS_PER_MINUTE } from "../core/constants/limits.js";
 import { DOCUMENT_FILES } from "../core/constants/paths.js";
 import { MCP_SERVER_NAME } from "../core/constants/workflow.js";
-import { AgentCallError, AgentSessionError, LlmError, UsageError } from "../core/errors.js";
+import { AgentCallError, AgentSessionError, LlmError, PlanningToolsError, UsageError } from "../core/errors.js";
 import type { Effort, ModelChoice } from "../core/models.js";
 import {
   isTurnAnswered,
   isWaitingMessageWritten,
+  planningToolsProblem,
   resumeCommands,
   toRoadmapPlan,
   type PlanSession,
@@ -168,12 +170,21 @@ export function transcriptChecks(): Pick<TurnPorts, "isStarted" | "isAnswered" |
   };
 }
 
+/** FR-PLAN-058: the planning tools a turn can't go without. */
+function neededPlanningTools(session: PlanSession): string[] {
+  return [...PLAN_TURN_TOOL_NAMES, ...(session.project?.phase === "brief" ? [BRIEF_TOOL_NAME] : [])];
+}
+
 /** FR-PLAN-005, FR-PLAN-015: one PM turn in the session's own Claude session. */
 export function turnPorts(settings: PmSettings, records: PlanStore, context: CommandContext): TurnPorts {
   return {
     records,
     ...transcriptChecks(),
     callPm: async (call) => {
+      // FR-PLAN-058: a turn without its planning tools is stopped before the PM replies.
+      const toolsCheck = new AbortController();
+      let toolsProblem: string | undefined;
+      const needed = neededPlanningTools(call.session);
       try {
         const result = await runAgent({
           ...pmCallOptions(settings, call),
@@ -181,12 +192,23 @@ export function turnPorts(settings: PmSettings, records: PlanStore, context: Com
           onLimits: (limits) => {
             savePlanLimits(context.environment, limits).catch(() => undefined);
           },
-          ...(settings.onEvent === undefined ? {} : { onEvent: settings.onEvent }),
+          onEvent: (event) => {
+            toolsProblem ??= planningToolsProblem(event, needed);
+            if (toolsProblem !== undefined) {
+              toolsCheck.abort();
+              return;
+            }
+            settings.onEvent?.(event);
+          },
           environment: context.environment,
-          signal: context.signal,
+          signal: AbortSignal.any([context.signal, toolsCheck.signal]),
         });
+        // A turn that ended before it could be stopped still didn't have its tools.
+        if (toolsProblem !== undefined) throw new PlanningToolsError(toolsProblem);
         return result.finalMessage;
       } catch (error) {
+        if (error instanceof PlanningToolsError) throw error;
+        if (toolsProblem !== undefined) throw new PlanningToolsError(toolsProblem, { cause: error });
         const resume = `Continue later with: ${resumeCommands(call.session).join("  or  ")}`;
         if (error instanceof AgentCallError && error.isUsageLimit) {
           const resets = error.resetsAt === null ? "" : ` It resets ${error.resetsAt}.`;

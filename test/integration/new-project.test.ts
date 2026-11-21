@@ -329,23 +329,28 @@ describe("a new project in the terminal", () => {
   );
 
   it(
-    "TC-PLAN-087: a failed design step offers retry or skip; skipping finishes the setup with no design system",
+    "TC-PLAN-087: a failed design step offers retry or continue without design; continuing finishes the setup with no design system",
     async () => {
       const root = emptyProject();
       const harness = agentHarness({ rules: RULES, env: { FAKE_CLAUDE_FALLBACK: "1", FAKE_CLAUDE_DESIGN: "fail" } });
-      typing("A booking app for a clinic", "/approve", "/approve");
+      typing("A booking app for a clinic", "/approve");
       selectMock.mockResolvedValueOnce("retry").mockResolvedValueOnce("skip");
       await plan(root, harness);
       const asked = selectMock.mock.calls.map((call) => (call[0] as { message: string }).message);
       expect(asked).toEqual([
-        "Drafting the design system didn't finish. What now?",
-        "Drafting the design system didn't finish. What now?",
+        "Making the design system didn't finish. What now?",
+        "Making the design system didn't finish. What now?",
       ]);
-      const choices = selectMock.mock.calls[0]?.[0].choices as readonly { value: string }[];
+      const choices = selectMock.mock.calls[0]?.[0].choices as readonly { value: string; name: string }[];
       expect(choices.map((choice) => choice.value)).toEqual(["retry", "skip", "later"]);
+      expect(choices.find((choice) => choice.value === "skip")?.name).toBe("Continue without design");
       expect(existsSync(path.join(root, ".luseen/design"))).toBe(false);
       expect(await onlySession(root)).toMatchObject({ status: "approved", project: { phase: "done" } });
-      expect(harness.output.out + harness.output.err).not.toContain("The design system in .luseen/design/");
+      const said = harness.output.out + harness.output.err;
+      expect(said).toContain("Continued without a design system.");
+      expect(said).not.toContain(
+        "The design system: .luseen/design/design-system.md and .luseen/design/style-guide.html",
+      );
     },
     SLOW,
   );

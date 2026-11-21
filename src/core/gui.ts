@@ -260,7 +260,7 @@ const ROUTES: readonly {
   { method: "POST", pattern: /^\/api\/plan\/retry$/, route: () => ({ name: "plan-retry" }) },
   { method: "POST", pattern: /^\/api\/plan\/approve$/, route: () => ({ name: "plan-approve" }) },
   { method: "POST", pattern: /^\/api\/plan\/cancel$/, route: () => ({ name: "plan-cancel" }) },
-  // FR-GUI-089: a new project's design system, approved or skipped, and its style guide to look at.
+  // FR-GUI-089: after a failed design step, a new project continues without a design system; and its style guide.
   { method: "POST", pattern: /^\/api\/plan\/design$/, route: () => ({ name: "plan-design" }) },
   { method: "GET", pattern: /^\/api\/design\/style-guide$/, route: () => ({ name: "style-guide" }) },
   // FR-PLAN-037: an image a session's message has, by its stored file name, for its thumbnail.
@@ -419,8 +419,8 @@ const planIdBodySchema = z.string().regex(PLAN_ID_PATTERN, "That isn't a plannin
 export const planOpenSchema = z.strictObject({ planId: planIdBodySchema, ...planOptionsShape });
 /** FR-PLAN-039, FR-PLAN-045: a session whose proposal is approved or cancelled, from the panel or Needs you. */
 export const planDecisionSchema = z.strictObject({ planId: planIdBodySchema });
-/** FR-GUI-089: a new project's draft design system, approved or skipped. */
-export const planDesignSchema = z.strictObject({ planId: planIdBodySchema, isApproved: z.boolean() });
+/** FR-GUI-089: a new project that continues without a design system, after its design step failed. */
+export const planDesignSchema = z.strictObject({ planId: planIdBodySchema });
 
 /** FR-PLAN-033: one uploaded file, as base64. Its type and size are checked once decoded (FR-PLAN-022). */
 export const planUploadSchema = z.strictObject({

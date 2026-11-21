@@ -1,11 +1,12 @@
 /// <reference lib="dom" />
 /** QA: a new project's design step, style guide and refusals in the GUI (gui FR-GUI-085 to FR-GUI-090). */
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import path from "node:path";
 import { chromium, type Browser, type Page } from "@playwright/test";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { openPlanStore } from "../../src/adapters/storage/plan-store.js";
+import { openTaskStore } from "../../src/adapters/storage/task-store.js";
 import type { PlanPanelView } from "../../src/application/gui-planning.js";
 import { newPlanSession, type RoadmapProposal } from "../../src/core/planning.js";
 import { agentHarness, makeTempFolder, type FakeClaudeRule } from "../support/helpers.js";
@@ -76,6 +77,15 @@ function emptyProject(): string {
   return root;
 }
 
+function roadmapTitles(root: string): string[] {
+  const store = openTaskStore(path.join(root, ".luseen"), "read");
+  try {
+    return store?.listRoadmaps().map((roadmap) => roadmap.title) ?? [];
+  } finally {
+    store?.close();
+  }
+}
+
 function every(ms: number, run: () => Promise<void>): () => void {
   const timer = setInterval(() => void run(), Math.min(ms, 200));
   return () => {
@@ -83,8 +93,14 @@ function every(ms: number, run: () => Promise<void>): () => void {
   };
 }
 
-async function startGui(root: string, env: Record<string, string> = {}) {
-  const harness = agentHarness({ rules: RULES, env: { FAKE_CLAUDE_FALLBACK: "1", ...env } });
+/** The PM's roadmap turn ends without proposing anything, so nothing is saved (FR-PLAN-053). */
+const NO_ROADMAP_RULES: FakeClaudeRule[] = [
+  { match: "The specs are written in", message: "I'll think about the roadmap." },
+  ...RULES.slice(1),
+];
+
+async function startGui(root: string, env: Record<string, string> = {}, rules: FakeClaudeRule[] = RULES) {
+  const harness = agentHarness({ rules, env: { FAKE_CLAUDE_FALLBACK: "1", ...env } });
   const gui = await startTestGui(root, {}, { every }, harness.environment);
   running.push(gui);
   return gui;
@@ -101,7 +117,10 @@ async function openPage(gui: TestGui): Promise<Page> {
   return page;
 }
 
-/** Through the API: the brief, the specs and the roadmap approved, so the session is at its design. */
+/**
+ * Through the API: the brief approved, the only approval, so the setup writes the specs, saves the roadmap and runs
+ * the design step by itself (FR-PLAN-061). Waits until the design step has ended: done, or failed at its design.
+ */
 async function toDesign(gui: TestGui, page?: Page): Promise<string> {
   if (page === undefined) await post(gui, "/api/plan", { target: { kind: "new-project" }, text: "A booking app" });
   else {
@@ -120,14 +139,11 @@ async function toDesign(gui: TestGui, page?: Page): Promise<string> {
   expect((await post(gui, "/api/plan/approve", { planId })).status).toBe(200);
   await vi.waitFor(async () => {
     const view = await viewOf(gui);
-    if (view.open?.proposal?.kind !== "roadmap" || view.turn !== null) throw new Error("no roadmap yet");
-  }, WAIT);
-  expect((await post(gui, "/api/plan/approve", { planId })).status).toBe(200);
-  await vi.waitFor(async () => {
-    const view = await viewOf(gui);
-    // With no design system made, the setup ends instead of waiting at its design (FR-PLAN-054).
+    // The setup ends, or waits at its design after a failed design step (FR-PLAN-054).
     const phase = view.open?.project?.phase;
-    if ((phase !== "design" && phase !== "done") || view.step !== null) throw new Error("design step running");
+    if ((phase !== "design" && phase !== "done") || view.step !== null || view.turn !== null) {
+      throw new Error("setup running");
+    }
   }, WAIT);
   return planId;
 }
@@ -155,8 +171,14 @@ describe("QA: the GUI's new project", () => {
       const gui = await startGui(root);
       const page = await openPage(gui);
       await toDesign(gui, page);
-      const card = page.locator('[aria-label="Design system"]');
+      // FR-GUI-089: the design system is approved with no click, so there's no Approve or Skip.
+      const card = page.locator('[aria-label="Project set up"]');
       await card.waitFor(WAIT);
+      expect(await page.locator("[data-plan-design]").count()).toBe(0);
+      expect(readFileSync(path.join(root, ".luseen/design/design-system.md"), "utf8")).toContain(
+        "## Status\n\napproved",
+      );
+      expect((await viewOf(gui)).open?.project?.phase).toBe("done");
       const [tab] = await Promise.all([
         page.context().waitForEvent("page"),
         card.locator('a[href="/api/design/style-guide"]').click(),
@@ -175,9 +197,7 @@ describe("QA: the GUI's new project", () => {
       // A new project's own jobs can't be started from Setup.
       const job = await post(gui, "/api/jobs", { command: "project-specs" });
       expect(job.status).toBe(400);
-      // FR-GUI-090: once approved, the canvas banner names the first task, with a copy button.
-      await card.locator('[data-plan-design="approve"]').click();
-      await page.locator('[aria-label="Project set up"]').waitFor(WAIT);
+      // FR-GUI-090: once set up, the canvas banner names the first task, with a copy button.
       await page.goto(`http://127.0.0.1:${gui.port}/?token=${gui.token}`);
       const banner = page.locator("#next-step");
       await expect.poll(() => banner.innerText(), WAIT).toContain('"work on task 1"');
@@ -187,7 +207,7 @@ describe("QA: the GUI's new project", () => {
   );
 
   it(
-    "TC-GUI-140 (QA): approve design before the design phase is refused",
+    "TC-GUI-140 (QA): continue without design before the design phase is refused, and the old approve flag is rejected",
     async () => {
       const root = emptyProject();
       const gui = await startGui(root);
@@ -200,8 +220,10 @@ describe("QA: the GUI's new project", () => {
         }
       }, WAIT);
       const planId = String((await viewOf(gui)).open?.id);
-      const early = await post(gui, "/api/plan/design", { planId, isApproved: true });
+      const early = await post(gui, "/api/plan/design", { planId });
       expect(early.status).toBe(409);
+      // FR-GUI-089: the design system can't be approved by hand any more, so the route takes only the session.
+      expect((await post(gui, "/api/plan/design", { planId, isApproved: true })).status).toBe(400);
       expect((await viewOf(gui)).open?.project?.phase).toBe("brief");
     },
     SLOW,
@@ -234,7 +256,7 @@ describe("QA: the GUI's new project", () => {
   );
 
   it(
-    "TC-GUI-139/FR-GUI-089 (QA): a failed design step shows its message with Retry and Skip, and Skip finishes",
+    "TC-GUI-139/FR-GUI-089 (QA): a failed design step shows its message with Retry and Continue without design, which finishes",
     async () => {
       const root = emptyProject();
       const gui = await startGui(root, { FAKE_CLAUDE_DESIGN: "fail" });
@@ -246,9 +268,18 @@ describe("QA: the GUI's new project", () => {
       await page.locator(".plan-error").first().waitFor(WAIT);
       const panel = await page.locator("#plan-panel").innerText();
       expect(panel).toContain("Retry");
-      // FR-GUI-089: "A failure must show the message with Retry and Skip."
-      expect(await page.locator('[data-plan-design="skip"]').count()).toBeGreaterThan(0);
-      expect((await post(gui, "/api/plan/design", { planId, isApproved: false })).status).toBe(200);
+      // FR-GUI-089: "A failure must show the message with Retry and Continue without design."
+      const skip = page.locator('[data-plan-design="skip"]');
+      await skip.first().waitFor(WAIT);
+      expect(await skip.first().innerText()).toBe("Continue without design");
+      expect(await page.locator('[data-plan-design="approve"]').count()).toBe(0);
+      // FR-PLAN-053: the roadmap was saved with no approval asked, shown with no Approve or Cancel.
+      const saved = page.locator('[aria-label="Roadmap saved"]');
+      await saved.waitFor(WAIT);
+      expect(await saved.locator("button").count()).toBe(0);
+      const continued = await post(gui, "/api/plan/design", { planId });
+      expect(continued.status).toBe(200);
+      expect(continued.body).toContain("Continued without a design system.");
       expect((await viewOf(gui)).open?.project?.phase).toBe("done");
     },
     SLOW,
@@ -269,8 +300,8 @@ describe("QA: the GUI's new project", () => {
       expect(await page.locator('[aria-label="Project set up"]').innerText()).not.toContain(".luseen/design");
       const card = page.locator('[aria-label="Design system"]');
       expect(await card.count()).toBe(0);
-      // And approving it is refused, as nothing passes the checks.
-      expect((await post(gui, "/api/plan/design", { planId, isApproved: true })).status).toBe(409);
+      // And continuing without design is refused, as the setup is already done.
+      expect((await post(gui, "/api/plan/design", { planId })).status).toBe(409);
     },
     SLOW,
   );
@@ -278,7 +309,7 @@ describe("QA: the GUI's new project", () => {
 
 describe("QA run 2: the GUI's design card", () => {
   it(
-    "FR-GUI-089 (QA run 2, DEF-2): after a failed design step the card has Skip and no Approve, and clicking Skip finishes",
+    "FR-GUI-089 (QA run 2, DEF-2): after a failed design step the card has Continue without design and no Approve, and clicking it finishes",
     async () => {
       const root = emptyProject();
       const gui = await startGui(root, { FAKE_CLAUDE_DESIGN: "fail" });
@@ -288,9 +319,12 @@ describe("QA run 2: the GUI's design card", () => {
       const card = page.locator('[aria-label="Design system"]');
       await card.waitFor(WAIT);
       expect(await card.locator('[data-plan-design="approve"]').count()).toBe(0);
+      expect(await card.locator("button").allInnerTexts()).toEqual(["Continue without design"]);
       await card.locator('[data-plan-design="skip"]').click();
       await page.locator('[aria-label="Project set up"]').waitFor(WAIT);
       expect(await page.locator('[aria-label="Project set up"]').innerText()).not.toContain(".luseen/design");
+      // FR-GUI-089: the style guide link is offered only when a design system exists.
+      expect(await page.locator('[aria-label="Project set up"] a[href="/api/design/style-guide"]').count()).toBe(0);
       expect((await viewOf(gui)).open?.project?.phase ?? "done").toBe("done");
       expect(existsSync(path.join(root, ".luseen/design"))).toBe(false);
     },
@@ -298,16 +332,19 @@ describe("QA run 2: the GUI's design card", () => {
   );
 
   it(
-    "TC-PLAN-087/FR-GUI-089 (QA run 2, DEF-3): Skip on a waiting draft removes it, and the summary names no design system",
+    "TC-PLAN-087/FR-GUI-089 (QA run 2, DEF-3): a draft that fails the checks is removed, not approved; Continue without design names no design system",
     async () => {
       const root = emptyProject();
-      const gui = await startGui(root);
+      const gui = await startGui(root, { FAKE_CLAUDE_DESIGN: "invalid" });
       const page = await openPage(gui);
       await toDesign(gui, page);
-      expect(existsSync(path.join(root, ".luseen/design/design-system.md"))).toBe(true);
+      const view = await viewOf(gui);
+      expect(view.open?.project?.phase).toBe("design");
+      expect(view.notice?.action).toBe("retry");
+      expect(existsSync(path.join(root, ".luseen/design/design-system.md"))).toBe(false);
       const card = page.locator('[aria-label="Design system"]');
       await card.waitFor(WAIT);
-      expect(await card.locator('[data-plan-design="approve"]').count()).toBe(1);
+      expect(await card.locator('[data-plan-design="approve"]').count()).toBe(0);
       await card.locator('[data-plan-design="skip"]').click();
       const done = page.locator('[aria-label="Project set up"]');
       await done.waitFor(WAIT);
@@ -351,7 +388,8 @@ describe("QA run 3: the GUI's new project after the code review", () => {
     "FR-PLAN-056/FR-GUI-088 (QA run 3): Cancel is refused while the specs are written, and works once the step ends",
     async () => {
       const root = emptyProject();
-      const gui = await startGui(root, { FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_DELAY_MS: "4000" });
+      // The PM's roadmap turn proposes nothing, so the session waits at its roadmap with nothing saved.
+      const gui = await startGui(root, { FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_DELAY_MS: "4000" }, NO_ROADMAP_RULES);
       await post(gui, "/api/plan", { target: { kind: "new-project" }, text: "A booking app" });
       await vi.waitFor(async () => {
         const view = await viewOf(gui);
@@ -367,13 +405,19 @@ describe("QA run 3: the GUI's new project after the code review", () => {
 
       await vi.waitFor(async () => {
         const view = await viewOf(gui);
-        if (view.open?.proposal?.kind !== "roadmap" || view.turn !== null) throw new Error("no roadmap yet");
+        if (view.notice?.action !== "retry" || view.turn !== null) throw new Error("roadmap turn not ended yet");
       }, WAIT);
+      expect((await viewOf(gui)).notice?.message).toBe(
+        "The PM ended without proposing the roadmap, so nothing was saved. Retry asks it again.",
+      );
       expect(existsSync(path.join(root, ".luseen/sdd/README.md"))).toBe(true);
-      expect((await post(gui, "/api/plan/cancel", { planId })).status).toBe(200);
+      const cancelled = await post(gui, "/api/plan/cancel", { planId });
+      expect(cancelled.status).toBe(200);
+      expect(cancelled.body).toContain("Kept what was already written: README.md, .luseen/sdd and the agent setup");
       const [session] = (await openPlanStore(root).list()).sessions;
       expect(session).toMatchObject({ status: "cancelled", project: { phase: "roadmap" } });
       expect(existsSync(path.join(root, "README.md"))).toBe(true);
+      expect(roadmapTitles(root)).toEqual([]);
     },
     SLOW,
   );
@@ -422,6 +466,7 @@ describe("QA run 3: the GUI's new project after the code review", () => {
         await held;
         await route.continue();
       });
+      expect(await card.locator('[data-plan-decide="approve"]').innerText()).toBe("Approve and set up");
       await card.locator('[data-plan-decide="approve"]').click();
       expect(await card.locator('[data-plan-decide="approve"]').isDisabled()).toBe(true);
       expect(await card.locator('[data-plan-decide="cancel"]').isDisabled()).toBe(true);
@@ -458,27 +503,241 @@ describe("QA run 3: the GUI's new project after the code review", () => {
 
 describe("QA run 3: exploring the design card", () => {
   it(
-    "DEF-10 (QA run 3): approve and skip sent at once leave a state that matches the answer each got",
+    "DEF-10 (QA run 3): two Continue without design sent at once after a failed design step: one wins, and the files match",
+    async () => {
+      const root = emptyProject();
+      const gui = await startGui(root, { FAKE_CLAUDE_DESIGN: "fail" });
+      const planId = await toDesign(gui);
+      expect((await viewOf(gui)).open?.project?.phase).toBe("design");
+      const [first, second] = await Promise.all([
+        post(gui, "/api/plan/design", { planId }),
+        post(gui, "/api/plan/design", { planId }),
+      ]);
+      const statuses = [first.status, second.status].sort();
+      // Exactly one finishes the setup, the other is refused, and the state matches.
+      expect(statuses, JSON.stringify([first.body.slice(0, 200), second.body.slice(0, 200)])).toEqual([200, 409]);
+      expect(existsSync(path.join(root, ".luseen/design"))).toBe(false);
+      const [session] = (await openPlanStore(root).list()).sessions;
+      expect(session).toMatchObject({ status: "approved", project: { phase: "done" } });
+      expect(roadmapTitles(root)).toEqual(["First release"]);
+    },
+    SLOW,
+  );
+});
+
+describe("QA (FR-PLAN-053, FR-PLAN-058, FR-PLAN-060): edge cases of the GUI's new project", () => {
+  const approveBrief = async (gui: TestGui): Promise<string> => {
+    await vi.waitFor(async () => {
+      const view = await viewOf(gui);
+      if ((view.open?.project?.brief ?? null) === null || view.turn !== null) throw new Error("no brief yet");
+    }, WAIT);
+    const planId = String((await viewOf(gui)).open?.id);
+    expect((await post(gui, "/api/plan/approve", { planId })).status).toBe(200);
+    return planId;
+  };
+  const waitForRetry = (gui: TestGui) =>
+    vi.waitFor(async () => {
+      const view = await viewOf(gui);
+      if (view.notice?.action !== "retry" || view.turn !== null || view.step !== null) throw new Error("running");
+      return view;
+    }, WAIT);
+  const waitForDone = (gui: TestGui) =>
+    vi.waitFor(async () => {
+      const view = await viewOf(gui);
+      if (view.open?.project?.phase !== "done" || view.step !== null) throw new Error("setup running");
+    }, WAIT);
+
+  it(
+    "TC-PLAN-086 (QA): an invalid roadmap proposal saves nothing and shows Retry; Retry saves the next valid one and goes on",
+    async () => {
+      const root = emptyProject();
+      const invalid = { ...ROADMAP, milestones: [{ title: "Foundation", goal: "Shell", tasks: [{ key: "x" }] }] };
+      const gui = await startGui(root, { FAKE_CLAUDE_DESIGN: "none" }, [
+        {
+          match: "The specs are written in",
+          message: "Here it is.",
+          tools: [{ name: "plan_propose", input: { proposal: invalid } }],
+          times: 1,
+        },
+        ...RULES,
+      ]);
+      await post(gui, "/api/plan", { target: { kind: "new-project" }, text: "A booking app" });
+      await approveBrief(gui);
+      const failed = await waitForRetry(gui);
+      expect(failed.open?.project?.phase).toBe("roadmap");
+      expect(roadmapTitles(root)).toEqual([]);
+      expect((await post(gui, "/api/plan/retry")).status).toBe(200);
+      await waitForDone(gui);
+      expect(roadmapTitles(root)).toEqual(["First release"]);
+    },
+    SLOW,
+  );
+
+  it(
+    "TC-PLAN-092 (QA): a roadmap turn whose luseen server failed shows the problem with Retry; one Retry saves the roadmap",
+    async () => {
+      const root = emptyProject();
+      const gui = await startGui(root, { FAKE_CLAUDE_DESIGN: "none" }, [
+        { match: "The specs are written in", mcpStatus: "failed", message: "I can't.", times: 1 },
+        ...RULES,
+      ]);
+      await post(gui, "/api/plan", { target: { kind: "new-project" }, text: "A booking app" });
+      await approveBrief(gui);
+      const failed = await waitForRetry(gui);
+      expect(failed.notice?.message).toContain("The PM can't reach luseen's planning tools");
+      expect(failed.open?.project?.phase).toBe("roadmap");
+      expect((await post(gui, "/api/plan/retry")).status).toBe(200);
+      await waitForDone(gui);
+      expect(roadmapTitles(root)).toEqual(["First release"]);
+    },
+    SLOW,
+  );
+
+  it(
+    "TC-PLAN-094 (QA): a page reloaded before Claude writes the message shows it once, and once after the reply",
+    async () => {
+      const root = emptyProject();
+      const gui = await startGui(root, { FAKE_CLAUDE_STARTUP_MS: "5000" });
+      const page = await openPage(gui);
+      await page.locator("#new-project-start").click();
+      await page.locator("#plan-text").fill("A todo app");
+      await page.locator("#plan-text").press("Enter");
+      await vi.waitFor(async () => {
+        if ((await viewOf(gui)).open === null) throw new Error("not started");
+      }, WAIT);
+      await page.reload();
+      await page
+        .locator("#plan-panel")
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .catch(async () => {
+          await page.locator("#new-project-start").click();
+        });
+      const sent = page.locator(".plan-user", { hasText: "A todo app" });
+      await sent.first().waitFor({ timeout: 3000 });
+      expect(await sent.count()).toBe(1);
+      await page.locator('[aria-label="Brief"]').waitFor(WAIT);
+      expect(await sent.count()).toBe(1);
+    },
+    SLOW,
+  );
+
+  it(
+    "TC-PLAN-094 (QA): a second Enter while the first message is being sent starts nothing else, and keeps what was typed",
+    async () => {
+      const root = emptyProject();
+      const gui = await startGui(root, { FAKE_CLAUDE_STARTUP_MS: "3000", FAKE_CLAUDE_PREPARE_MS: "1500" });
+      const page = await openPage(gui);
+      await page.locator("#new-project-start").click();
+      await page.locator("#plan-text").fill("A todo app");
+      await page.locator("#plan-text").press("Enter");
+      await page.locator("#plan-text").press("Enter");
+      await page.locator("#plan-text").fill("And a calendar");
+      await page.locator("#plan-text").press("Enter");
+      await page.locator('[aria-label="Brief"]').waitFor(WAIT);
+      expect((await openPlanStore(root).list()).sessions.length).toBe(1);
+      expect(await page.locator(".plan-user", { hasText: "A todo app" }).count()).toBe(1);
+      expect(await page.locator(".plan-user", { hasText: "And a calendar" }).count()).toBe(0);
+      expect(await page.locator("#plan-text").inputValue()).toBe("And a calendar");
+    },
+    SLOW,
+  );
+
+  it(
+    "FR-PLAN-060, FR-PLAN-061 (QA): a message sent while the specs are written is refused and put back, and the setup goes on",
+    async () => {
+      const root = emptyProject();
+      const gui = await startGui(root, {
+        FAKE_CLAUDE_DESIGN: "none",
+        FAKE_CLAUDE_MODE: "slow",
+        FAKE_CLAUDE_DELAY_MS: "3000",
+      });
+      const page = await openPage(gui);
+      await page.locator("#new-project-start").click();
+      await page.locator("#plan-text").fill("A booking app");
+      await page.locator("#plan-text").press("Enter");
+      await page.locator('[aria-label="Brief"]').waitFor(WAIT);
+      await page.locator('[aria-label="Brief"]').getByRole("button", { name: "Approve and set up" }).click();
+      await vi.waitFor(async () => {
+        if ((await viewOf(gui)).step?.kind !== "specs") throw new Error("no specs step yet");
+      }, WAIT);
+      const refused = await post(gui, "/api/plan/message", { text: "Also payments", uploads: [] });
+      expect(refused.status).toBe(409);
+      await page.locator("#plan-text").fill("Also payments");
+      await page.locator("#plan-text").press("Enter");
+      await page.locator(".plan-error", { hasText: "luseen is still setting up the project" }).waitFor(WAIT);
+      expect(await page.locator("#plan-text").inputValue()).toBe("Also payments");
+      expect(await page.locator(".plan-user", { hasText: "Also payments" }).count()).toBe(0);
+      await waitForDone(gui);
+      expect(roadmapTitles(root)).toEqual(["First release"]);
+      await page.locator('[aria-label="Project set up"]').waitFor(WAIT);
+    },
+    SLOW,
+  );
+  it(
+    "FR-PLAN-056 (QA): cancelling during the roadmap turn saves no roadmap, runs no design step, and keeps what was written",
+    async () => {
+      const root = emptyProject();
+      const gui = await startGui(root, {}, [{ ...RULES[0], delayMs: 8000 }, ...RULES.slice(1)]);
+      await post(gui, "/api/plan", { target: { kind: "new-project" }, text: "A booking app" });
+      const planId = await approveBrief(gui);
+      await vi.waitFor(async () => {
+        const view = await viewOf(gui);
+        if (view.open?.project?.phase !== "roadmap" || view.turn === null) throw new Error("no roadmap turn yet");
+      }, WAIT);
+      const cancelled = await post(gui, "/api/plan/cancel", { planId });
+      expect(cancelled.status).toBe(200);
+      await new Promise((resolve) => setTimeout(resolve, 9000));
+      const [session] = (await openPlanStore(root).list()).sessions;
+      expect(session).toMatchObject({ status: "cancelled", project: { phase: "roadmap" } });
+      expect(roadmapTitles(root)).toEqual([]);
+      expect(existsSync(path.join(root, ".luseen/design"))).toBe(false);
+      expect(existsSync(path.join(root, "README.md"))).toBe(true);
+    },
+    SLOW,
+  );
+
+  it(
+    "FR-PLAN-048 (QA): a GUI restarted during the roadmap turn continues the setup at the roadmap when the session is opened",
+    async () => {
+      const root = emptyProject();
+      const first = await startGui(root, {}, [{ ...RULES[0], hang: true }, ...RULES.slice(1)]);
+      await post(first, "/api/plan", { target: { kind: "new-project" }, text: "A booking app" });
+      const planId = await approveBrief(first);
+      await vi.waitFor(async () => {
+        const view = await viewOf(first);
+        if (view.open?.project?.phase !== "roadmap" || view.turn === null) throw new Error("no roadmap turn yet");
+      }, WAIT);
+      await first.stop();
+      running.splice(running.indexOf(first), 1);
+
+      const second = await startGui(root, { FAKE_CLAUDE_DESIGN: "none" });
+      expect((await post(second, "/api/plan/open", { planId })).status).toBe(200);
+      await vi.waitFor(async () => {
+        const view = await viewOf(second);
+        if (view.open?.project?.phase === "done") return;
+        if (view.notice?.action === "retry" && view.turn === null && view.step === null) {
+          await post(second, "/api/plan/retry");
+        }
+        throw new Error("not done yet");
+      }, WAIT);
+      expect(roadmapTitles(root)).toEqual(["First release"]);
+      // README.md and the specs aren't written again.
+      expect(readFileSync(path.join(root, "README.md"), "utf8")).toBe(`${BRIEF}\n`);
+    },
+    SLOW,
+  );
+  it(
+    "TC-GUI-140 (QA): the approved design system is shown with the paths of design-system.md and style-guide.html",
     async () => {
       const root = emptyProject();
       const gui = await startGui(root);
-      const planId = await toDesign(gui);
-      expect(existsSync(path.join(root, ".luseen/design/design-system.md"))).toBe(true);
-      const [approved, skipped] = await Promise.all([
-        post(gui, "/api/plan/design", { planId, isApproved: true }),
-        post(gui, "/api/plan/design", { planId, isApproved: false }),
-      ]);
-      const hasDesign = existsSync(path.join(root, ".luseen/design/design-system.md"));
-      const statuses = [approved.status, skipped.status];
-      // Exactly one decision wins, and the files match it.
-      expect(
-        statuses.filter((status) => status === 200),
-        JSON.stringify([approved.body, skipped.body]),
-      ).toHaveLength(1);
-      expect(
-        hasDesign,
-        JSON.stringify([approved.status, approved.body.slice(0, 200), skipped.status, skipped.body.slice(0, 200)]),
-      ).toBe(approved.status === 200);
+      const page = await openPage(gui);
+      await toDesign(gui, page);
+      const summary = page.locator('[aria-label="Project set up"]');
+      await summary.waitFor(WAIT);
+      const shown = await page.locator("#plan-log").innerText();
+      expect(shown).toContain(".luseen/design/design-system.md");
+      expect(shown).toContain(".luseen/design/style-guide.html");
     },
     SLOW,
   );

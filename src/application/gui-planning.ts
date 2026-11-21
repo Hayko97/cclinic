@@ -5,7 +5,13 @@
  */
 import { PLAN_ATTACHMENTS_FOLDER, PLAN_LIMITS, PLANS_FOLDER } from "../core/constants/agents.js";
 import { PLAN_VIEW_POLL_MS, UPLOAD_ORPHAN_MS } from "../core/constants/gui.js";
-import { AgentSessionError, CancelledError, SessionClosedError, UsageError } from "../core/errors.js";
+import {
+  AgentSessionError,
+  CancelledError,
+  PlanningToolsError,
+  SessionClosedError,
+  UsageError,
+} from "../core/errors.js";
 import type { TranscriptLines, TranscriptLocation, TranscriptPosition } from "../core/canvas.js";
 import { parseTranscriptLine } from "../core/canvas.js";
 import {
@@ -44,8 +50,9 @@ import {
 import { redact } from "../core/redaction.js";
 import {
   approveBrief,
-  finishDesign,
+  continueWithoutDesign,
   projectSummary,
+  saveProjectRoadmap,
   takeRoadmapRequest,
   writeProjectDesign,
   writeProjectSpecs,
@@ -225,8 +232,8 @@ export interface Planner {
   /** Approves the waiting proposal, or a new project's waiting brief (FR-PLAN-051). */
   approve(planId: string): Promise<string>;
   cancel(planId: string): Promise<string>;
-  /** FR-GUI-089: approves or skips a new project's draft design system, which finishes its setup. */
-  finishDesign(planId: string, isApproved: boolean): Promise<string>;
+  /** FR-GUI-089: after a failed design step, finishes a new project's setup without a design system. */
+  continueWithoutDesign(planId: string): Promise<string>;
   /** `pageId` is the page that holds it, so a page counts only its own files (FR-PLAN-022). */
   upload(name: string, contentBase64: string, pageId: string): Promise<UploadView>;
   removeUpload(id: string): Promise<void>;
@@ -440,19 +447,24 @@ function createPlannerCore(ports: PlannerPorts): Planner {
     const run = async (): Promise<void> => {
       try {
         await runTurn(turns(controller.signal), id, message, count);
+        // FR-PLAN-061: a new project goes on by itself once the PM's turn ends, such as by saving its roadmap.
+        if ((await ports.records.read(id))?.project != null) await advanceProject(id);
       } catch (error) {
         if (error instanceof SessionClosedError) {
           // Approved or cancelled from another place while the PM worked: nothing to retry.
           notice = { message: messageOf(error), action: null };
         } else if (controller.signal.aborted || error instanceof CancelledError) {
           notice = { message: "Stopped. Nothing was saved, and the session is kept.", action: "retry" };
+        } else if (error instanceof PlanningToolsError) {
+          notice = { message: messageOf(error), action: "retry" };
         } else if (error instanceof AgentSessionError) {
           notice = { message: messageOf(error), action: "resume" };
         } else {
           notice = { message: messageOf(error), action: "retry" };
         }
       } finally {
-        turn = null;
+        // A new project's next turn may have started from this one (FR-PLAN-061); only this turn ends here.
+        if (turn?.controller === controller) turn = null;
         changed();
       }
     };
@@ -491,8 +503,9 @@ function createPlannerCore(ports: PlannerPorts): Planner {
   };
 
   /**
-   * FR-PLAN-048, FR-PLAN-052 to FR-PLAN-054: takes a new project on from where it is: its specs, then the request for
-   * its first roadmap, or its design step. Nothing happens at its brief, or while the PM waits for the user.
+   * FR-PLAN-048, FR-PLAN-052 to FR-PLAN-054, FR-PLAN-061: takes a new project on from where it is, with no approval
+   * asked: its specs, then the request for its first roadmap, the roadmap the PM proposed, and its design system.
+   * Nothing happens at its brief.
    */
   const advanceProject = async (id: string): Promise<void> => {
     const session = await ports.records.read(id);
@@ -508,8 +521,19 @@ function createPlannerCore(ports: PlannerPorts): Planner {
         await writeProjectSpecs(project, id);
         await askRoadmap();
       });
-    } else if (phase === "roadmap") {
+    } else if (phase === "roadmap" && session?.proposal === null && session.project?.isRoadmapAsked !== true) {
       await askRoadmap();
+    } else if (phase === "roadmap") {
+      // The PM's roadmap turn has ended: its proposal is saved, or Retry asks for it again.
+      try {
+        await saveProjectRoadmap(project, ports.decisions, id);
+      } catch (error) {
+        if (!(error instanceof AgentSessionError)) throw error;
+        notice = { message: messageOf(error), action: "retry" };
+        changed();
+        return;
+      }
+      await advanceProject(id);
     } else if (phase === "design") {
       runStep("design", async () => {
         await writeProjectDesign(project, id);
@@ -782,9 +806,9 @@ function createPlannerCore(ports: PlannerPorts): Planner {
       changed();
       return decided.message;
     },
-    finishDesign: async (planId, isApproved) => {
+    continueWithoutDesign: async (planId) => {
       if (planId === openId) requireIdle();
-      const message = await finishDesign(project, planId, isApproved);
+      const message = await continueWithoutDesign(project, planId);
       changed();
       return message;
     },

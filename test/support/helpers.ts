@@ -241,7 +241,7 @@ export class FakeLlm implements LlmProvider {
   }
 }
 
-const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
+export const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
 
 /** A rule for the fake `claude` (see FAKE_CLAUDE_SCRIPT in test/fixtures/fake-claude/claude). */
 export interface FakeClaudeRule {
@@ -265,6 +265,10 @@ export interface FakeClaudeRule {
   readonly beforeTranscript?: boolean;
   /** Planning tool calls made through the `--mcp-config` server, such as plan_propose. */
   readonly tools?: readonly { readonly name: string; readonly input?: Readonly<Record<string, unknown>> }[];
+  /** FR-PLAN-058: the `--mcp-config` server's status in the `init` event, such as "failed", instead of connecting. */
+  readonly mcpStatus?: string;
+  /** FR-PLAN-058: tools the server offers that the `init` event leaves out. */
+  readonly hiddenTools?: readonly string[];
 }
 
 export interface FakeClaudeCall {
@@ -358,7 +362,7 @@ export const NO_PLANNER: Planner = {
   retry: NOT_PLANNING,
   approve: NOT_PLANNING,
   cancel: NOT_PLANNING,
-  finishDesign: NOT_PLANNING,
+  continueWithoutDesign: NOT_PLANNING,
   upload: NOT_PLANNING,
   removeUpload: NOT_PLANNING,
   attachment: () => Promise.resolve(undefined),

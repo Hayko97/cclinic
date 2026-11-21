@@ -35,6 +35,11 @@ const state = {
   /** Thumbnails of images waiting to be sent, by upload ID, drawn without a URL (FR-GUI-012). */
   thumbnails: new Map(),
   isSending: false,
+  /**
+   * FR-PLAN-060: the message just sent, shown at once until the transcript has it: its text, its uploads, when it was
+   * sent, the session it went to (null for a new one), and how many of the user's messages that session showed then.
+   */
+  pending: null,
   // FR-PLAN-036: a session being opened takes no message until it's open (DEF-38).
   isOpening: false,
 };
@@ -307,26 +312,57 @@ function drawTargetMenu() {
   );
 }
 
-/** FR-PLAN-021, FR-PLAN-036: sends the message, starting a session when none is open. */
+/** The user's messages the session's conversation shows, to tell when the transcript has a new one (FR-PLAN-060). */
+function userMessageCount(planId) {
+  if (state.itemsPlanId !== planId) return 0;
+  return state.items.filter((item) => item.kind === "user" || item.repeats).length;
+}
+
+function clearPending() {
+  for (const upload of state.pending?.uploads ?? []) state.thumbnails.delete(upload.id);
+  state.pending = null;
+}
+
+/**
+ * FR-PLAN-021, FR-PLAN-036, FR-PLAN-060: sends the message, starting a session when none is open. It's shown at
+ * once, and the box is cleared; a refused or failed message goes back in the box, with the problem and Retry.
+ */
 async function send(text) {
   const open = state.view?.open ?? null;
-  const uploads = state.uploads.map((upload) => upload.id);
+  const uploads = state.uploads;
   if ((text.trim() === "" && uploads.length === 0) || state.isOpening) return;
-  state.isSending = true;
-  draw();
   const isNew = open === null || open.status !== "open";
+  clearPending();
+  state.pending = {
+    text,
+    uploads,
+    at: new Date().toISOString(),
+    planId: isNew ? null : open.id,
+    shownCount: isNew ? 0 : userMessageCount(open.id),
+  };
+  state.isSending = true;
+  state.isFollowing = true;
+  state.uploads = [];
+  byId("plan-text").value = "";
+  draw();
+  growComposer();
+  const ids = uploads.map((upload) => upload.id);
   const reply = isNew
-    ? await call("/api/plan", { target: chosenTarget(), ...options(), text, uploads })
-    : await call("/api/plan/message", { text, uploads });
+    ? await call("/api/plan", { target: chosenTarget(), ...options(), text, uploads: ids })
+    : await call("/api/plan/message", { text, uploads: ids });
   state.isSending = false;
-  if (reply !== undefined) {
-    byId("plan-text").value = "";
-    for (const upload of state.uploads) state.thumbnails.delete(upload.id);
-    state.uploads = [];
+  if (reply === undefined) {
+    state.pending = null;
+    byId("plan-text").value = text;
+    state.uploads = uploads;
+    state.local = state.local.map((item) => (item.action === null ? { ...item, action: "resend" } : item));
+  } else {
     state.local = [];
-    state.isFollowing = true;
+    if (state.pending !== null && state.pending.planId === null)
+      state.pending = { ...state.pending, planId: state.view?.open?.id ?? null };
   }
   draw();
+  growComposer();
   if (reply !== undefined) byId("plan-text").focus();
 }
 
@@ -407,18 +443,33 @@ function proposalCard(open) {
           element("p", { className: "plan-card-kind" }, "Open questions"),
           element("ul", {}, ...proposal.openQuestions.map((question) => element("li", {}, question))),
         );
+  // FR-PLAN-053: a new project's first roadmap was approved with its brief, so it's saved with nothing to decide.
+  const isSetup = open.target.kind === "new-project";
   return element(
     "section",
     { className: "plan-card", "aria-label": "Proposal" },
+    isSetup ? element("p", { className: "plan-card-kind" }, "First roadmap, saving") : null,
     ...body,
     questions,
-    element(
-      "div",
-      { className: "actions" },
-      button("Cancel", decide("cancel"), "", { "data-plan-decide": "cancel" }),
-      button("Approve", decide("approve"), "primary", { "data-plan-decide": "approve" }),
-      element("span", { className: "muted" }, "or reply below to change it"),
-    ),
+    isSetup
+      ? null
+      : element(
+          "div",
+          { className: "actions" },
+          button("Cancel", decide("cancel"), "", { "data-plan-decide": "cancel" }),
+          button("Approve", decide("approve"), "primary", { "data-plan-decide": "approve" }),
+          element("span", { className: "muted" }, "or reply below to change it"),
+        ),
+  );
+}
+
+/** FR-PLAN-053: a new project's first roadmap, saved by the setup. */
+function savedRoadmapCard(outcome) {
+  return element(
+    "section",
+    { className: "plan-card", "aria-label": "Roadmap saved", role: "status" },
+    element("p", { className: "plan-card-kind" }, "Roadmap saved"),
+    element("p", {}, outcome),
   );
 }
 
@@ -444,58 +495,66 @@ function briefCard(open) {
           element("ul", {}, ...brief.files.map((name) => element("li", {}, name))),
         ),
     element(
+      "p",
+      { className: "muted" },
+      "Approving it sets up the project: luseen writes the specs and the agent setup, saves the first roadmap and, for a project with screens, makes the design system.",
+    ),
+    element(
       "div",
       { className: "actions" },
       button("Cancel", decide("cancel"), "", { "data-plan-decide": "cancel" }),
-      button("Approve", decide("approve"), "primary", { "data-plan-decide": "approve" }),
+      button("Approve and set up", decide("approve"), "primary", { "data-plan-decide": "approve" }),
       element("span", { className: "muted" }, "or reply below to change it"),
     ),
   );
 }
 
 /**
- * FR-GUI-089: a new project's draft design system, to look at, then approve or skip. When the design step failed,
- * there's no draft: Retry is in the problem shown, and Skip finishes the setup without one.
+ * FR-GUI-089: shown only when a new project's design step failed: Retry is in the problem shown, and this finishes the
+ * setup without a design system.
  */
 function designCard(open) {
-  const decide = (isApproved) => (event) => {
+  const skip = (event) => {
     event.currentTarget.disabled = true;
-    void call("/api/plan/design", { planId: open.id, isApproved }).then(reported);
+    void call("/api/plan/design", { planId: open.id }).then(reported);
   };
-  const hasDesign = open.project.hasDesign;
   return element(
     "section",
     { className: "plan-card", "aria-label": "Design system" },
-    element("p", { className: "plan-card-kind" }, hasDesign ? "Design system (draft)" : "Design system"),
-    hasDesign
-      ? element(
-          "p",
-          {},
-          "The designer wrote .luseen/design/design-system.md, design.tokens.json and style-guide.html. ",
-          element(
-            "a",
-            { href: "/api/design/style-guide", target: "_blank", rel: "noopener noreferrer" },
-            "Open the style guide",
-          ),
-        )
-      : element("p", { className: "muted" }, "There's no draft yet. Retry the design step, or skip it for now."),
+    element("p", { className: "plan-card-kind" }, "Design system"),
+    element(
+      "p",
+      { className: "muted" },
+      "The design step didn't finish. Retry it, or continue without a design system.",
+    ),
     element(
       "div",
       { className: "actions" },
-      button(hasDesign ? "Skip, and remove the draft" : "Skip", decide(false), "", { "data-plan-design": "skip" }),
-      hasDesign ? button("Approve design", decide(true), "primary", { "data-plan-design": "approve" }) : null,
+      button("Continue without design", skip, "", { "data-plan-design": "skip" }),
     ),
   );
 }
 
 /** FR-PLAN-055, FR-GUI-090: what the setup made, and the first task to work on. */
-function summaryCard(summary) {
+function summaryCard(summary, hasDesign) {
   const task = /work on task \d+/.exec(summary)?.[0];
   return element(
     "section",
     { className: "plan-card", "aria-label": "Project set up", role: "status" },
     element("p", { className: "plan-card-kind" }, "Ready"),
     element("div", { className: "plan-md" }, ...renderMarkdown(summary)),
+    // FR-GUI-089: the design system made by the setup, to look at.
+    hasDesign
+      ? element(
+          "p",
+          {},
+          element(
+            "a",
+            { href: "/api/design/style-guide", target: "_blank", rel: "noopener noreferrer" },
+            "Open the style guide",
+          ),
+        )
+      : null,
     task === undefined ? null : element("div", { className: "actions" }, copyButton(task, `Copy "${task}"`, "")),
   );
 }
@@ -713,28 +772,58 @@ function conversation(open) {
         timer(step.startedAt),
       ),
     );
-  else if (project?.phase === "design" && open.status === "open") nodes.push(designCard(open));
-  if (project?.summary != null) nodes.push(summaryCard(project.summary));
+  else if (project?.phase === "design" && open.status === "open" && state.view?.notice != null)
+    nodes.push(designCard(open));
+  if (project?.phase === "design" && open.outcome !== null) nodes.push(savedRoadmapCard(open.outcome));
+  if (project?.summary != null) nodes.push(summaryCard(project.summary, project.hasDesign));
   // FR-PLAN-038: a message a stopped turn left unanswered shows until the transcript has it.
   const unanswered = unansweredShown(open, items);
   if (unanswered !== null) nodes.push(itemNode(unanswered, { open, isReplaced: false }));
+  const pending = unanswered === null ? pendingShown(open) : null;
+  if (pending !== null) nodes.push(pendingNode(pending));
   const turn = state.view?.turn;
   if (turn !== null && turn !== undefined) {
     const activity = items.filter((item) => item.kind === "activity" && (item.at ?? "") >= turn.startedAt).at(-1);
-    nodes.push(
-      element(
-        "p",
-        { className: "plan-working", role: "status" },
-        element("span", { className: "plan-spinner", "aria-hidden": "true" }),
-        element("span", {}, "Working · "),
-        timer(turn.startedAt),
-        activity === undefined ? null : element("span", { className: "plan-working-activity" }, ` · ${activity.text}`),
-      ),
-    );
-  }
+    nodes.push(workingRow(pending === null ? "Working" : "Starting the PM", turn.startedAt, activity?.text));
+  } else if (pending !== null && state.isSending) nodes.push(workingRow("Starting the PM", pending.at));
   if (open.status !== "open" && open.outcome !== null && project?.summary == null)
     nodes.push(element("p", { className: "plan-outcome", role: "status" }, open.outcome));
   return nodes;
+}
+
+/** FR-PLAN-038: a spinner, what's happening and for how long, and the newest activity. */
+function workingRow(label, startedAt, activity) {
+  return element(
+    "p",
+    { className: "plan-working", role: "status" },
+    element("span", { className: "plan-spinner", "aria-hidden": "true" }),
+    element("span", {}, `${label} · `),
+    timer(startedAt),
+    activity === undefined ? null : element("span", { className: "plan-working-activity" }, ` · ${activity}`),
+  );
+}
+
+/** FR-PLAN-060: the message just sent, while the open session's transcript doesn't have it yet. */
+function pendingShown(open) {
+  const pending = state.pending;
+  if (pending === null || (pending.planId !== null && pending.planId !== open.id)) return null;
+  return userMessageCount(open.id) > pending.shownCount ? null : pending;
+}
+
+function pendingNode(pending) {
+  return element(
+    "div",
+    { className: "plan-msg plan-user" },
+    element("p", { className: "plan-who" }, "You"),
+    element("div", { className: "plan-bubble" }, pending.text === "" ? null : element("p", {}, pending.text)),
+    pending.uploads.length === 0
+      ? null
+      : element(
+          "div",
+          { className: "plan-chips" },
+          ...pending.uploads.map((upload) => fileChip(upload.name, upload.kind, undefined, { uploadId: upload.id })),
+        ),
+  );
 }
 
 /** FR-PLAN-041: a problem where it happened, with the one action that helps. */
@@ -758,7 +847,12 @@ function noticeNodes() {
           ? button("Retry", retry)
           : notice.action === "resume"
             ? button("Resume", retry)
-            : button("Dismiss", forget(notice));
+            : notice.action === "resend"
+              ? button("Retry", () => {
+                  forget(notice)();
+                  void send(byId("plan-text").value);
+                })
+              : button("Dismiss", forget(notice));
     return element("div", { className: "plan-error", role: "alert" }, element("p", {}, notice.message), action);
   });
 }
@@ -833,7 +927,14 @@ function drawLog() {
   const log = byId("plan-log");
   const open = state.view?.open ?? null;
   const top = log.scrollTop;
-  const nodes = open === null ? [emptyState()] : conversation(open);
+  // FR-PLAN-060: a first message being sent replaces the empty state at once.
+  const starting = state.pending !== null && state.pending.planId === null && state.isSending;
+  const nodes =
+    open !== null
+      ? conversation(open)
+      : starting
+        ? [pendingNode(state.pending), workingRow("Starting the PM", state.pending.at)]
+        : [emptyState()];
   const jump = state.isFollowing
     ? null
     : button(
@@ -845,7 +946,7 @@ function drawLog() {
         },
         "small jump-latest",
       );
-  log.classList.toggle("is-empty", open === null);
+  log.classList.toggle("is-empty", open === null && !starting);
   log.replaceChildren(...nodes, ...noticeNodes(), jump ?? []);
   // FR-PLAN-040: new messages are followed only while the conversation is at its bottom.
   if (state.isFollowing) log.scrollTop = log.scrollHeight;
@@ -959,6 +1060,7 @@ function receive(view) {
   setPlan(view);
   if (view.open?.id !== previous?.open?.id) {
     state.folded.clear();
+    if (state.pending?.planId != null && state.pending.planId !== view.open?.id) clearPending();
     // This page's problems belong to the session they happened in.
     if (previous !== null) state.local = [];
   }
@@ -977,6 +1079,7 @@ function receiveItems(planId, items, isReplacing) {
   if (isReplacing || state.itemsPlanId !== planId) state.items = items;
   else state.items = [...state.items, ...items];
   state.itemsPlanId = planId;
+  if (state.pending !== null && pendingShown({ id: planId }) === null && state.pending.planId !== null) clearPending();
   if (!wasAtBottom && !isReplacing && items.length > 0) state.isFollowing = false;
   if (isOpen()) draw();
 }

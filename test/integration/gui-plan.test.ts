@@ -904,7 +904,8 @@ describe("Plan in the browser", () => {
       const working = panel(page).locator(".plan-working");
       await expect.poll(() => working.count(), WAIT).toBe(1);
       expect(await working.locator(".plan-spinner").count()).toBe(1);
-      expect(await working.textContent()).toMatch(/Working · \d+s/);
+      // FR-PLAN-060: "Starting the PM" until the transcript has the message, then "Working".
+      expect(await working.textContent()).toMatch(/(Starting the PM|Working) · \d+s/);
       expect((await working.boundingBox())?.height).toBeLessThan(28);
 
       await page.locator("#plan-sessions-button").click();

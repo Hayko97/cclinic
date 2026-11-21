@@ -9,8 +9,10 @@ import { claudeTranscriptPath } from "../adapters/llm/agent-process.js";
 import { isProcessRunning } from "../adapters/storage/file-lock.js";
 import {
   approveBrief,
-  finishDesign,
+  continueWithoutDesign,
   projectSummary,
+  releaseRoadmapRequest,
+  saveProjectRoadmap,
   takeRoadmapRequest,
   writeProjectDesign,
   writeProjectSpecs,
@@ -236,6 +238,10 @@ async function attachFiles(state: ChatState, given: readonly string[]): Promise<
 }
 
 /** FR-PLAN-008, FR-PLAN-011: the PM's reply, its suggestions and sources, and a new proposal. */
+const PROPOSAL_CHOICES = "/approve to save it, /cancel to drop it, or reply to change it.";
+const BRIEF_CHOICES =
+  "/approve to save it and set up the project (specs, agent setup, first roadmap and design system), /cancel to drop it, or reply to change it.";
+
 function showReply(state: ChatState, reply: string, previousProposal: string | null): void {
   const { session, context } = state;
   const lines = [`\nPM › ${reply}`];
@@ -250,8 +256,9 @@ function showReply(state: ChatState, reply: string, previousProposal: string | n
   }
   const brief = session.project?.brief ?? null;
   if (brief !== null && brief.proposedAt !== previousProposal) lines.push("", renderWaitingBrief(brief.markdown));
-  if (session.proposal !== null || brief !== null)
-    lines.push("", "/approve to save it, /cancel to drop it, or reply to change it.");
+  // FR-PLAN-053, FR-PLAN-057: a new project's roadmap is saved with no approval; its brief's approval sets it all up.
+  if (brief !== null) lines.push("", BRIEF_CHOICES);
+  else if (session.proposal !== null && session.project === null) lines.push("", PROPOSAL_CHOICES);
   context.reporter.notice(`${lines.join("\n")}\n`);
 }
 
@@ -369,19 +376,8 @@ async function chatTurns(state: ChatState): Promise<void> {
 }
 
 /**
- * FR-PLAN-054: drafts the design system. A failed step keeps the session at its design and offers to retry or skip
- * it; stopping instead keeps it for later. True when a draft waits, false when nothing was made.
- */
-async function draftDesign(state: ChatState): Promise<boolean | "skipped"> {
-  const drafted = await retrying(state, "Drafting the design system", () =>
-    writeProjectDesign(state.project, state.session.id),
-  );
-  return drafted ?? "skipped";
-}
-
-/**
- * FR-PLAN-052, FR-PLAN-054: runs a new project's step; when it fails, shows why and offers to retry it, or to stop
- * and continue later, which keeps the session at that step. The design step can also be skipped: then this returns
+ * FR-PLAN-052 to FR-PLAN-054: runs a new project's step; when it fails, shows why and offers to retry it, or to stop
+ * and continue later, which keeps the session at that step. The design step can also be left out: then this returns
  * undefined.
  */
 async function retrying<T>(state: ChatState, what: string, step: () => Promise<T>): Promise<T | undefined> {
@@ -395,7 +391,7 @@ async function retrying<T>(state: ChatState, what: string, step: () => Promise<T
       state.context.reporter.notice(error.message);
       const next = await chooseFrom(`${what} didn't finish. What now?`, [
         { value: "retry", name: "Retry it" },
-        ...(canSkip ? [{ value: "skip", name: "Skip the design system" }] : []),
+        ...(canSkip ? [{ value: "skip", name: "Continue without design" }] : []),
         { value: "later", name: "Stop, and continue later" },
       ]);
       if (next === "skip") return undefined;
@@ -405,8 +401,8 @@ async function retrying<T>(state: ChatState, what: string, step: () => Promise<T
 }
 
 /**
- * FR-PLAN-048, FR-PLAN-052 to FR-PLAN-055: takes a new project as far as it goes without the user: the specs, the
- * request for the first roadmap, and the design step. True when the setup is finished.
+ * FR-PLAN-048, FR-PLAN-052 to FR-PLAN-055, FR-PLAN-061: takes a new project to its end with no approval asked: the
+ * specs, the first roadmap, saved once the PM proposes it, and the design system. True when the setup is finished.
  */
 async function driveProject(state: ChatState): Promise<boolean> {
   const { project, context } = state;
@@ -419,22 +415,25 @@ async function driveProject(state: ChatState): Promise<boolean> {
     session = await reread();
   }
   if (session.project?.phase === "roadmap") {
-    const request = await takeRoadmapRequest(project, id);
-    if (request !== undefined) await sendTurn(state, request);
-    return false;
+    const saved = await retrying(state, "Planning the first roadmap", async () => {
+      const request = await takeRoadmapRequest(project, id);
+      if (request !== undefined) {
+        try {
+          await sendTurn(state, request);
+        } catch (error) {
+          // A turn that stopped, such as without its planning tools (FR-PLAN-058), is asked for again on Retry.
+          if (error instanceof AgentSessionError) await releaseRoadmapRequest(project, id);
+          throw error;
+        }
+      }
+      return saveProjectRoadmap(project, decisionPorts(state.target, state.records), id);
+    });
+    if (saved !== undefined) context.reporter.result(saved);
+    session = await reread();
   }
   if (session.project?.phase === "design") {
-    // FR-DSGN-041: the designer may find no user interface, so there's nothing to approve.
-    const isDrafted = await draftDesign(state);
-    if (isDrafted === true) {
-      const isApproved = await chooseFrom("The design system is a draft. Approve it?", [
-        { value: true, name: "Approve the design system" },
-        { value: false, name: "Skip it, and remove the draft" },
-      ]);
-      context.reporter.result(await finishDesign(project, id, isApproved));
-    } else if (isDrafted === "skipped") {
-      context.reporter.result(await finishDesign(project, id, false));
-    }
+    const made = await retrying(state, "Making the design system", () => writeProjectDesign(project, id));
+    context.reporter.result(made ?? (await continueWithoutDesign(project, id)));
     session = await reread();
   }
   if (session.project?.phase !== "done") return false;
@@ -587,14 +586,16 @@ async function resumeSession(
     `Continuing ${session.id}. Continue it elsewhere with: ${resumeCommands(session).join("  or  ")}`,
   );
   if (first !== undefined) await sendTurn(state, first);
-  else if (state.session.project?.phase === "roadmap" && (await driveProject(state))) return undefined;
-  else if ((state.session.project?.brief ?? null) !== null) {
+  // FR-PLAN-048, FR-PLAN-061: a new project at its roadmap saves what the PM proposed, and goes on by itself.
+  if (state.session.project?.phase === "roadmap" && (await driveProject(state))) return undefined;
+  if (first !== undefined) return state;
+  if ((state.session.project?.brief ?? null) !== null) {
     base.context.reporter.notice(
-      `${renderWaitingBrief(state.session.project?.brief?.markdown ?? "")}\n\n/approve to save it, /cancel to drop it, or reply to change it.\n`,
+      `${renderWaitingBrief(state.session.project?.brief?.markdown ?? "")}\n\n${BRIEF_CHOICES}\n`,
     );
   } else if (state.session.proposal !== null) {
     base.context.reporter.notice(
-      `${renderWaitingProposal(state.session.proposal, state.session.target)}\n\n/approve to save it, /cancel to drop it, or reply to change it.\n`,
+      `${renderWaitingProposal(state.session.proposal, state.session.target)}\n\n${PROPOSAL_CHOICES}\n`,
     );
   }
   return state;

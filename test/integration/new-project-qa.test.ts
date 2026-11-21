@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openPlanStore } from "../../src/adapters/storage/plan-store.js";
 import { writeProjectBrief } from "../../src/adapters/storage/project-files.js";
 import { openTaskStore } from "../../src/adapters/storage/task-store.js";
+import { cancelSession } from "../../src/application/planning-session.js";
 import { runGenerate, type GenerateOptions } from "../../src/cli/generate-command.js";
 import { runPlanCommand } from "../../src/cli/plan-command.js";
+import { decisionPorts } from "../../src/cli/planning-ports.js";
 import type { PlanSession, RoadmapProposal } from "../../src/core/planning.js";
 import { agentHarness, makeTempFolder, type FakeClaudeRule } from "../support/helpers.js";
 
@@ -127,15 +129,49 @@ const generationCalls = (harness: Harness) =>
 const pmTurns = (harness: Harness) =>
   harness.calls().filter((call) => call.args.includes("--session-id") || call.args.includes("--resume"));
 
-/** Runs the session up to its waiting roadmap, then Ctrl+C. */
-async function stopAtRoadmap(root: string, hasScreens: boolean): Promise<void> {
-  const harness = agentHarness({ rules: rules(hasScreens), env: { FAKE_CLAUDE_FALLBACK: "1" } });
-  typing("A booking app for a clinic", "/approve");
-  pressCtrlC();
-  await plan(root, harness).catch(() => undefined);
+/** Ctrl+C at a menu, as @inquirer reports it. */
+function pressCtrlCAtMenu(): void {
+  selectMock.mockImplementationOnce(() => {
+    const error = new Error("User force closed the prompt");
+    error.name = "ExitPromptError";
+    return Promise.reject(error);
+  });
+}
+
+/** The PM's roadmap turn that ends without proposing anything, so the session stays at its roadmap (FR-PLAN-053). */
+const noRoadmapRules = (hasScreens: boolean): FakeClaudeRule[] => [
+  { match: "The specs are written in", message: "I'll think about the roadmap." },
+  ...rules(hasScreens).slice(1),
+];
+
+const ROADMAP_FAILED = "Planning the first roadmap didn't finish. What now?";
+const DESIGN_FAILED = "Making the design system didn't finish. What now?";
+
+/**
+ * Runs the session up to its roadmap, where the PM's turn proposes nothing, then answers the failure's menu with
+ * `answer` ("later"), or Ctrl+C when none is given. Nothing is saved, and the session stays at its roadmap.
+ */
+async function stopAtRoadmap(
+  root: string,
+  hasScreens: boolean,
+  firstMessage = "A booking app for a clinic",
+  answer?: string,
+) {
+  const harness = agentHarness({ rules: noRoadmapRules(hasScreens), env: { FAKE_CLAUDE_FALLBACK: "1" } });
+  typing(firstMessage, "/approve");
+  if (answer === undefined) pressCtrlCAtMenu();
+  else selectMock.mockResolvedValueOnce(answer);
+  await expect(plan(root, harness)).rejects.toThrow();
+  const asked = selectMock.mock.calls.map((call) => (call[0] as { message: string }).message);
+  expect(asked).toEqual([ROADMAP_FAILED]);
+  const said = harness.output.out + harness.output.err;
+  expect(said).toContain("The PM ended without proposing the roadmap, so nothing was saved. Retry asks it again.");
   const session = await onlySession(root);
-  expect(session.project?.phase).toBe("roadmap");
-  expect(session.proposal).not.toBeNull();
+  expect(session).toMatchObject({ status: "open", proposal: null, project: { phase: "roadmap" } });
+  expect(roadmapTitles(root)).toEqual([]);
+  selectMock.mockReset();
+  inputMock.mockReset();
+  return harness;
 }
 
 describe("QA: resuming a new project at its roadmap", () => {
@@ -143,14 +179,20 @@ describe("QA: resuming a new project at its roadmap", () => {
     "TC-PLAN-089 (QA): luseen plan --resume continues at the roadmap, with no generation and no brief turn",
     async () => {
       const root = emptyProject();
-      await stopAtRoadmap(root, false);
+      const first = await stopAtRoadmap(root, false);
+      const claudeSessionId = (await onlySession(root)).claudeSessionId;
+      expect(generationCalls(first).length).toBeGreaterThan(0);
       const resumed = agentHarness({ rules: rules(false), env: { FAKE_CLAUDE_FALLBACK: "1" } });
-      typing("/approve");
       await plan(root, resumed, "plan-1");
+      // No generation and no brief turn: the only PM turn asks for the roadmap again, in the same Claude session,
+      // and the roadmap it proposes is saved with nothing asked (FR-PLAN-053, FR-PLAN-061).
       expect(generationCalls(resumed)).toEqual([]);
-      expect(pmTurns(resumed)).toEqual([]);
+      expect(pmTurns(resumed).map((call) => call.prompt.slice(0, 24))).toEqual(["The specs are written in"]);
+      expect(pmTurns(resumed)[0]?.args).toContain(claudeSessionId);
+      expect(selectMock).not.toHaveBeenCalled();
+      expect(inputMock).not.toHaveBeenCalled();
       expect(roadmapTitles(root)).toEqual(["First release"]);
-      expect((await onlySession(root)).project?.phase).toBe("done");
+      expect(await onlySession(root)).toMatchObject({ status: "approved", project: { phase: "done" } });
     },
     SLOW,
   );
@@ -231,17 +273,23 @@ describe("QA: cancelling and failing after the brief", () => {
       const root = emptyProject();
       const outside = makeTempFolder();
       writeFileSync(path.join(outside, "idea.md"), "# Idea\n");
-      const harness = agentHarness({ rules: rules(false), env: { FAKE_CLAUDE_FALLBACK: "1" } });
-      typing(`A booking app @${path.join(outside, "idea.md")}`, "/approve", "/cancel");
-      await plan(root, harness).catch(() => undefined);
+      // The roadmap is saved as soon as the PM proposes it, so the session is at its roadmap, with nothing saved,
+      // only when the PM's turn proposed nothing and the user stopped at the failure.
+      await stopAtRoadmap(root, false, `A booking app @${path.join(outside, "idea.md")}`, "later");
+      // Cancelled the way /cancel does it.
+      const cancelled = await cancelSession(decisionPorts(root), "plan-1", {
+        pid: process.pid,
+        isRunning: () => false,
+      });
       expect(existsSync(path.join(root, "README.md"))).toBe(true);
       expect(readFileSync(path.join(root, "docs/idea.md"), "utf8")).toBe("# Idea\n");
       expect(existsSync(path.join(root, ".luseen/sdd/README.md"))).toBe(true);
       expect(roadmapTitles(root)).toEqual([]);
       const session = await onlySession(root);
       expect(session.status).toBe("cancelled");
-      const said = harness.output.out + harness.output.err;
-      expect(said).toContain("Kept what was already written: README.md, docs/, .luseen/sdd and the agent setup");
+      expect(cancelled.message).toBe(
+        "Cancelled. Kept what was already written: README.md, docs/, .luseen/sdd and the agent setup.",
+      );
     },
     SLOW,
   );
@@ -273,21 +321,37 @@ describe("QA: cancelling and failing after the brief", () => {
   );
 
   it(
-    "TC-PLAN-087 (QA): skipping the design leaves a draft at most, and the summary doesn't claim a design system",
+    "TC-PLAN-087 (QA): a failed design step leaves no partial draft; continuing without design removes the design folder, and the summary doesn't claim a design system",
     async () => {
       const root = emptyProject();
-      const harness = agentHarness({ rules: rules(true), env: { FAKE_CLAUDE_FALLBACK: "1" } });
-      typing("A booking app for a clinic", "/approve", "/approve");
-      selectMock.mockResolvedValueOnce(false);
+      const draft = path.join(root, ".luseen/design/design-system.md");
+      // The design step fails after writing part of a draft, as a run that stops partway does, into the design folder.
+      const harness = agentHarness({
+        rules: rules(true),
+        env: { FAKE_CLAUDE_FALLBACK: "1", FAKE_CLAUDE_DESIGN: "fail", FAKE_CLAUDE_ALSO_WRITE: draft },
+      });
+      typing("A booking app for a clinic");
+      inputMock.mockImplementationOnce(() => {
+        mkdirSync(path.dirname(draft), { recursive: true });
+        return Promise.resolve("/approve");
+      });
+      selectMock.mockImplementationOnce(() => {
+        // The failed step left no partial draft behind when the failure is shown, so nothing unapproved is used.
+        expect(existsSync(draft)).toBe(false);
+        return Promise.resolve("skip");
+      });
       await plan(root, harness);
-      expect((await onlySession(root)).project?.phase).toBe("done");
+      expect(selectMock).toHaveBeenCalledTimes(1);
+      expect(await onlySession(root)).toMatchObject({ status: "approved", project: { phase: "done" } });
       const said = harness.output.out + harness.output.err;
-      expect(said).toContain("Skipped the design system.");
+      expect(said).toContain("Continued without a design system.");
       const summary = said.slice(said.indexOf("The project is set up:"));
-      // TC-PLAN-087: "skipping moves to done with no design files".
-      expect.soft(existsSync(path.join(root, ".luseen/design/design-system.md"))).toBe(false);
+      // TC-PLAN-087: Continue without design removes the draft and moves to done with no design files.
+      expect(existsSync(path.join(root, ".luseen/design"))).toBe(false);
       // FR-PLAN-055: the design system's paths are listed only when it was made.
-      expect(summary).not.toContain("The design system in .luseen/design/");
+      expect(summary).not.toContain(
+        "The design system: .luseen/design/design-system.md and .luseen/design/style-guide.html",
+      );
     },
     SLOW,
   );
@@ -380,17 +444,17 @@ describe("QA: the brief's edge cases", () => {
 
 describe("QA run 2: the design phase in the terminal", () => {
   it(
-    "TC-PLAN-089 (QA run 2, DEF-1): stopped at the design question, running luseen again continues the open session",
+    "TC-PLAN-089 (QA run 2, DEF-1): stopped with Ctrl+C at a failed design step, running luseen again continues the open session",
     async () => {
       const root = emptyProject();
-      const first = agentHarness({ rules: rules(true), env: { FAKE_CLAUDE_FALLBACK: "1" } });
-      typing("A booking app for a clinic", "/approve", "/approve");
-      selectMock.mockImplementationOnce(() => {
-        const error = new Error("User force closed the prompt");
-        error.name = "ExitPromptError";
-        return Promise.reject(error);
+      const first = agentHarness({
+        rules: rules(true),
+        env: { FAKE_CLAUDE_FALLBACK: "1", FAKE_CLAUDE_DESIGN: "fail" },
       });
+      typing("A booking app for a clinic", "/approve");
+      pressCtrlCAtMenu();
       await plan(root, first).catch(() => undefined);
+      expect(selectMock.mock.calls.map((call) => (call[0] as { message: string }).message)).toEqual([DESIGN_FAILED]);
       expect((await onlySession(root)).project?.phase).toBe("design");
       const again = agentHarness({ rules: rules(true), env: { FAKE_CLAUDE_FALLBACK: "1" } });
       const started: string[] = [];
@@ -430,20 +494,25 @@ describe("QA run 2: the design phase in the terminal", () => {
   );
 
   it(
-    "TC-PLAN-087 (QA run 2, DEF-3): skip removes the waiting draft, and the summary names no design system",
+    "TC-PLAN-087 (QA run 2, DEF-3): a draft that fails the checks is removed, not approved; continue without design names no design system",
     async () => {
       const root = emptyProject();
-      const harness = agentHarness({ rules: rules(true), env: { FAKE_CLAUDE_FALLBACK: "1" } });
-      typing("A booking app for a clinic", "/approve", "/approve");
-      selectMock.mockImplementationOnce(() => {
-        // The draft exists when the question is asked.
-        expect(existsSync(path.join(root, ".luseen/design/design-system.md"))).toBe(true);
-        return Promise.resolve(false);
+      const harness = agentHarness({
+        rules: rules(true),
+        env: { FAKE_CLAUDE_FALLBACK: "1", FAKE_CLAUDE_DESIGN: "invalid" },
+      });
+      typing("A booking app for a clinic", "/approve");
+      selectMock.mockImplementationOnce(async () => {
+        // The failing draft is already removed when the failure is shown, and the session waits at its design.
+        expect(existsSync(path.join(root, ".luseen/design"))).toBe(false);
+        expect((await onlySession(root)).project?.phase).toBe("design");
+        return "skip";
       });
       await plan(root, harness);
-      expect(selectMock).toHaveBeenCalledTimes(1);
+      expect(selectMock.mock.calls.map((call) => (call[0] as { message: string }).message)).toEqual([DESIGN_FAILED]);
       expect(existsSync(path.join(root, ".luseen/design"))).toBe(false);
       const said = harness.output.out + harness.output.err;
+      expect(said).toContain("Continued without a design system.");
       expect(said.slice(said.indexOf("The project is set up:"))).not.toContain(".luseen/design");
       expect((await onlySession(root)).status).toBe("approved");
     },
@@ -451,25 +520,30 @@ describe("QA run 2: the design phase in the terminal", () => {
   );
 
   it(
-    "FR-PLAN-054 (QA run 2): a failed design step in the terminal offers retry or skip",
+    "FR-PLAN-054 (QA run 2): a failed design step in the terminal offers retry or continue without design",
     async () => {
       const root = emptyProject();
       const failing = agentHarness({
         rules: rules(true),
         env: { FAKE_CLAUDE_FALLBACK: "1", FAKE_CLAUDE_DESIGN: "fail" },
       });
-      typing("A booking app for a clinic", "/approve", "/approve");
+      typing("A booking app for a clinic", "/approve");
       const outcome = await plan(root, failing).then(
         () => "finished",
         (error: unknown) => String(error),
       );
       const said = failing.output.out + failing.output.err + outcome;
       expect((await onlySession(root)).project?.phase).toBe("design");
-      // The failure is shown, then retry, skip, or stop and continue later are offered (FR-PLAN-054).
+      // The failure is shown, then retry, continue without design, or stop and continue later are offered (FR-PLAN-054).
       const question = selectMock.mock.calls[0]?.[0];
-      expect(question?.message, said.slice(-1500)).toBe("Drafting the design system didn't finish. What now?");
-      const choices = question?.choices as readonly { value: string }[] | undefined;
+      expect(question?.message, said.slice(-1500)).toBe(DESIGN_FAILED);
+      const choices = question?.choices as readonly { value: string; name: string }[] | undefined;
       expect(choices?.map((choice) => choice.value)).toEqual(["retry", "skip", "later"]);
+      expect(choices?.map((choice) => choice.name)).toEqual([
+        "Retry it",
+        "Continue without design",
+        "Stop, and continue later",
+      ]);
     },
     SLOW,
   );
@@ -485,17 +559,17 @@ const choicesOf = (index: number) =>
 
 describe("QA run 3: a failed step in the terminal (DEF-9)", () => {
   it(
-    "FR-PLAN-054 (QA run 3): a failed design step's 'later' stops at the design; resuming drafts it and asks to approve",
+    "FR-PLAN-054 (QA run 3): a failed design step's 'later' stops at the design; resuming makes it and approves it with nothing asked",
     async () => {
       const root = emptyProject();
       const failing = agentHarness({
         rules: rules(true),
         env: { FAKE_CLAUDE_FALLBACK: "1", FAKE_CLAUDE_DESIGN: "fail" },
       });
-      typing("A booking app for a clinic", "/approve", "/approve");
+      typing("A booking app for a clinic", "/approve");
       selectMock.mockResolvedValueOnce("later");
       await expect(plan(root, failing)).rejects.toThrow();
-      expect(questions()).toEqual(["Drafting the design system didn't finish. What now?"]);
+      expect(questions()).toEqual([DESIGN_FAILED]);
       expect(choicesOf(0)).toEqual(["retry", "skip", "later"]);
       expect(await onlySession(root)).toMatchObject({ status: "open", project: { phase: "design" } });
       expect(existsSync(path.join(root, ".luseen/design"))).toBe(false);
@@ -503,41 +577,37 @@ describe("QA run 3: a failed step in the terminal (DEF-9)", () => {
 
       selectMock.mockReset();
       const resumed = agentHarness({ rules: rules(true), env: { FAKE_CLAUDE_FALLBACK: "1" } });
-      selectMock.mockResolvedValueOnce(true);
       await plan(root, resumed, "plan-1");
-      expect(questions()).toEqual(["The design system is a draft. Approve it?"]);
+      expect(questions()).toEqual([]);
       expect(designCalls(resumed)).toHaveLength(1);
       expect(pmTurns(resumed)).toEqual([]);
       expect(readFileSync(path.join(root, ".luseen/design/design-system.md"), "utf8")).toContain(
         "## Status\n\napproved",
       );
       expect(await onlySession(root)).toMatchObject({ status: "approved", project: { phase: "done" } });
-      expect(resumed.output.out + resumed.output.err).toContain("The design system in .luseen/design/");
+      expect(resumed.output.out + resumed.output.err).toContain(
+        "The design system: .luseen/design/design-system.md and .luseen/design/style-guide.html",
+      );
     },
     SLOW,
   );
 
   it(
-    "FR-PLAN-054 (QA run 3): retrying a failed design step that then succeeds asks to approve the draft",
+    "FR-PLAN-054 (QA run 3): retrying a failed design step that then succeeds approves the design system with nothing asked",
     async () => {
       const root = emptyProject();
       const harness = agentHarness({
         rules: rules(true),
         env: { FAKE_CLAUDE_FALLBACK: "1", FAKE_CLAUDE_DESIGN: "fail" },
       });
-      typing("A booking app for a clinic", "/approve", "/approve");
-      selectMock
-        .mockImplementationOnce(() => {
-          // The next try succeeds, as after a passing outage.
-          harness.environment.FAKE_CLAUDE_DESIGN = "valid";
-          return Promise.resolve("retry");
-        })
-        .mockResolvedValueOnce(true);
+      typing("A booking app for a clinic", "/approve");
+      selectMock.mockImplementationOnce(() => {
+        // The next try succeeds, as after a passing outage.
+        harness.environment.FAKE_CLAUDE_DESIGN = "valid";
+        return Promise.resolve("retry");
+      });
       await plan(root, harness);
-      expect(questions()).toEqual([
-        "Drafting the design system didn't finish. What now?",
-        "The design system is a draft. Approve it?",
-      ]);
+      expect(questions()).toEqual([DESIGN_FAILED]);
       expect(designCalls(harness)).toHaveLength(2);
       expect(readFileSync(path.join(root, ".luseen/design/design-system.md"), "utf8")).toContain(
         "## Status\n\napproved",
@@ -591,19 +661,31 @@ describe("QA run 3: a failed step in the terminal (DEF-9)", () => {
 
 describe("QA run 3: continuing a new project", () => {
   it(
-    "TC-PLAN-089 (QA run 3): resuming at the design with a draft waiting asks to approve it, without running the design step again",
+    "TC-PLAN-089 (QA run 3): resuming at the design with a draft already made approves it, without running the design step again",
     async () => {
       const root = emptyProject();
-      const first = agentHarness({ rules: rules(true), env: { FAKE_CLAUDE_FALLBACK: "1" } });
-      typing("A booking app for a clinic", "/approve", "/approve");
-      selectMock.mockImplementationOnce(() => {
-        const error = new Error("User force closed the prompt");
-        error.name = "ExitPromptError";
-        return Promise.reject(error);
+      const first = agentHarness({
+        rules: rules(true),
+        env: { FAKE_CLAUDE_FALLBACK: "1", FAKE_CLAUDE_DESIGN: "fail" },
       });
+      typing("A booking app for a clinic", "/approve");
+      pressCtrlCAtMenu();
       await plan(root, first).catch(() => undefined);
       expect((await onlySession(root)).project?.phase).toBe("design");
-      expect(existsSync(path.join(root, ".luseen/design/design-system.md"))).toBe(true);
+      // A valid draft left behind, as when the session stopped after the design step wrote it and before luseen
+      // approved it.
+      const draftFolder = path.join(root, ".luseen/design");
+      const sections = ["Status", "Principles", "Color", "Typography", "Spacing and layout", "Shape and elevation"]
+        .concat(["Motion", "Accessibility", "Components", "Templates", "Decisions", "Sources", "Open questions"])
+        .map((name) => `## ${name}\n\n${name === "Status" ? "draft" : "Text."}\n`)
+        .join("\n");
+      mkdirSync(draftFolder, { recursive: true });
+      writeFileSync(path.join(draftFolder, "design-system.md"), `# Design system\n\n${sections}`);
+      writeFileSync(
+        path.join(draftFolder, "design.tokens.json"),
+        JSON.stringify({ color: { $type: "color", blue: { $value: "#2563eb" } } }),
+      );
+      writeFileSync(path.join(draftFolder, "style-guide.html"), "<!doctype html><title>Style guide</title>");
 
       selectMock.mockReset();
       // A design step run again would fail, so the test sees it.
@@ -611,11 +693,11 @@ describe("QA run 3: continuing a new project", () => {
         rules: rules(true),
         env: { FAKE_CLAUDE_FALLBACK: "1", FAKE_CLAUDE_DESIGN: "fail" },
       });
-      selectMock.mockResolvedValueOnce(true);
       await plan(root, resumed, "plan-1");
       expect(designCalls(resumed)).toEqual([]);
       expect(resumed.calls()).toEqual([]);
-      expect(questions()).toEqual(["The design system is a draft. Approve it?"]);
+      expect(questions()).toEqual([]);
+      expect(readFileSync(path.join(draftFolder, "design-system.md"), "utf8")).toContain("## Status\n\napproved");
       expect(await onlySession(root)).toMatchObject({ status: "approved", project: { phase: "done" } });
     },
     SLOW,
@@ -706,4 +788,223 @@ describe("QA run 3: the files the brief writes", () => {
       expect(existsSync(path.join(root, "docs"))).toBe(false);
     }
   });
+});
+
+describe("QA (FR-PLAN-053, FR-PLAN-058, FR-PLAN-061): the first roadmap in the terminal", () => {
+  it(
+    "TC-PLAN-092 (QA): a roadmap turn stopped for missing planning tools runs the PM again on the first Retry",
+    async () => {
+      const root = emptyProject();
+      const harness = agentHarness({
+        rules: [
+          { match: "The specs are written in", mcpStatus: "failed", message: "I can't save it.", times: 1 },
+          ...rules(false),
+        ],
+        env: { FAKE_CLAUDE_FALLBACK: "1" },
+      });
+      typing("A booking app for a clinic", "/approve");
+      selectMock.mockResolvedValueOnce("retry");
+      await plan(root, harness);
+      const said = harness.output.out + harness.output.err;
+      expect(said).toContain("The PM can't reach luseen's planning tools");
+      // One Retry is enough: the PM is asked again, and nothing claims it ended without proposing.
+      expect(selectMock.mock.calls.map((call) => (call[0] as { message: string }).message)).toEqual([ROADMAP_FAILED]);
+      expect(said).not.toContain("The PM ended without proposing the roadmap");
+      expect(pmTurns(harness).length).toBe(3);
+      expect(roadmapTitles(root)).toEqual(["First release"]);
+      expect((await onlySession(root)).project?.phase).toBe("done");
+    },
+    SLOW,
+  );
+
+  it(
+    "TC-PLAN-092 (QA): in a fake TTY, a brief turn missing brief_propose stops with no PM text; resuming answers the kept message",
+    async () => {
+      const root = emptyProject();
+      const missing = agentHarness({
+        rules: [{ match: "empty folder", hiddenTools: ["brief_propose"], message: "Run luseen plan and paste this." }],
+        env: { FAKE_CLAUDE_FALLBACK: "1" },
+      });
+      typing("A booking app for a clinic");
+      const error = await plan(root, missing).catch((caught: unknown) => caught);
+      expect((error as Error).message).toContain(
+        "The PM can't reach luseen's planning tools: brief_propose is missing.",
+      );
+      expect(missing.output.out + missing.output.err).not.toContain("Run luseen plan and paste this.");
+      expect(await onlySession(root)).toMatchObject({ status: "open", project: { phase: "brief" } });
+
+      inputMock.mockReset();
+      const working = agentHarness({
+        rules: [{ ...rules(false)[1], match: "Your last turn was stopped" }],
+        env: { FAKE_CLAUDE_FALLBACK: "1" },
+      });
+      typing("/cancel");
+      await plan(root, working, "plan-1");
+      const [retried] = pmTurns(working);
+      expect(retried?.args).toContain("--resume");
+      // The kept message is in the Claude session's transcript, so the PM is asked to answer it.
+      expect(retried?.prompt).toMatch(/^Your last turn was stopped\. Answer my last message\./);
+      expect(working.output.out + working.output.err).toContain("PM › Here's the brief.");
+    },
+    SLOW,
+  );
+
+  it(
+    "TC-PLAN-086 (QA): a roadmap turn whose only proposal is invalid saves nothing, keeps the roadmap phase, and offers Retry",
+    async () => {
+      const root = emptyProject();
+      const invalid = { ...ROADMAP, milestones: [{ title: "Foundation", goal: "Shell", tasks: [{ key: "x" }] }] };
+      const harness = agentHarness({
+        rules: [
+          {
+            match: "The specs are written in",
+            message: "Here it is.",
+            tools: [{ name: "plan_propose", input: { proposal: invalid } }],
+            times: 1,
+          },
+          ...rules(false),
+        ],
+        env: { FAKE_CLAUDE_FALLBACK: "1" },
+      });
+      typing("A booking app for a clinic", "/approve");
+      selectMock.mockResolvedValueOnce("later");
+      await expect(plan(root, harness)).rejects.toThrow();
+      expect(selectMock.mock.calls.map((call) => (call[0] as { message: string }).message)).toEqual([ROADMAP_FAILED]);
+      expect(roadmapTitles(root)).toEqual([]);
+      expect(await onlySession(root)).toMatchObject({ status: "open", proposal: null, project: { phase: "roadmap" } });
+    },
+    SLOW,
+  );
+});
+
+describe("QA run 2 (DEF-1): retrying the first roadmap in the terminal", () => {
+  const roadmapFailedAsked = () => selectMock.mock.calls.map((call) => (call[0] as { message: string }).message);
+
+  it(
+    "FR-PLAN-053 (QA run 2): a roadmap turn stopped by the usage limit runs the PM again on the first Retry",
+    async () => {
+      const root = emptyProject();
+      const harness = agentHarness({
+        rules: [
+          {
+            match: "The specs are written in",
+            message: "You've hit your session limit. Resets at 5pm.",
+            exitCode: 1,
+            apiErrorStatus: 429,
+            times: 1,
+          },
+          ...rules(false),
+        ],
+        env: { FAKE_CLAUDE_FALLBACK: "1" },
+      });
+      typing("A booking app for a clinic", "/approve");
+      selectMock.mockResolvedValueOnce("retry");
+      await plan(root, harness);
+      const said = harness.output.out + harness.output.err;
+      expect(said).toContain("The PM stopped: Claude's usage limit is reached.");
+      expect(roadmapFailedAsked()).toEqual([ROADMAP_FAILED]);
+      expect(said).not.toContain("The PM ended without proposing the roadmap");
+      // The brief's turn, the stopped roadmap turn, and the retried one.
+      expect(pmTurns(harness).length).toBe(3);
+      expect(roadmapTitles(root)).toEqual(["First release"]);
+      expect(await onlySession(root)).toMatchObject({ status: "approved", project: { phase: "done" } });
+    },
+    SLOW,
+  );
+
+  it(
+    "FR-PLAN-058 (QA run 2): two stops for missing planning tools need two Retries, each running the PM",
+    async () => {
+      const root = emptyProject();
+      const harness = agentHarness({
+        rules: [
+          { match: "The specs are written in", mcpStatus: "failed", message: "I can't save it.", times: 2 },
+          ...rules(false),
+        ],
+        env: { FAKE_CLAUDE_FALLBACK: "1" },
+      });
+      typing("A booking app for a clinic", "/approve");
+      selectMock.mockResolvedValueOnce("retry").mockResolvedValueOnce("retry");
+      await plan(root, harness);
+      const said = harness.output.out + harness.output.err;
+      expect(roadmapFailedAsked()).toEqual([ROADMAP_FAILED, ROADMAP_FAILED]);
+      expect(said).not.toContain("The PM ended without proposing the roadmap");
+      expect(pmTurns(harness).length).toBe(4);
+      expect(roadmapTitles(root)).toEqual(["First release"]);
+      expect(await onlySession(root)).toMatchObject({ status: "approved", project: { phase: "done" } });
+    },
+    SLOW,
+  );
+
+  it(
+    "FR-PLAN-048 (QA run 2, DEF-3): a stop for missing planning tools, then 'later'; resuming saves the PM's roadmap with nothing asked",
+    async () => {
+      const root = emptyProject();
+      const stopped = agentHarness({
+        rules: [
+          { match: "The specs are written in", mcpStatus: "failed", message: "I can't save it.", times: 1 },
+          ...rules(false),
+        ],
+        env: { FAKE_CLAUDE_FALLBACK: "1" },
+      });
+      typing("A booking app for a clinic", "/approve");
+      selectMock.mockResolvedValueOnce("later");
+      await expect(plan(root, stopped)).rejects.toThrow();
+      expect(await onlySession(root)).toMatchObject({
+        status: "open",
+        proposal: null,
+        project: { phase: "roadmap", isRoadmapAsked: false },
+      });
+      expect(roadmapTitles(root)).toEqual([]);
+
+      selectMock.mockReset();
+      inputMock.mockReset();
+      const resumed = agentHarness({ rules: rules(false), env: { FAKE_CLAUDE_FALLBACK: "1" } });
+      // No message is typed: resuming must finish the setup by itself (FR-PLAN-048, FR-PLAN-061).
+      pressCtrlC();
+      await plan(root, resumed, "plan-1").catch(() => undefined);
+      expect(inputMock).not.toHaveBeenCalled();
+      expect(roadmapFailedAsked()).toEqual([]);
+      expect(pmTurns(resumed).length).toBeGreaterThanOrEqual(1);
+      expect(roadmapTitles(root)).toEqual(["First release"]);
+      expect(await onlySession(root)).toMatchObject({ status: "approved", project: { phase: "done" } });
+    },
+    SLOW,
+  );
+
+  it(
+    "FR-PLAN-048 (QA run 2): a roadmap turn stopped by the usage limit, then 'later'; resuming saves the roadmap with nothing asked",
+    async () => {
+      const root = emptyProject();
+      const stopped = agentHarness({
+        rules: [
+          {
+            match: "The specs are written in",
+            message: "You've hit your session limit. Resets at 5pm.",
+            exitCode: 1,
+            apiErrorStatus: 429,
+            times: 1,
+          },
+          ...rules(false),
+        ],
+        env: { FAKE_CLAUDE_FALLBACK: "1" },
+      });
+      typing("A booking app for a clinic", "/approve");
+      selectMock.mockResolvedValueOnce("later");
+      await expect(plan(root, stopped)).rejects.toThrow();
+      expect(await onlySession(root)).toMatchObject({ status: "open", proposal: null, project: { phase: "roadmap" } });
+
+      selectMock.mockReset();
+      inputMock.mockReset();
+      const resumed = agentHarness({ rules: rules(false), env: { FAKE_CLAUDE_FALLBACK: "1" } });
+      // No message is typed: resuming must finish the setup by itself (FR-PLAN-048, FR-PLAN-061).
+      pressCtrlC();
+      await plan(root, resumed, "plan-1").catch(() => undefined);
+      expect(inputMock).not.toHaveBeenCalled();
+      expect(roadmapFailedAsked()).toEqual([]);
+      expect(roadmapTitles(root)).toEqual(["First release"]);
+      expect(await onlySession(root)).toMatchObject({ status: "approved", project: { phase: "done" } });
+    },
+    SLOW,
+  );
 });

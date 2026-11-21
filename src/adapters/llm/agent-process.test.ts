@@ -29,6 +29,22 @@ describe("agent process arguments", () => {
       expect(between(args, "--tools", "--allowedTools")).not.toContain(tool);
   });
 
+  it("TC-PLAN-007: with a planning server, no safe mode, which would turn the server off, and no settings are loaded", () => {
+    const mcpConfig = { mcpServers: { luseen: { command: "node", args: ["luseen", "mcp", "--plan", "plan-1"] } } };
+    const args = buildAgentArgs({
+      model: "haiku",
+      effort: "low",
+      tools: READ_ONLY_TOOLS,
+      allowedTools: READ_ONLY_TOOLS,
+      deniedTools: AGENT_DENIED_TOOLS,
+      mcpConfig,
+    });
+    expect(args).not.toContain("--safe-mode");
+    expect(args[args.indexOf("--setting-sources") + 1]).toBe("");
+    expect(args[args.indexOf("--mcp-config") + 1]).toBe(JSON.stringify(mcpConfig));
+    expect(args).toContain("--strict-mcp-config");
+  });
+
   it("TC-AUTO-021: with a session ID, the session is kept under that ID", () => {
     const args = buildAgentArgs({
       model: "haiku",

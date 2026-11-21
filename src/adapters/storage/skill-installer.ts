@@ -11,10 +11,12 @@ import {
   renderAgentsBlock,
   renderClaudeBlock,
   renderDesignerAgent,
+  renderPmAgent,
   renderSkill,
   type SkillSource,
 } from "../../core/agent-skills.js";
 import { CLAUDE_AGENTS_FOLDER, DESIGNER_AGENT_NAME } from "../../core/constants/design.js";
+import { PM_AGENT_NAME } from "../../core/constants/plugin.js";
 import { AGENTS_FILE, CLAUDE_FILE, LEGACY_NAME, SKILL_FILE, SKILL_FOLDERS } from "../../core/constants/paths.js";
 import { CLAUDE_SETTINGS_FILE, CODEX_MCP_CONFIG, MCP_CONFIG_FILE } from "../../core/constants/workflow.js";
 import { holdsLegacyEntry, mergeClaudeSettings, mergeMcpConfig, type McpConfigMerge } from "../../core/mcp-config.js";
@@ -166,12 +168,14 @@ export async function installSkills(options: InstallOptions): Promise<readonly S
       entries.push({ path: relative, status });
     }
   }
-  const designerAgent = `${CLAUDE_AGENTS_FOLDER}/${DESIGNER_AGENT_NAME}.md`;
-  if (skillSource === "project" && isIncluded(designerAgent))
-    entries.push({
-      path: designerAgent,
-      status: await installSkillFile(path.join(target, designerAgent), renderDesignerAgent(docsPath, sha256), isForced),
-    });
+  // FR-PLAN-052: the PM and the designer, as Claude Code agents of the project.
+  const agents = [
+    [`${CLAUDE_AGENTS_FOLDER}/${PM_AGENT_NAME}.md`, renderPmAgent(docsPath, sha256)],
+    [`${CLAUDE_AGENTS_FOLDER}/${DESIGNER_AGENT_NAME}.md`, renderDesignerAgent(docsPath, sha256)],
+  ] as const;
+  for (const [relative, content] of agents)
+    if (skillSource === "project" && isIncluded(relative))
+      entries.push({ path: relative, status: await installSkillFile(path.join(target, relative), content, isForced) });
   for (const [relative, section] of instructions)
     if (isIncluded(relative))
       entries.push({ path: relative, status: await installInstructionFile(path.join(target, relative), section) });

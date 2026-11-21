@@ -436,7 +436,7 @@ describe("product engineer and tasks", () => {
       "Never run `luseen tasks roadmap add`, `luseen tasks milestone add` or `luseen tasks add`",
     );
     expect(planner).toContain(
-      "Propose with `plan_propose`; luseen checks it, asks the user, and saves it only after they approve.",
+      "Propose with `plan_propose`; luseen checks it, asks the user, and saves it only after they approve (a new project's first roadmap is approved with its brief).",
     );
     expect(planner).toContain("first call the luseen MCP tool `plan_begin`");
     expect(planner).toContain("call `plan_resume` with that ID before anything else");

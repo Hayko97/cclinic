@@ -60,6 +60,8 @@ export const PLAN_ID_SOURCE = "plan-[1-9]\\d{0,8}";
 export const PLAN_ID_PATTERN = new RegExp(`^${PLAN_ID_SOURCE}$`);
 /** FR-PLAN-005, FR-MCP-046: the planning tools a PM turn luseen drives may call. */
 export const PLAN_DRIVEN_TOOL_NAMES = ["plan_status", "plan_suggest", "plan_propose"] as const;
+/** FR-PLAN-058: the planning tools every PM turn luseen drives can't go without. */
+export const PLAN_TURN_TOOL_NAMES = ["plan_suggest", "plan_propose"] as const;
 /** FR-MCP-048: offered only to a new-project session. */
 export const BRIEF_TOOL_NAME = "brief_propose";
 

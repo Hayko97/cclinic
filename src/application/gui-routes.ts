@@ -358,10 +358,12 @@ export function createGuiHandler(ports: GuiPorts): (request: GuiRequest) => Prom
       case "plan-design": {
         const parsed = planDesignSchema.safeParse(await request.readBody());
         if (!parsed.success) return json(HTTP_STATUS.badRequest, { error: firstMessage(parsed.error.issues) });
-        const { planId, isApproved } = parsed.data;
         return refusedAsConflict(async () => ({
           status: HTTP_STATUS.ok,
-          data: { message: await ports.planner.finishDesign(planId, isApproved), plan: await ports.planner.view() },
+          data: {
+            message: await ports.planner.continueWithoutDesign(parsed.data.planId),
+            plan: await ports.planner.view(),
+          },
         }));
       }
       case "style-guide": {

@@ -35,7 +35,7 @@ flowchart LR
     A[1. Write<br/>README.md] --> B[2. luseen<br/>specs] --> C[3. luseen plan<br/>chat with PM] --> D[4. Agent builds<br/>task by task] --> E[5. luseen auto<br/>builds the rest]
 ```
 
-> **Starting from an empty folder?** Run `luseen` (or `luseen gui` and **Start a new project**). The PM interviews you, reads the documents you attach, and writes the brief as `README.md` once you approve it. luseen then writes the specs, sets up your coding agents and has the PM propose the first roadmap, plus a draft design system when the project has screens. Prefer to write the brief yourself? Follow the steps below.
+> **Starting from an empty folder?** Run `luseen` (or `luseen gui` and **Start a new project**). The PM interviews you, reads the documents you attach, and writes the brief as `README.md`. Approving the brief is the only click: luseen then writes the specs, sets up your coding agents, saves the first roadmap the PM proposes, and makes the design system when the project has screens, all in the same chat. Prefer to write the brief yourself? Follow the steps below.
 
 ### 1. Create the folder and describe the idea
 
